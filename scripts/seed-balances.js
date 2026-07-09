@@ -62,7 +62,7 @@ async function run() {
 
     const testUsers = [
       {
-        employee_id: 'c4e23da9-2993-4380-b459-720e14ca53cc',
+        employee_id: '87327813-ad8a-4127-a9b3-4ede219ecef7',
         employee_name: 'Alice Martin',
         employee_email: 'employee@entreprise.com',
         initial_balance: '25.0',
@@ -70,7 +70,7 @@ async function run() {
         remaining_balance: '25.0'
       },
       {
-        employee_id: '839fef5c-25ee-498a-97a2-da6733432531',
+        employee_id: 'e7b63926-98ab-4f4d-b643-258de48438df',
         employee_name: 'Bob Dupont',
         employee_email: 'hr@entreprise.com',
         initial_balance: '25.0',
