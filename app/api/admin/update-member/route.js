@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
+import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr'
@@ -30,7 +31,7 @@ export async function POST(req) {
       const rows = await balancesSheet.getRows();
 
       const balanceRow = rows.find(
-        (row) => row.get('employee_id') === employee_id
+        (row) => row.get(LeaveBalancesColumns.employee_id) === employee_id
       );
 
       if (!balanceRow) {
@@ -42,8 +43,8 @@ export async function POST(req) {
 
       // Check if the updated email conflicts with another user
       const emailConflict = rows.some(
-        (row) => row.get('employee_id') !== employee_id && 
-                 row.get('employee_email')?.toLowerCase() === email.toLowerCase()
+        (row) => row.get(LeaveBalancesColumns.employee_id) !== employee_id && 
+                 row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === email.toLowerCase()
       );
 
       if (emailConflict) {
@@ -53,20 +54,20 @@ export async function POST(req) {
         };
       }
 
-      const currentTakenCP = parseFloat(balanceRow.get('taken_days') || 0);
-      const currentTakenPerm = parseFloat(balanceRow.get('taken_perm') || 0);
+      const currentTakenCP = parseFloat(balanceRow.get(LeaveBalancesColumns.taken_days) || 0);
+      const currentTakenPerm = parseFloat(balanceRow.get(LeaveBalancesColumns.taken_perm) || 0);
 
       const newRemainingCP = initialCP - currentTakenCP;
       const newRemainingPerm = initialPermissions - currentTakenPerm;
 
-      // Update values
-      balanceRow.set('employee_name', name);
-      balanceRow.set('employee_email', email.toLowerCase());
-      balanceRow.set('manager_name', manager_name || 'Aucun');
-      balanceRow.set('initial_balance', initialCP.toString());
-      balanceRow.set('remaining_balance', newRemainingCP.toString());
-      balanceRow.set('initial_perm', initialPermissions.toString());
-      balanceRow.set('remaining_perm', newRemainingPerm.toString());
+      // Update values using translated columns
+      balanceRow.set(LeaveBalancesColumns.employee_name, name);
+      balanceRow.set(LeaveBalancesColumns.employee_email, email.toLowerCase());
+      balanceRow.set(LeaveBalancesColumns.manager_name, manager_name || 'Aucun');
+      balanceRow.set(LeaveBalancesColumns.initial_balance, initialCP.toString());
+      balanceRow.set(LeaveBalancesColumns.remaining_balance, newRemainingCP.toString());
+      balanceRow.set(LeaveBalancesColumns.initial_perm, initialPermissions.toString());
+      balanceRow.set(LeaveBalancesColumns.remaining_perm, newRemainingPerm.toString());
 
       await balanceRow.save();
 

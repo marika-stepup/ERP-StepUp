@@ -23,8 +23,8 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        setError(authError.message === 'Invalid login credentials' 
-          ? 'Identifiants de connexion invalides. Veuillez réessayer.' 
+        setError(authError.message === 'Invalid login credentials'
+          ? 'Identifiants de connexion invalides. Veuillez réessayer.'
           : authError.message
         );
       } else {
@@ -50,12 +50,12 @@ export default function LoginPage() {
   return (
     <div className="login-wrapper">
       <div className="login-card">
-        <img 
-          src="/Logo Step Up.png" 
-          alt="Step Up Logo" 
-          className="login-logo-img" 
+        <img
+          src="/Logo Step Up.png"
+          alt="Step Up Logo"
+          className="login-logo-img"
         />
-        
+
         <h1>Step Hub</h1>
         <p>Portail interne de l'agence. Connectez-vous pour accéder à votre espace de gestion des congés.</p>
 
@@ -71,7 +71,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="collaborateur@stepupdigital.net"
+              placeholder="votre@mail.pro"
               disabled={loading || success}
             />
           </div>

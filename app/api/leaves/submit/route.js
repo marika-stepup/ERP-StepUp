@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
 import { calculateBusinessDays, generateUUID } from '../../../../lib/utils';
+import { LeaveBalancesColumns, LeaveRequestsColumns } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
-  // 1. Authenticate and verify role 'employee'
-  const auth = await verifyRole(req, ['employee']);
+  // 1. Authenticate and verify role 'employee' (which includes HR users acting as employees)
+  const auth = await verifyRole(req, ['employee', 'hr']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -45,21 +46,28 @@ export async function POST(req) {
       const balanceRows = await balancesSheet.getRows();
 
       const employeeBalanceRow = balanceRows.find(
-        (row) => row.get('employee_id') === employee.id
+        (row) => row.get(LeaveBalancesColumns.employee_id) === employee.id ||
+                 row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === employee.email.toLowerCase()
       );
 
       if (!employeeBalanceRow) {
         return {
-          error: `No leave balance record found for employee ID: ${employee.id}. Please contact HR.`,
+          error: `No leave balance record found for employee: ${employee.email}. Please contact HR.`,
           status: 404
         };
       }
 
-      const remainingBalance = parseFloat(employeeBalanceRow.get('remaining_balance') || 0);
+      // Check balance depending on leave type (Permission vs normal CP/RTT)
+      const isPermission = leave_type.toLowerCase().includes('perm');
+      const balanceField = isPermission 
+        ? LeaveBalancesColumns.remaining_perm 
+        : LeaveBalancesColumns.remaining_balance;
+      
+      const remainingBalance = parseFloat(employeeBalanceRow.get(balanceField) || 0);
 
       if (remainingBalance < businessDays) {
         return {
-          error: `Insufficient leave balance. Requested: ${businessDays} days, Available: ${remainingBalance} days.`,
+          error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingBalance} j.`,
           status: 400
         };
       }
@@ -70,17 +78,17 @@ export async function POST(req) {
       const nowStr = new Date().toISOString();
 
       await requestsSheet.addRow({
-        request_id: requestId,
-        employee_id: employee.id,
-        employee_name: employee.name,
-        start_date: start_date,
-        end_date: end_date,
-        business_days: businessDays.toString(),
-        leave_type: leave_type,
-        status: 'Pending',
-        created_at: nowStr,
-        updated_at: nowStr,
-        hr_comment: ''
+        [LeaveRequestsColumns.request_id]: requestId,
+        [LeaveRequestsColumns.employee_id]: employee.id,
+        [LeaveRequestsColumns.employee_name]: employeeBalanceRow.get(LeaveBalancesColumns.employee_name) || employee.name || 'Utilisateur',
+        [LeaveRequestsColumns.start_date]: start_date,
+        [LeaveRequestsColumns.end_date]: end_date,
+        [LeaveRequestsColumns.business_days]: businessDays.toString(),
+        [LeaveRequestsColumns.leave_type]: leave_type,
+        [LeaveRequestsColumns.status]: 'Pending',
+        [LeaveRequestsColumns.created_at]: nowStr,
+        [LeaveRequestsColumns.updated_at]: nowStr,
+        [LeaveRequestsColumns.hr_comment]: ''
       });
 
       return {
@@ -88,7 +96,7 @@ export async function POST(req) {
         data: {
           request_id: requestId,
           employee_id: employee.id,
-          employee_name: employee.name,
+          employee_name: employeeBalanceRow.get(LeaveBalancesColumns.employee_name) || employee.name,
           start_date,
           end_date,
           business_days: businessDays,

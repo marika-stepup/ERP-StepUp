@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
+import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr'
@@ -43,7 +44,8 @@ export async function POST(req) {
       const rows = await balancesSheet.getRows();
 
       const balanceRow = rows.find(
-        (row) => row.get('employee_id') === employee_id || row.get('employee_email')?.toLowerCase() === employee_id.toLowerCase()
+        (row) => row.get(LeaveBalancesColumns.employee_id) === employee_id || 
+                 row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === employee_id.toLowerCase()
       );
 
       if (!balanceRow) {
@@ -54,36 +56,36 @@ export async function POST(req) {
       }
 
       if (normalizedType === 'cp') {
-        const currentTaken = parseFloat(balanceRow.get('taken_days') || 0);
+        const currentTaken = parseFloat(balanceRow.get(LeaveBalancesColumns.taken_days) || 0);
         const newRemaining = numericValue - currentTaken;
 
-        balanceRow.set('initial_balance', numericValue.toString());
-        balanceRow.set('remaining_balance', newRemaining.toString());
+        balanceRow.set(LeaveBalancesColumns.initial_balance, numericValue.toString());
+        balanceRow.set(LeaveBalancesColumns.remaining_balance, newRemaining.toString());
         await balanceRow.save();
 
         return {
           success: true,
           data: {
-            employee_id: balanceRow.get('employee_id'),
-            employee_name: balanceRow.get('employee_name'),
+            employee_id: balanceRow.get(LeaveBalancesColumns.employee_id),
+            employee_name: balanceRow.get(LeaveBalancesColumns.employee_name),
             type: 'cp',
             initial_balance: numericValue,
             remaining_balance: newRemaining
           }
         };
       } else {
-        const currentTaken = parseFloat(balanceRow.get('taken_perm') || 0);
+        const currentTaken = parseFloat(balanceRow.get(LeaveBalancesColumns.taken_perm) || 0);
         const newRemaining = numericValue - currentTaken;
 
-        balanceRow.set('initial_perm', numericValue.toString());
-        balanceRow.set('remaining_perm', newRemaining.toString());
+        balanceRow.set(LeaveBalancesColumns.initial_perm, numericValue.toString());
+        balanceRow.set(LeaveBalancesColumns.remaining_perm, newRemaining.toString());
         await balanceRow.save();
 
         return {
           success: true,
           data: {
-            employee_id: balanceRow.get('employee_id'),
-            employee_name: balanceRow.get('employee_name'),
+            employee_id: balanceRow.get(LeaveBalancesColumns.employee_id),
+            employee_name: balanceRow.get(LeaveBalancesColumns.employee_name),
             type: 'perm',
             initial_perm: numericValue,
             remaining_perm: newRemaining

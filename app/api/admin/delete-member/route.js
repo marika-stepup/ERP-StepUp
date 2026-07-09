@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
+import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr'
@@ -27,7 +28,7 @@ export async function POST(req) {
       const rows = await balancesSheet.getRows();
 
       const balanceRow = rows.find(
-        (row) => row.get('employee_id') === employee_id
+        (row) => row.get(LeaveBalancesColumns.employee_id) === employee_id
       );
 
       if (!balanceRow) {
@@ -37,7 +38,7 @@ export async function POST(req) {
         };
       }
 
-      const employeeName = balanceRow.get('employee_name');
+      const employeeName = balanceRow.get(LeaveBalancesColumns.employee_name);
       
       // Delete the row from the Google Sheet
       await balanceRow.delete();

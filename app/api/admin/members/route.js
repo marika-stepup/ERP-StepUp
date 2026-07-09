@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet } from '../../../../lib/googleSheets';
+import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
   // 1. Authenticate user as 'hr'
@@ -16,18 +17,18 @@ export async function GET(req) {
 
     // 3. Map sheet rows to JSON response
     const members = rows.map((row) => ({
-      employee_id: row.get('employee_id'),
-      employee_name: row.get('employee_name'),
-      employee_email: row.get('employee_email'),
-      initial_balance: parseFloat(row.get('initial_balance') || 0),
-      taken_days: parseFloat(row.get('taken_days') || 0),
-      remaining_balance: parseFloat(row.get('remaining_balance') || 0),
+      employee_id: row.get(LeaveBalancesColumns.employee_id),
+      employee_name: row.get(LeaveBalancesColumns.employee_name),
+      employee_email: row.get(LeaveBalancesColumns.employee_email),
+      initial_balance: parseFloat(row.get(LeaveBalancesColumns.initial_balance) || 0),
+      taken_days: parseFloat(row.get(LeaveBalancesColumns.taken_days) || 0),
+      remaining_balance: parseFloat(row.get(LeaveBalancesColumns.remaining_balance) || 0),
       // Permissions support
-      initial_perm: parseFloat(row.get('initial_perm') || 0),
-      taken_perm: parseFloat(row.get('taken_perm') || 0),
-      remaining_perm: parseFloat(row.get('remaining_perm') || 0),
+      initial_perm: parseFloat(row.get(LeaveBalancesColumns.initial_perm) || 0),
+      taken_perm: parseFloat(row.get(LeaveBalancesColumns.taken_perm) || 0),
+      remaining_perm: parseFloat(row.get(LeaveBalancesColumns.remaining_perm) || 0),
       // Hierarchy manager
-      manager_name: row.get('manager_name') || 'Aucun'
+      manager_name: row.get(LeaveBalancesColumns.manager_name) || 'Aucun'
     }));
 
     return NextResponse.json({

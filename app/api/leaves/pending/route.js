@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet } from '../../../../lib/googleSheets';
+import { LeaveRequestsColumns } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
   // 1. Authenticate and verify role 'hr'
@@ -16,19 +17,19 @@ export async function GET(req) {
 
     // 3. Filter rows with status "Pending"
     const pendingRequests = rows
-      .filter((row) => row.get('status') === 'Pending')
+      .filter((row) => row.get(LeaveRequestsColumns.status) === 'Pending')
       .map((row) => ({
-        request_id: row.get('request_id'),
-        employee_id: row.get('employee_id'),
-        employee_name: row.get('employee_name'),
-        start_date: row.get('start_date'),
-        end_date: row.get('end_date'),
-        business_days: parseFloat(row.get('business_days') || 0),
-        leave_type: row.get('leave_type'),
-        status: row.get('status'),
-        created_at: row.get('created_at'),
-        updated_at: row.get('updated_at'),
-        hr_comment: row.get('hr_comment')
+        request_id: row.get(LeaveRequestsColumns.request_id),
+        employee_id: row.get(LeaveRequestsColumns.employee_id),
+        employee_name: row.get(LeaveRequestsColumns.employee_name),
+        start_date: row.get(LeaveRequestsColumns.start_date),
+        end_date: row.get(LeaveRequestsColumns.end_date),
+        business_days: parseFloat(row.get(LeaveRequestsColumns.business_days) || 0),
+        leave_type: row.get(LeaveRequestsColumns.leave_type),
+        status: row.get(LeaveRequestsColumns.status),
+        created_at: row.get(LeaveRequestsColumns.created_at),
+        updated_at: row.get(LeaveRequestsColumns.updated_at),
+        hr_comment: row.get(LeaveRequestsColumns.hr_comment)
       }));
 
     return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex, withRetry } from '../../../../lib/googleSheets';
+import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr'
@@ -19,14 +20,14 @@ export async function POST(req) {
 
       // Loop and update each row
       for (const row of rows) {
-        const currentInitial = parseFloat(row.get('initial_balance') || 0);
-        const currentTaken = parseFloat(row.get('taken_days') || 0);
+        const currentInitial = parseFloat(row.get(LeaveBalancesColumns.initial_balance) || 0);
+        const currentTaken = parseFloat(row.get(LeaveBalancesColumns.taken_days) || 0);
         
         const newInitial = currentInitial + 2.5;
         const newRemaining = newInitial - currentTaken;
 
-        row.set('initial_balance', newInitial.toString());
-        row.set('remaining_balance', newRemaining.toString());
+        row.set(LeaveBalancesColumns.initial_balance, newInitial.toString());
+        row.set(LeaveBalancesColumns.remaining_balance, newRemaining.toString());
 
         // Save with retry
         await withRetry(() => row.save());

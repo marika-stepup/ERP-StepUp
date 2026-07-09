@@ -33,7 +33,7 @@ export default function Page() {
   const [submitting, setSubmitting] = useState(false);
 
   // Form States (Add/Edit Member)
-  const [editingMember, setEditingMember] = useState(null); // When set, we are in Edit Mode
+  const [editingMember, setEditingMember] = useState(null); // When set, we are in Edit Modal
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('employee');
@@ -49,6 +49,27 @@ export default function Page() {
   const [hrError, setHrError] = useState(null);
   const [hrSuccess, setHrSuccess] = useState(null);
   const [adjustingId, setAdjustingId] = useState(null);
+
+  // Custom Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null
+  });
+
+  // Helper to trigger custom confirm modal
+  const triggerConfirm = (title, message, onConfirm) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
 
   // 1. Initial Session Check
   useEffect(() => {
@@ -222,7 +243,7 @@ export default function Page() {
     }
   };
 
-  // 5. Start Edit Mode for a Member
+  // 5. Start Edit Mode for a Member (Opens Modal)
   const startEditMember = (m) => {
     setEditingMember(m);
     setNewMemberName(m.employee_name);
@@ -289,31 +310,35 @@ export default function Page() {
 
   // 8. Delete Member (HR Admin)
   const handleDeleteMember = async (employeeId) => {
-    if (!confirm('Voulez-vous vraiment supprimer ce membre ainsi que tous ses soldes ? Cette action est irréversible.')) return;
-    
-    setHrError(null);
-    setHrSuccess(null);
+    triggerConfirm(
+      'Supprimer ce membre',
+      'Voulez-vous vraiment supprimer ce membre ainsi que tous ses soldes ? Cette action est irréversible.',
+      async () => {
+        setHrError(null);
+        setHrSuccess(null);
 
-    try {
-      const res = await fetch('/api/admin/delete-member', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ employee_id: employeeId })
-      });
+        try {
+          const res = await fetch('/api/admin/delete-member', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ employee_id: employeeId })
+          });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setHrError(data.error || 'Erreur lors de la suppression.');
-      } else {
-        setHrSuccess(data.message);
-        fetchDashboardData();
+          const data = await res.json();
+          if (!res.ok) {
+            setHrError(data.error || 'Erreur lors de la suppression.');
+          } else {
+            setHrSuccess(data.message);
+            fetchDashboardData();
+          }
+        } catch (err) {
+          setHrError('Une erreur réseau est survenue.');
+        }
       }
-    } catch (err) {
-      setHrError('Une erreur réseau est survenue.');
-    }
+    );
   };
 
   // 9. Adjust Balance Quick Input (HR Admin Table)
@@ -352,63 +377,75 @@ export default function Page() {
 
   // 10. Credit +2.5j CP to all members
   const handleCreditAll = async () => {
-    if (!confirm('Voulez-vous vraiment créditer de +2.5j de CP TOUS les collaborateurs du système ?')) return;
-    setHrError(null);
-    setHrSuccess(null);
+    triggerConfirm(
+      'Créditer les collaborateurs',
+      'Voulez-vous vraiment créditer de +2.5j de CP TOUS les collaborateurs du système ?',
+      async () => {
+        setHrError(null);
+        setHrSuccess(null);
 
-    try {
-      const res = await fetch('/api/admin/credit-all', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        try {
+          const res = await fetch('/api/admin/credit-all', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+          });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setHrError(data.error || 'Erreur lors du crédit global.');
-      } else {
-        setHrSuccess(data.message);
-        fetchDashboardData();
+          const data = await res.json();
+          if (!res.ok) {
+            setHrError(data.error || 'Erreur lors du crédit global.');
+          } else {
+            setHrSuccess(data.message);
+            fetchDashboardData();
+          }
+        } catch (err) {
+          setHrError('Une erreur réseau est survenue.');
+        }
       }
-    } catch (err) {
-      setHrError('Une erreur réseau est survenue.');
-    }
+    );
   };
 
   // 11. Approve/Reject Leave Request
   const handleValidateLeave = async (requestId, action) => {
-    setHrError(null);
-    setHrSuccess(null);
-    const comment = hrComments[requestId] || '';
+    const actionLabel = action === 'Approuver' ? 'accepter' : 'refuser';
+    triggerConfirm(
+      `${action} la demande`,
+      `Voulez-vous vraiment ${actionLabel} cette demande de congé ?`,
+      async () => {
+        setHrError(null);
+        setHrSuccess(null);
+        const comment = hrComments[requestId] || '';
 
-    try {
-      const res = await fetch('/api/leaves/validate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          request_id: requestId,
-          action: action,
-          hr_comment: comment
-        })
-      });
+        try {
+          const res = await fetch('/api/leaves/validate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              request_id: requestId,
+              action: action,
+              hr_comment: comment
+            })
+          });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setHrError(data.error || 'Erreur lors de la validation.');
-      } else {
-        setHrSuccess(`La demande a été ${action === 'Approuver' ? 'approuvée' : 'refusée'} avec succès.`);
-        setHrComments(prev => {
-          const updated = { ...prev };
-          delete updated[requestId];
-          return updated;
-        });
-        fetchDashboardData();
+          const data = await res.json();
+          if (!res.ok) {
+            setHrError(data.error || 'Erreur lors de la validation.');
+          } else {
+            setHrSuccess(`La demande a été ${action === 'Approuver' ? 'approuvée' : 'refusée'} avec succès.`);
+            setHrComments(prev => {
+              const updated = { ...prev };
+              delete updated[requestId];
+              return updated;
+            });
+            fetchDashboardData();
+          }
+        } catch (err) {
+          setHrError('Une erreur réseau est survenue.');
+        }
       }
-    } catch (err) {
-      setHrError('Une erreur réseau est survenue.');
-    }
+    );
   };
 
   const handleLogout = async () => {
@@ -436,7 +473,7 @@ export default function Page() {
         </div>
         <div className="session-badge">
           <span>Connecté en tant que : <strong>{user?.email}</strong></span>
-          <span className="badge-role" className={`badge-role ${userRole === 'hr' ? 'hr' : 'employee'}`} style={{ marginLeft: '0.5rem' }}>
+          <span className={`badge-role ${userRole === 'hr' ? 'hr' : 'employee'}`} style={{ marginLeft: '0.5rem' }}>
             {userRole === 'hr' ? 'RH' : 'Salarié'}
           </span>
           <button onClick={handleLogout} className="logout-btn-header" style={{ marginLeft: '1rem' }}>
@@ -452,20 +489,20 @@ export default function Page() {
             className={`tab-button ${activeTab === 'mySpace' ? 'active' : ''}`}
             onClick={() => setActiveTab('mySpace')}
           >
-            Mon Espace
+            Mon espace
           </button>
           <button 
             className={`tab-button ${activeTab === 'globalDashboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('globalDashboard')}
           >
-            📊 Tableau de Bord Global
+            Tableau de bord global
           </button>
           {userRole === 'hr' && (
             <button 
               className={`tab-button ${activeTab === 'adminRH' ? 'active' : ''}`}
               onClick={() => setActiveTab('adminRH')}
             >
-              💼 Administration RH
+              Administration RH
             </button>
           )}
         </div>
@@ -478,10 +515,10 @@ export default function Page() {
             {/* Sidebar with Balance & Request Form */}
             <div className="sidebar">
               <div className="panel">
-                <h2 className="panel-title">📋 Mes Soldes Restants</h2>
+                <h2 className="panel-title">📋 Mes soldes restants</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div className="balance-card-mini cp">
-                    <span className="balance-card-title">Congés Payés</span>
+                    <span className="balance-card-title">Congés payés</span>
                     <span className="balance-card-value">
                       {balance.remaining_balance} <span>jours</span>
                     </span>
@@ -789,17 +826,15 @@ export default function Page() {
 
             {/* Split creation form & adjustment table */}
             <div className="split-layout">
-              {/* Add/Edit user form */}
+              {/* Add user form */}
               <div className="sidebar" style={{ width: '350px' }}>
                 <div className="panel">
-                  <h2 className="panel-title">
-                    {editingMember ? '📝 Modifier le Membre' : '👤 Ajouter un Membre'}
-                  </h2>
+                  <h2 className="panel-title">👤 Ajouter un Membre</h2>
                   
                   {memberError && <div className="error-message">{memberError}</div>}
                   {memberSuccess && <div className="success-message">Données enregistrées avec succès.</div>}
 
-                  <form onSubmit={editingMember ? handleUpdateMember : handleCreateMember} style={{ padding: 0, border: 'none', background: 'none' }}>
+                  <form onSubmit={handleCreateMember} style={{ padding: 0, border: 'none', background: 'none' }}>
                     <div className="form-group">
                       <label>Nom Complet</label>
                       <input
@@ -824,21 +859,19 @@ export default function Page() {
                       />
                     </div>
 
-                    {!editingMember && (
-                      <div className="form-group">
-                        <label>Rôle dans le système</label>
-                        <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)}>
-                          <option value="employee">Collaborateur</option>
-                          <option value="hr">Administrateur RH</option>
-                        </select>
-                      </div>
-                    )}
+                    <div className="form-group">
+                      <label>Rôle dans le système</label>
+                      <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)}>
+                        <option value="employee">Collaborateur</option>
+                        <option value="hr">Administrateur RH</option>
+                      </select>
+                    </div>
 
                     <div className="form-group">
                       <label>Responsable Hiérarchique N+1</label>
                       <select value={newMemberManager} onChange={(e) => setNewMemberManager(e.target.value)}>
                         <option value="Aucun">Aucun (Directeur / RH)</option>
-                        {allMembers.filter(m => m.employee_id !== editingMember?.employee_id).map(m => (
+                        {allMembers.map(m => (
                           <option key={m.employee_id} value={m.employee_name}>{m.employee_name}</option>
                         ))}
                       </select>
@@ -865,16 +898,9 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <button type="submit" className="btn-accent" style={{ flexGrow: 1 }} disabled={memberLoading}>
-                        {memberLoading ? 'Enregistrement...' : editingMember ? 'Sauvegarder' : 'Enregistrer'}
-                      </button>
-                      {editingMember && (
-                        <button type="button" className="btn-secondary" onClick={cancelEditMember} disabled={memberLoading}>
-                          Annuler
-                        </button>
-                      )}
-                    </div>
+                    <button type="submit" className="btn-accent" disabled={memberLoading}>
+                      {memberLoading ? 'Enregistrement...' : 'Enregistrer'}
+                    </button>
                   </form>
                 </div>
               </div>
@@ -963,18 +989,117 @@ export default function Page() {
 
           </div>
         )}
-
-        {/* Global Footer Controls */}
-        <div style={{ marginTop: '2rem', textAlign: 'center', width: '100%' }}>
-          <button 
-            onClick={handleLogout} 
-            className="btn-secondary"
-            style={{ width: '200px', display: 'inline-flex' }}
-          >
-            Se déconnecter de la session
-          </button>
-        </div>
       </div>
+
+      {/* ==================================================== */}
+      {/* 4. MODAL: EDIT MEMBER POPUP                         */}
+      {/* ==================================================== */}
+      {editingMember && (
+        <div className="modal-backdrop">
+          <div className="modal-content">
+            <h2 className="modal-title">📝 Modifier le Membre</h2>
+            <p className="modal-message" style={{ marginBottom: '1.25rem' }}>
+              Mettez à jour les informations et soldes initiaux pour <strong>{editingMember.employee_name}</strong>.
+            </p>
+
+            {memberError && <div className="error-message">{memberError}</div>}
+
+            <form onSubmit={handleUpdateMember} style={{ padding: 0, border: 'none', background: 'none', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label>Nom Complet</label>
+                <input
+                  type="text"
+                  placeholder="Jean Dupont"
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  required
+                  disabled={memberLoading}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Adresse Email</label>
+                <input
+                  type="email"
+                  placeholder="jean.dupont@entreprise.com"
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  required
+                  disabled={memberLoading}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Responsable Hiérarchique N+1</label>
+                <select value={newMemberManager} onChange={(e) => setNewMemberManager(e.target.value)} disabled={memberLoading}>
+                  <option value="Aucun">Aucun (Directeur / RH)</option>
+                  {allMembers.filter(m => m.employee_id !== editingMember?.employee_id).map(m => (
+                    <option key={m.employee_id} value={m.employee_name}>{m.employee_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Solde Initial CP</label>
+                  <input
+                    type="number"
+                    value={newMemberCP}
+                    onChange={(e) => setNewMemberCP(e.target.value)}
+                    disabled={memberLoading}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Solde Initial Perm.</label>
+                  <input
+                    type="number"
+                    value={newMemberPerm}
+                    onChange={(e) => setNewMemberPerm(e.target.value)}
+                    disabled={memberLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="submit" className="btn-accent" style={{ minWidth: '110px' }} disabled={memberLoading}>
+                  {memberLoading ? 'Envoi...' : 'Sauvegarder'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={cancelEditMember} disabled={memberLoading}>
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 5. MODAL: CUSTOM CONFIRM POPUP                      */}
+      {/* ==================================================== */}
+      {confirmModal.isOpen && (
+        <div className="modal-backdrop" style={{ zIndex: 110 }}>
+          <div className="modal-content modal-content-small">
+            <h2 className="modal-title">🛡️ {confirmModal.title}</h2>
+            <p className="modal-message" style={{ marginBottom: '1.5rem' }}>{confirmModal.message}</p>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn-accent" 
+                onClick={confirmModal.onConfirm}
+              >
+                Confirmer
+              </button>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

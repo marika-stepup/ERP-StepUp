@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
 import { generateUUID } from '../../../../lib/utils';
+import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr'
@@ -32,7 +33,7 @@ export async function POST(req) {
 
       // Check if email already exists
       const exists = rows.some(
-        (row) => row.get('employee_email')?.toLowerCase() === email.toLowerCase()
+        (row) => row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === email.toLowerCase()
       );
 
       if (exists) {
@@ -42,19 +43,19 @@ export async function POST(req) {
         };
       }
 
-      // Add new member row
+      // Add new member row using French columns mapping
       const employeeId = generateUUID();
       await balancesSheet.addRow({
-        employee_id: employeeId,
-        employee_name: name,
-        employee_email: email.toLowerCase(),
-        initial_balance: initialCP.toString(),
-        taken_days: '0.0',
-        remaining_balance: initialCP.toString(),
-        initial_perm: initialPermissions.toString(),
-        taken_perm: '0.0',
-        remaining_perm: initialPermissions.toString(),
-        manager_name: manager_name || 'Aucun'
+        [LeaveBalancesColumns.employee_id]: employeeId,
+        [LeaveBalancesColumns.employee_name]: name,
+        [LeaveBalancesColumns.employee_email]: email.toLowerCase(),
+        [LeaveBalancesColumns.initial_balance]: initialCP.toString(),
+        [LeaveBalancesColumns.taken_days]: '0.0',
+        [LeaveBalancesColumns.remaining_balance]: initialCP.toString(),
+        [LeaveBalancesColumns.initial_perm]: initialPermissions.toString(),
+        [LeaveBalancesColumns.taken_perm]: '0.0',
+        [LeaveBalancesColumns.remaining_perm]: initialPermissions.toString(),
+        [LeaveBalancesColumns.manager_name]: manager_name || 'Aucun'
       });
 
       return {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
+import { LeaveBalancesColumns, LeaveRequestsColumns } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate and verify role 'hr'
@@ -8,7 +9,6 @@ export async function POST(req) {
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
-  const hrUser = auth.user;
 
   try {
     const body = await req.json();
@@ -37,7 +37,7 @@ export async function POST(req) {
       const requestRows = await requestsSheet.getRows();
 
       const targetRequestRow = requestRows.find(
-        (row) => row.get('request_id') === request_id
+        (row) => row.get(LeaveRequestsColumns.request_id) === request_id
       );
 
       if (!targetRequestRow) {
@@ -48,7 +48,7 @@ export async function POST(req) {
       }
 
       // Check if already processed
-      const currentStatus = targetRequestRow.get('status');
+      const currentStatus = targetRequestRow.get(LeaveRequestsColumns.status);
       if (currentStatus !== 'Pending') {
         return {
           error: `This request has already been processed. Current status: ${currentStatus}.`,
@@ -56,8 +56,9 @@ export async function POST(req) {
         };
       }
 
-      const employeeId = targetRequestRow.get('employee_id');
-      const businessDays = parseFloat(targetRequestRow.get('business_days') || 0);
+      const employeeId = targetRequestRow.get(LeaveRequestsColumns.employee_id);
+      const businessDays = parseFloat(targetRequestRow.get(LeaveRequestsColumns.business_days) || 0);
+      const leaveType = targetRequestRow.get(LeaveRequestsColumns.leave_type) || '';
       const nowStr = new Date().toISOString();
 
       if (normalizedAction === 'approuver' || normalizedAction === 'approve') {
@@ -66,7 +67,7 @@ export async function POST(req) {
         const balanceRows = await balancesSheet.getRows();
 
         const balanceRow = balanceRows.find(
-          (row) => row.get('employee_id') === employeeId
+          (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
         );
 
         if (!balanceRow) {
@@ -76,31 +77,37 @@ export async function POST(req) {
           };
         }
 
-        const initialBalance = parseFloat(balanceRow.get('initial_balance') || 0);
-        const currentTaken = parseFloat(balanceRow.get('taken_days') || 0);
-        const currentRemaining = parseFloat(balanceRow.get('remaining_balance') || 0);
+        // Determine column fields depending on CP or Permission type
+        const isPermission = leaveType.toLowerCase().includes('perm');
+        const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
+        const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
+        const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
 
-        // Re-verify balance (double-spend protection in case of concurrent approvals)
-        if (currentRemaining < businessDays) {
+        const initialBalanceValue = parseFloat(balanceRow.get(initialCol) || 0);
+        const currentTakenValue = parseFloat(balanceRow.get(takenCol) || 0);
+        const currentRemainingValue = parseFloat(balanceRow.get(remainingCol) || 0);
+
+        // Re-verify balance
+        if (currentRemainingValue < businessDays) {
           return {
-            error: `Cannot approve request. Employee only has ${currentRemaining} remaining days, requested ${businessDays} days.`,
+            error: `Cannot approve request. Employee only has ${currentRemainingValue} remaining days, requested ${businessDays} days.`,
             status: 400
           };
         }
 
         // Calculate updates
-        const newTaken = currentTaken + businessDays;
-        const newRemaining = initialBalance - newTaken;
+        const newTaken = currentTakenValue + businessDays;
+        const newRemaining = initialBalanceValue - newTaken;
 
         // Update Leave_Balances row
-        balanceRow.set('taken_days', newTaken.toString());
-        balanceRow.set('remaining_balance', newRemaining.toString());
+        balanceRow.set(takenCol, newTaken.toString());
+        balanceRow.set(remainingCol, newRemaining.toString());
         await balanceRow.save();
 
         // Update Leave_Requests status to "Approved"
-        targetRequestRow.set('status', 'Approved');
-        targetRequestRow.set('hr_comment', hr_comment || 'Approuvé');
-        targetRequestRow.set('updated_at', nowStr);
+        targetRequestRow.set(LeaveRequestsColumns.status, 'Approved');
+        targetRequestRow.set(LeaveRequestsColumns.hr_comment, hr_comment || 'Approuvé');
+        targetRequestRow.set(LeaveRequestsColumns.updated_at, nowStr);
         await targetRequestRow.save();
 
         return {
@@ -118,9 +125,9 @@ export async function POST(req) {
       } else {
         // Refuse request
         // Update Leave_Requests status to "Rejected"
-        targetRequestRow.set('status', 'Rejected');
-        targetRequestRow.set('hr_comment', hr_comment || 'Refusé');
-        targetRequestRow.set('updated_at', nowStr);
+        targetRequestRow.set(LeaveRequestsColumns.status, 'Rejected');
+        targetRequestRow.set(LeaveRequestsColumns.hr_comment, hr_comment || 'Refusé');
+        targetRequestRow.set(LeaveRequestsColumns.updated_at, nowStr);
         await targetRequestRow.save();
 
         return {
