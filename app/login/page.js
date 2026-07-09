@@ -48,51 +48,55 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="card">
-      <div className="logo-container" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-        <img src="/Logo Step Up.png" alt="Step Up Logo" style={{ height: '50px', objectFit: 'contain' }} />
-      </div>
-      
-      <h1>Step Hub - Connexion</h1>
-      <p>Connectez-vous pour accéder au portail interne de gestion des congés.</p>
+    <div className="login-wrapper">
+      <div className="login-card">
+        <img 
+          src="/Logo Step Up.png" 
+          alt="Step Up Logo" 
+          className="login-logo-img" 
+        />
+        
+        <h1>Step Hub</h1>
+        <p>Portail interne de l'agence. Connectez-vous pour accéder à votre espace de gestion des congés.</p>
 
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">Connexion réussie ! Redirection vers le dashboard...</div>}
+        {error && <div className="error-message">{error}</div>}
+        {success && <div className="success-message">Connexion réussie ! Redirection...</div>}
 
-      <form onSubmit={handleLogin}>
-        <div className="form-group">
-          <label htmlFor="email">Adresse Email</label>
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            placeholder="collaborateur@entreprise.com"
-            disabled={loading || success}
-          />
+        <form onSubmit={handleLogin} style={{ border: 'none', background: 'none', padding: 0 }}>
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <label htmlFor="email" style={{ textAlign: 'left', marginBottom: '0.4rem' }}>Adresse Email</label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="collaborateur@stepupdigital.net"
+              disabled={loading || success}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '1.75rem' }}>
+            <label htmlFor="password" style={{ textAlign: 'left', marginBottom: '0.4rem' }}>Mot de passe</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+              disabled={loading || success}
+            />
+          </div>
+
+          <button type="submit" style={{ width: '100%' }} disabled={loading || success}>
+            {loading ? 'Connexion en cours...' : 'Se connecter'}
+          </button>
+        </form>
+
+        <div className="footer" style={{ marginTop: '2rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          Accès restreint aux collaborateurs autorisés de l'agence Step Up.
         </div>
-
-        <div className="form-group">
-          <label htmlFor="password">Mot de passe</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            placeholder="••••••••"
-            disabled={loading || success}
-          />
-        </div>
-
-        <button type="submit" disabled={loading || success}>
-          {loading ? 'Connexion en cours...' : 'Se connecter'}
-        </button>
-      </form>
-
-      <div className="footer">
-        Accès restreint au personnel autorisé. Sécurisé par Supabase RBAC.
       </div>
     </div>
   );
