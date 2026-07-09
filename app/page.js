@@ -11,6 +11,9 @@ export default function Page() {
   // Navigation
   const [activeTab, setActiveTab] = useState('mySpace'); // 'mySpace', 'globalDashboard', 'adminRH'
 
+  // Dark/Light Mode state
+  const [darkMode, setDarkMode] = useState(false);
+
   // Business Data States
   const [balance, setBalance] = useState({ 
     initial_balance: 0, taken_days: 0, remaining_balance: 0,
@@ -71,8 +74,15 @@ export default function Page() {
     });
   };
 
-  // 1. Initial Session Check
+  // 1. Initial Session Check & Dark Mode check
   useEffect(() => {
+    // Check local storage for dark mode
+    const storedMode = localStorage.getItem('darkMode') === 'true';
+    setDarkMode(storedMode);
+    if (storedMode) {
+      document.body.classList.add('dark');
+    }
+
     const checkUser = async () => {
       try {
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -104,6 +114,18 @@ export default function Page() {
       subscription?.unsubscribe();
     };
   }, []);
+
+  // Toggle Dark Mode function
+  const toggleDarkMode = () => {
+    const nextMode = !darkMode;
+    setDarkMode(nextMode);
+    localStorage.setItem('darkMode', nextMode.toString());
+    if (nextMode) {
+      document.body.classList.add('dark');
+    } else {
+      document.body.classList.remove('dark');
+    }
+  };
 
   const userRole = user?.app_metadata?.role || user?.user_metadata?.role || 'employee';
 
@@ -471,13 +493,57 @@ export default function Page() {
           <img src="/Logo Step Up.png" alt="Step Hub Logo" className="logo-img" />
           <span className="logo-text">Step Hub</span>
         </div>
-        <div className="session-badge">
-          <span>Connecté en tant que : <strong>{user?.email}</strong></span>
-          <span className={`badge-role ${userRole === 'hr' ? 'hr' : 'employee'}`} style={{ marginLeft: '0.5rem' }}>
+        <div className="session-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span>Collaborateur : <strong>{balance.employee_name || user?.email}</strong></span>
+          <span className={`badge-role ${userRole === 'hr' ? 'hr' : 'employee'}`} style={{ marginLeft: '0.25rem' }}>
             {userRole === 'hr' ? 'RH' : 'Salarié'}
           </span>
-          <button onClick={handleLogout} className="logout-btn-header" style={{ marginLeft: '1rem' }}>
-            Se déconnecter
+          
+          {/* Dark Mode Switcher Icon */}
+          <button 
+            onClick={toggleDarkMode}
+            className="logout-btn-header"
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              padding: '0.45rem', 
+              marginLeft: '0.75rem',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px'
+            }}
+            title={darkMode ? "Mode Clair" : "Mode Sombre"}
+          >
+            {darkMode ? (
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '16px', height: '16px' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21M4.93 4.93l1.414 1.414M16.24 16.24l1.414 1.414M3 12h2.25m13.5 0H21M5.757 18.243l-1.414-1.414M19.636 5.636l-1.414 1.414m-5.456 6.364a9 9 0 11-12.728 0 9 9 0 0112.728 0z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '16px', height: '16px' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+              </svg>
+            )}
+          </button>
+
+          {/* Logout Icon Button */}
+          <button 
+            onClick={handleLogout} 
+            className="logout-btn-header" 
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              padding: '0.45rem',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px'
+            }}
+            title="Se déconnecter"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '16px', height: '16px' }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
           </button>
         </div>
       </header>
@@ -649,10 +715,9 @@ export default function Page() {
                             </td>
                             <td><strong>{req.business_days} j</strong></td>
                             <td>
-                              <span className={`status-badge ${
-                                req.status === 'Pending' ? 'status-pending' :
+                              <span className={`status-badge ${req.status === 'Pending' ? 'status-pending' :
                                 req.status === 'Approved' ? 'status-approved' : 'status-rejected'
-                              }`}>
+                                }`}>
                                 {req.status === 'Pending' ? 'En attente' :
                                  req.status === 'Approved' ? 'Approuvé' : 'Refusé'}
                               </span>
@@ -964,14 +1029,14 @@ export default function Page() {
                             </td>
                             <td>
                               <div className="action-buttons-cell">
-                                <button 
-                                  className="btn-small btn-secondary" 
+                                <button
+                                  className="btn-small btn-secondary"
                                   onClick={() => startEditMember(m)}
                                 >
                                   Modifier
                                 </button>
-                                <button 
-                                  className="btn-small btn-danger" 
+                                <button
+                                  className="btn-small btn-danger"
                                   onClick={() => handleDeleteMember(m.employee_id)}
                                 >
                                   Supprimer
