@@ -1,0 +1,46 @@
+import { NextResponse } from 'next/server';
+import { verifyRole } from '../../../../lib/supabaseAuth';
+import { getSheet } from '../../../../lib/googleSheets';
+
+export async function GET(req) {
+  // 1. Authenticate user as 'hr'
+  const auth = await verifyRole(req, ['hr']);
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+  }
+
+  try {
+    // 2. Fetch the Leave_Balances sheet
+    const balancesSheet = await getSheet('Leave_Balances');
+    const rows = await balancesSheet.getRows();
+
+    // 3. Map sheet rows to JSON response
+    const members = rows.map((row) => ({
+      employee_id: row.get('employee_id'),
+      employee_name: row.get('employee_name'),
+      employee_email: row.get('employee_email'),
+      initial_balance: parseFloat(row.get('initial_balance') || 0),
+      taken_days: parseFloat(row.get('taken_days') || 0),
+      remaining_balance: parseFloat(row.get('remaining_balance') || 0),
+      // Permissions support
+      initial_perm: parseFloat(row.get('initial_perm') || 0),
+      taken_perm: parseFloat(row.get('taken_perm') || 0),
+      remaining_perm: parseFloat(row.get('remaining_perm') || 0),
+      // Hierarchy manager
+      manager_name: row.get('manager_name') || 'Aucun'
+    }));
+
+    return NextResponse.json({
+      success: true,
+      count: members.length,
+      members
+    });
+
+  } catch (error) {
+    console.error('Error fetching members list:', error);
+    return NextResponse.json(
+      { error: 'Internal server error while fetching members list.' },
+      { status: 500 }
+    );
+  }
+}

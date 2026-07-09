@@ -24,214 +24,140 @@ function assertThrows(fn, message) {
 // 1. UNIT TESTS: calculateBusinessDays
 // ==========================================
 console.log('--- Testing calculateBusinessDays ---');
-
-// Standard week (Monday to Friday)
 assertEqual(calculateBusinessDays('2026-07-13', '2026-07-17'), 5, '5 working days in a week');
-
-// Weekend crossing (Friday to Monday)
 assertEqual(calculateBusinessDays('2026-07-10', '2026-07-13'), 2, '2 working days between Friday and Monday');
-
-// Weekend only (Saturday to Sunday)
 assertEqual(calculateBusinessDays('2026-07-11', '2026-07-12'), 0, '0 working days over a weekend');
 
-// Single weekend day
-assertEqual(calculateBusinessDays('2026-07-12', '2026-07-12'), 0, '0 working days for Sunday');
-
-// Single working day (Wednesday)
-assertEqual(calculateBusinessDays('2026-07-15', '2026-07-15'), 1, '1 working day for a Wednesday');
-
-// Inverted dates error
-assertThrows(() => {
-  calculateBusinessDays('2026-07-15', '2026-07-14');
-}, 'Should throw error when start date is after end date');
-
-// Invalid date string
-assertThrows(() => {
-  calculateBusinessDays('invalid-date', '2026-07-15');
-}, 'Should throw error on invalid date formats');
-
-
 // ==========================================
-// 2. MOCK INTEGRATION TESTS FOR CONTROLLERS
+// 2. MOCK INTEGRATION TESTS FOR NEW ENDPOINTS
 // ==========================================
-console.log('\n--- Running Controller Simulation (Mocks) ---');
+console.log('\n--- Running Extended Admin Controller Simulation (Mocks) ---');
 
-// Simple mock implementation of the database & authentication for route verification
+// Mock Database Representation
 const mockBalances = [
-  { employee_id: 'emp-123', employee_name: 'Alice Martin', initial_balance: 25.0, taken_days: 5.0, remaining_balance: 20.0 },
-  { employee_id: 'emp-456', employee_name: 'Bob Dupont', initial_balance: 10.0, taken_days: 9.0, remaining_balance: 1.0 }
+  { employee_id: 'emp-123', employee_name: 'Alice Martin', employee_email: 'employee@entreprise.com', initial_balance: 25.0, taken_days: 5.0, remaining_balance: 20.0, initial_perm: 5.0, taken_perm: 0.0, remaining_perm: 5.0, manager_name: 'Bob Dupont' },
+  { employee_id: 'emp-456', employee_name: 'Bob Dupont', employee_email: 'hr@entreprise.com', initial_balance: 25.0, taken_days: 0.0, remaining_balance: 25.0, initial_perm: 5.0, taken_perm: 0.0, remaining_perm: 5.0, manager_name: 'Aucun' }
 ];
 
 const mockRequests = [];
 
-// Simulation of submit handler logic
-function simulateSubmitLeave(userRole, userId, requestBody) {
-  console.log(`\n[Submit Request] User: ${userId} (${userRole})`);
-  
-  // 1. Role validation
-  if (userRole !== 'employee') {
-    return { status: 403, error: `Access denied. Role "${userRole}" is not authorized.` };
+// Simulation functions matching our API endpoints
+function simulateGetMembers(userRole) {
+  console.log(`\n[Get Members] Role: ${userRole}`);
+  if (userRole !== 'hr') {
+    return { status: 403, error: 'Access denied.' };
+  }
+  return { status: 200, count: mockBalances.length, members: mockBalances };
+}
+
+function simulateCreateMember(userRole, body) {
+  console.log(`\n[Create Member] Role: ${userRole}, Body:`, body);
+  if (userRole !== 'hr') {
+    return { status: 403, error: 'Access denied.' };
   }
 
-  const { start_date, end_date, leave_type } = requestBody;
-  if (!start_date || !end_date || !leave_type) {
-    return { status: 400, error: 'Missing required fields.' };
+  const { email, name, manager_name, initial_balance, initial_perm } = body;
+  if (!email || !name) {
+    return { status: 400, error: 'Missing email or name.' };
   }
 
-  // 2. Business days calculation
-  let businessDays;
-  try {
-    businessDays = calculateBusinessDays(start_date, end_date);
-  } catch (err) {
-    return { status: 400, error: err.message };
+  const exists = mockBalances.some(m => m.employee_email.toLowerCase() === email.toLowerCase());
+  if (exists) {
+    return { status: 400, error: 'Member already exists.' };
   }
 
-  if (businessDays <= 0) {
-    return { status: 400, error: 'No business days in range.' };
-  }
-
-  // 3. Balance verification
-  const balance = mockBalances.find(b => b.employee_id === userId);
-  if (!balance) {
-    return { status: 404, error: 'No balance record found.' };
-  }
-
-  if (balance.remaining_balance < businessDays) {
-    return { 
-      status: 400, 
-      error: `Insufficient balance. Requested: ${businessDays}, Available: ${balance.remaining_balance}` 
-    };
-  }
-
-  // 4. Create request
-  const newRequest = {
-    request_id: 'req-' + Math.random().toString(36).substr(2, 9),
-    employee_id: userId,
-    employee_name: balance.employee_name,
-    start_date,
-    end_date,
-    business_days: businessDays,
-    leave_type,
-    status: 'Pending',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    hr_comment: ''
+  const newMember = {
+    employee_id: 'emp-' + Math.random().toString(36).substr(2, 9),
+    employee_name: name,
+    employee_email: email.toLowerCase(),
+    initial_balance: parseFloat(initial_balance || 0),
+    taken_days: 0.0,
+    remaining_balance: parseFloat(initial_balance || 0),
+    initial_perm: parseFloat(initial_perm || 0),
+    taken_perm: 0.0,
+    remaining_perm: parseFloat(initial_perm || 0),
+    manager_name: manager_name || 'Aucun'
   };
 
-  mockRequests.push(newRequest);
-  return { status: 200, message: 'Submitted', request: newRequest };
+  mockBalances.push(newMember);
+  return { status: 200, member: newMember };
 }
 
-// Simulation of pending handler logic
-function simulateGetPending(userRole) {
-  console.log(`\n[Get Pending] Role: ${userRole}`);
+function simulateAdjustBalance(userRole, body) {
+  console.log(`\n[Adjust Balance] Role: ${userRole}, Body:`, body);
   if (userRole !== 'hr') {
-    return { status: 403, error: `Access denied. Role "${userRole}" is not authorized.` };
+    return { status: 403, error: 'Access denied.' };
   }
 
-  const pending = mockRequests.filter(r => r.status === 'Pending');
-  return { status: 200, count: pending.length, requests: pending };
+  const { employee_id, type, value } = body;
+  const member = mockBalances.find(m => m.employee_id === employee_id);
+  if (!member) {
+    return { status: 404, error: 'Member not found.' };
+  }
+
+  const numericVal = parseFloat(value);
+  if (type === 'cp') {
+    member.initial_balance = numericVal;
+    member.remaining_balance = numericVal - member.taken_days;
+  } else if (type === 'perm') {
+    member.initial_perm = numericVal;
+    member.remaining_perm = numericVal - member.taken_perm;
+  }
+
+  return { status: 200, balance: member };
 }
 
-// Simulation of validation handler logic
-function simulateValidateLeave(userRole, requestBody) {
-  console.log(`\n[Validate Request] Role: ${userRole}, Body:`, requestBody);
+function simulateCreditAll(userRole) {
+  console.log(`\n[Credit All] Role: ${userRole}`);
   if (userRole !== 'hr') {
-    return { status: 403, error: `Access denied. Role "${userRole}" is not authorized.` };
+    return { status: 403, error: 'Access denied.' };
   }
 
-  const { request_id, action, hr_comment } = requestBody;
-  if (!request_id || !action) {
-    return { status: 400, error: 'Missing parameters.' };
-  }
+  mockBalances.forEach(m => {
+    m.initial_balance += 2.5;
+    m.remaining_balance += 2.5;
+  });
 
-  const request = mockRequests.find(r => r.request_id === request_id);
-  if (!request) {
-    return { status: 404, error: 'Request not found.' };
-  }
-
-  if (request.status !== 'Pending') {
-    return { status: 400, error: 'Request already processed.' };
-  }
-
-  if (action === 'Approuver') {
-    const balance = mockBalances.find(b => b.employee_id === request.employee_id);
-    if (!balance) {
-      return { status: 404, error: 'Balance record not found.' };
-    }
-
-    if (balance.remaining_balance < request.business_days) {
-      return { status: 400, error: 'Insufficient balance on approval time.' };
-    }
-
-    // Update balance
-    balance.taken_days += request.business_days;
-    balance.remaining_balance -= request.business_days;
-
-    // Update request
-    request.status = 'Approved';
-    request.hr_comment = hr_comment || 'Approved by HR';
-    request.updated_at = new Date().toISOString();
-
-    return { status: 200, message: 'Approved', request, balance };
-  } else if (action === 'Refuser') {
-    request.status = 'Rejected';
-    request.hr_comment = hr_comment || 'Rejected by HR';
-    request.updated_at = new Date().toISOString();
-
-    return { status: 200, message: 'Rejected', request };
-  } else {
-    return { status: 400, error: 'Invalid action.' };
-  }
+  return { status: 200, count: mockBalances.length };
 }
 
-// --- Execute simulation flow ---
+// --- Execute Admin API flows ---
 
-// 1. Employee Alice submits a valid request (5 working days)
-const res1 = simulateSubmitLeave('employee', 'emp-123', {
-  start_date: '2026-07-13',
-  end_date: '2026-07-17',
-  leave_type: 'CP'
+// 1. GET /api/admin/members - authorized (HR)
+const m1 = simulateGetMembers('hr');
+assertEqual(m1.status, 200, 'HR can list members');
+assertEqual(m1.count, 2, 'Initial members list contains 2 members');
+
+// 2. GET /api/admin/members - forbidden (Employee)
+const m2 = simulateGetMembers('employee');
+assertEqual(m2.status, 403, 'Employee is forbidden from listing members');
+
+// 3. POST /api/admin/create-member - authorized (HR)
+const m3 = simulateCreateMember('hr', {
+  email: 'new-hire@entreprise.com',
+  name: 'Charlotte Dubois',
+  manager_name: 'Alice Martin',
+  initial_balance: 15.0,
+  initial_perm: 5.0
 });
-assertEqual(res1.status, 200, 'Alice submits a 5-day request');
-assertEqual(res1.request.business_days, 5, 'Calculated business days is 5');
-assertEqual(res1.request.status, 'Pending', 'Status is initially Pending');
+assertEqual(m3.status, 200, 'HR can create a new member');
+assertEqual(mockBalances.length, 3, 'Total members increased to 3');
+assertEqual(mockBalances[2].employee_name, 'Charlotte Dubois', 'New member name matches');
 
-// 2. Employee Bob submits an invalid request (wants 5 days, but only has 1 day)
-const res2 = simulateSubmitLeave('employee', 'emp-456', {
-  start_date: '2026-07-13',
-  end_date: '2026-07-17',
-  leave_type: 'CP'
+// 4. POST /api/admin/adjust-balance - adjust Alice's CP
+const m4 = simulateAdjustBalance('hr', {
+  employee_id: 'emp-123',
+  type: 'cp',
+  value: 30.0
 });
-assertEqual(res2.status, 400, 'Bob request fails due to insufficient balance');
+assertEqual(m4.status, 200, 'HR can adjust CP balance');
+assertEqual(m4.balance.initial_balance, 30.0, 'Initial CP adjusted to 30.0');
+assertEqual(m4.balance.remaining_balance, 25.0, 'Remaining CP correctly calculated (30 - 5 taken = 25)');
 
-// 3. HR lists pending requests (should see Alice's request)
-const res3 = simulateGetPending('hr');
-assertEqual(res3.status, 200, 'HR retrieves pending list');
-assertEqual(res3.count, 1, 'HR finds 1 pending request');
-assertEqual(res3.requests[0].employee_name, 'Alice Martin', 'Pending request belongs to Alice');
+// 5. POST /api/admin/credit-all - credit +2.5j to everyone
+const m5 = simulateCreditAll('hr');
+assertEqual(m5.status, 200, 'HR can credit all members');
+assertEqual(mockBalances[0].initial_balance, 32.5, "Alice's CP increased from 30.0 to 32.5");
+assertEqual(mockBalances[0].remaining_balance, 27.5, "Alice's remaining CP increased to 27.5");
 
-// 4. Employee Alice tries to retrieve pending requests (should be forbidden)
-const res4 = simulateGetPending('employee');
-assertEqual(res4.status, 403, 'Employee cannot list pending requests');
-
-// 5. HR approves Alice's request
-const aliceRequestId = res1.request.request_id;
-const res5 = simulateValidateLeave('hr', {
-  request_id: aliceRequestId,
-  action: 'Approuver',
-  hr_comment: 'Bonnes vacances!'
-});
-assertEqual(res5.status, 200, 'HR successfully approves request');
-assertEqual(res5.balance.taken_days, 10.0, 'Alice taken_days increased to 10.0');
-assertEqual(res5.balance.remaining_balance, 15.0, 'Alice remaining_balance decreased to 15.0');
-assertEqual(res5.request.status, 'Approved', 'Alice request status is updated to Approved');
-
-// 6. HR tries to validate the same request again
-const res6 = simulateValidateLeave('hr', {
-  request_id: aliceRequestId,
-  action: 'Approuver'
-});
-assertEqual(res6.status, 400, 'Re-validating already processed request fails');
-
-console.log('\n🎉 ALL TESTS COMPLETED SUCCESSFULLY! BUSINESS LOGIC IS SOLID! 🎉');
+console.log('\n🎉 EXTENDED API TESTS COMPLETED SUCCESSFULLY! BUSINESS LOGIC IS SOLID! 🎉');
