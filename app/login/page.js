@@ -49,12 +49,12 @@ export default function LoginPage() {
 
   return (
     <div className="card">
-      <div className="logo-container">
-        <span className="logo">ERP.Congés</span>
+      <div className="logo-container" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+        <img src="/Logo Step Up.png" alt="Step Up Logo" style={{ height: '50px', objectFit: 'contain' }} />
       </div>
       
-      <h1>Connexion Espace Interne</h1>
-      <p>Connectez-vous avec vos identifiants Supabase pour accéder au module de gestion des congés.</p>
+      <h1>Step Hub - Connexion</h1>
+      <p>Connectez-vous pour accéder au portail interne de gestion des congés.</p>
 
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">Connexion réussie ! Redirection vers le dashboard...</div>}

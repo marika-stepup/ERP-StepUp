@@ -11,9 +11,6 @@ export default function Page() {
   // Navigation
   const [activeTab, setActiveTab] = useState('mySpace'); // 'mySpace', 'globalDashboard', 'adminRH'
 
-  // Simulating/switching accounts list (matching Supabase test accounts)
-  const [sessionEmail, setSessionEmail] = useState('');
-
   // Business Data States
   const [balance, setBalance] = useState({ 
     initial_balance: 0, taken_days: 0, remaining_balance: 0,
@@ -22,10 +19,9 @@ export default function Page() {
   const [myRequests, setMyRequests] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
-  const [allRequests, setAllRequests] = useState([]); // for global planning
 
   // Form States (Submit Leave)
-  const [leaveType, setLeaveType] = useState('CP'); // 'CP' or 'Perm'
+  const [leaveType, setLeaveType] = useState('CP'); // 'CP' or 'Permission'
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('08:00');
   const [endDate, setEndDate] = useState('');
@@ -36,7 +32,8 @@ export default function Page() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form States (Add Member)
+  // Form States (Add/Edit Member)
+  const [editingMember, setEditingMember] = useState(null); // When set, we are in Edit Mode
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('employee');
@@ -61,7 +58,6 @@ export default function Page() {
         if (session) {
           setUser(session.user);
           setToken(session.access_token);
-          setSessionEmail(session.user.email);
         } else {
           window.location.href = '/login';
         }
@@ -78,7 +74,6 @@ export default function Page() {
       if (session) {
         setUser(session.user);
         setToken(session.access_token);
-        setSessionEmail(session.user.email);
       } else {
         window.location.href = '/login';
       }
@@ -132,13 +127,6 @@ export default function Page() {
           const pendingData = await pendingRes.json();
           setPendingRequests(pendingData.requests || []);
         }
-
-        // Get all requests for global planning (simulated from reading history or API)
-        // For planning, we merge pending + approved requests
-        const sheetRes = await fetch('/api/admin/members', { // dummy fetch to reload, we can read raw requests if we have an endpoint
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        // We will mock/render the planning based on the members and pending requests for now
       }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -151,44 +139,7 @@ export default function Page() {
     }
   }, [user, token, userRole]);
 
-  // 3. Switch User Session (for prototype testing)
-  const handleSessionChange = async (e) => {
-    const selectedEmail = e.target.value;
-    setSessionEmail(selectedEmail);
-    setLoading(true);
-
-    let password = '';
-    if (selectedEmail === 'employee@entreprise.com') {
-      password = 'passEmployee123';
-    } else if (selectedEmail === 'hr@entreprise.com') {
-      password = 'passHR123';
-    }
-
-    try {
-      if (password) {
-        const { error } = await supabaseClient.auth.signInWithPassword({
-          email: selectedEmail,
-          password: password
-        });
-        if (error) {
-          alert('Erreur lors du changement de session: ' + error.message);
-        } else {
-          // Force active tab to Mon Espace upon switching
-          setActiveTab('mySpace');
-        }
-      } else {
-        // Log out if they select something else
-        await supabaseClient.auth.signOut();
-        window.location.href = '/login';
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 4. Submit Leave Request
+  // 3. Submit Leave Request
   const handleSubmitLeave = async (e) => {
     e.preventDefault();
     setSubmitError(null);
@@ -206,8 +157,7 @@ export default function Page() {
           start_date: startDate,
           end_date: endDate,
           leave_type: leaveType,
-          reason: reason,
-          // Custom field: hours/days can be sent if required, but business_days is calculated on server
+          reason: reason
         })
       });
 
@@ -229,7 +179,7 @@ export default function Page() {
     }
   };
 
-  // 5. Create new member (HR Admin)
+  // 4. Create new member (HR Admin)
   const handleCreateMember = async (e) => {
     e.preventDefault();
     setMemberError(null);
@@ -272,7 +222,101 @@ export default function Page() {
     }
   };
 
-  // 6. Adjust Balance (HR Admin Table)
+  // 5. Start Edit Mode for a Member
+  const startEditMember = (m) => {
+    setEditingMember(m);
+    setNewMemberName(m.employee_name);
+    setNewMemberEmail(m.employee_email);
+    setNewMemberRole(m.employee_email.includes('hr@') ? 'hr' : 'employee');
+    setNewMemberManager(m.manager_name || 'Aucun');
+    setNewMemberCP(m.initial_balance.toString());
+    setNewMemberPerm((m.initial_perm || 5).toString());
+    
+    // Clear alerts
+    setMemberError(null);
+    setMemberSuccess(false);
+  };
+
+  // 6. Cancel Edit Mode
+  const cancelEditMember = () => {
+    setEditingMember(null);
+    setNewMemberName('');
+    setNewMemberEmail('');
+    setNewMemberRole('employee');
+    setNewMemberManager('Aucun');
+    setNewMemberCP('25');
+    setNewMemberPerm('5');
+  };
+
+  // 7. Update Member Details (HR Admin)
+  const handleUpdateMember = async (e) => {
+    e.preventDefault();
+    setMemberError(null);
+    setMemberSuccess(false);
+    setMemberLoading(true);
+
+    try {
+      const res = await fetch('/api/admin/update-member', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          employee_id: editingMember.employee_id,
+          name: newMemberName,
+          email: newMemberEmail,
+          manager_name: newMemberManager,
+          initial_balance: parseFloat(newMemberCP || 0),
+          initial_perm: parseFloat(newMemberPerm || 0)
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setMemberError(data.error || 'Erreur lors de la mise à jour du membre.');
+      } else {
+        setMemberSuccess(true);
+        cancelEditMember();
+        fetchDashboardData();
+      }
+    } catch (err) {
+      setMemberError('Une erreur réseau est survenue.');
+    } finally {
+      setMemberLoading(false);
+    }
+  };
+
+  // 8. Delete Member (HR Admin)
+  const handleDeleteMember = async (employeeId) => {
+    if (!confirm('Voulez-vous vraiment supprimer ce membre ainsi que tous ses soldes ? Cette action est irréversible.')) return;
+    
+    setHrError(null);
+    setHrSuccess(null);
+
+    try {
+      const res = await fetch('/api/admin/delete-member', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ employee_id: employeeId })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setHrError(data.error || 'Erreur lors de la suppression.');
+      } else {
+        setHrSuccess(data.message);
+        fetchDashboardData();
+      }
+    } catch (err) {
+      setHrError('Une erreur réseau est survenue.');
+    }
+  };
+
+  // 9. Adjust Balance Quick Input (HR Admin Table)
   const handleAdjustBalance = async (employeeId, type, value) => {
     setAdjustingId(employeeId);
     setHrError(null);
@@ -306,7 +350,7 @@ export default function Page() {
     }
   };
 
-  // 7. Credit +2.5j CP to all members
+  // 10. Credit +2.5j CP to all members
   const handleCreditAll = async () => {
     if (!confirm('Voulez-vous vraiment créditer de +2.5j de CP TOUS les collaborateurs du système ?')) return;
     setHrError(null);
@@ -330,7 +374,7 @@ export default function Page() {
     }
   };
 
-  // 8. Approve/Reject Leave Request
+  // 11. Approve/Reject Leave Request
   const handleValidateLeave = async (requestId, action) => {
     setHrError(null);
     setHrSuccess(null);
@@ -345,7 +389,7 @@ export default function Page() {
         },
         body: JSON.stringify({
           request_id: requestId,
-          action: action, // 'Approuver' ou 'Refuser'
+          action: action,
           hr_comment: comment
         })
       });
@@ -375,9 +419,9 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div className="card" style={{ marginTop: '5rem' }}>
-        <span className="logo">CongésApp</span>
-        <h1 style={{ marginTop: '1.5rem' }}>Chargement de l'espace de travail...</h1>
+      <div className="card" style={{ marginTop: '5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <img src="/Logo Step Up.png" alt="Step Hub" style={{ height: '40px', marginBottom: '1.5rem' }} />
+        <h1>Chargement de l'espace...</h1>
       </div>
     );
   }
@@ -387,23 +431,17 @@ export default function Page() {
       {/* --- TOP HEADER NAVIGATION BAR --- */}
       <header className="app-header">
         <div className="logo-container">
-          <span className="logo-icon">📅</span>
-          <span className="logo-text">CongésApp</span>
+          <img src="/Logo Step Up.png" alt="Step Hub Logo" className="logo-img" />
+          <span className="logo-text">Step Hub</span>
         </div>
         <div className="session-badge">
-          <span>Session de :</span>
-          <select 
-            value={sessionEmail} 
-            onChange={handleSessionChange} 
-            className="session-select"
-          >
-            <option value="employee@entreprise.com">Alice Martin (RH/Salarié)</option>
-            <option value="hr@entreprise.com">Bob Dupont (HR)</option>
-            {user?.email && user.email !== 'employee@entreprise.com' && user.email !== 'hr@entreprise.com' && (
-              <option value={user.email}>{user.email} (Connecté)</option>
-            )}
-            <option value="logout">-- Se Déconnecter --</option>
-          </select>
+          <span>Connecté en tant que : <strong>{user?.email}</strong></span>
+          <span className="badge-role" className={`badge-role ${userRole === 'hr' ? 'hr' : 'employee'}`} style={{ marginLeft: '0.5rem' }}>
+            {userRole === 'hr' ? 'RH' : 'Salarié'}
+          </span>
+          <button onClick={handleLogout} className="logout-btn-header" style={{ marginLeft: '1rem' }}>
+            Se déconnecter
+          </button>
         </div>
       </header>
 
@@ -451,7 +489,7 @@ export default function Page() {
                   <div className="balance-card-mini perm">
                     <span className="balance-card-title">Permissions</span>
                     <span className="balance-card-value">
-                      {balance.remaining_perm || 5} <span>jours</span>
+                      {balance.remaining_perm} <span>jours</span>
                     </span>
                   </div>
                 </div>
@@ -566,7 +604,7 @@ export default function Page() {
                         {myRequests.map((req) => (
                           <tr key={req.request_id}>
                             <td>
-                              <strong style={{ color: 'var(--accent-color)' }}>{req.leave_type}</strong>
+                              <strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong>
                             </td>
                             <td>
                               Du {req.start_date}<br />
@@ -628,9 +666,9 @@ export default function Page() {
               <h2 className="panel-title">📊 Soldes Globaux & Responsables (N+1)</h2>
               <p className="panel-subtitle">Visualisation en temps réel des congés restants et de l'organigramme.</p>
 
-              {allMembers.length === 0 ? (
+              {userRole !== 'hr' && allMembers.length === 0 ? (
                 <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  Activez la session RH pour afficher la liste des collaborateurs.
+                  Chargement des soldes...
                 </p>
               ) : (
                 <div className="table-container">
@@ -652,8 +690,8 @@ export default function Page() {
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.employee_email}</div>
                           </td>
                           <td>{m.manager_name || 'Aucun'}</td>
-                          <td><strong style={{ color: 'var(--accent-color)' }}>{m.remaining_balance}j</strong> / {m.initial_balance}j</td>
-                          <td><strong>{m.remaining_perm || 5}j</strong> / {m.initial_perm || 5}j</td>
+                          <td><strong style={{ color: 'var(--brand-orange)' }}>{m.remaining_balance}j</strong> / {m.initial_balance}j</td>
+                          <td><strong>{m.remaining_perm}j</strong> / {m.initial_perm}j</td>
                           <td>
                             <span className="status-badge status-approved" style={{ fontSize: '0.7rem' }}>
                               Actif
@@ -689,13 +727,13 @@ export default function Page() {
             {hrSuccess && <div className="success-message">{hrSuccess}</div>}
 
             {/* Validation Panel */}
-            <div className="panel" style={{ borderTop: '4px solid var(--accent-color)' }}>
+            <div className="panel" style={{ borderTop: '4px solid var(--brand-orange)' }}>
               <h2 className="panel-title">🛡️ Suivi et Validation Finale RH</h2>
               <p className="panel-subtitle">Valider ou refuser les demandes de congé de l'entreprise.</p>
 
               {pendingRequests.length === 0 ? (
                 <p style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>
-                  Aucune demande en attente de traitement RH.
+                  Aucun dossier validé par le N+1 en attente de traitement RH.
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -751,15 +789,17 @@ export default function Page() {
 
             {/* Split creation form & adjustment table */}
             <div className="split-layout">
-              {/* Add user form */}
+              {/* Add/Edit user form */}
               <div className="sidebar" style={{ width: '350px' }}>
                 <div className="panel">
-                  <h2 className="panel-title">👤 Ajouter un Membre</h2>
+                  <h2 className="panel-title">
+                    {editingMember ? '📝 Modifier le Membre' : '👤 Ajouter un Membre'}
+                  </h2>
                   
                   {memberError && <div className="error-message">{memberError}</div>}
-                  {memberSuccess && <div className="success-message">Compte enregistré dans le Google Sheet !</div>}
+                  {memberSuccess && <div className="success-message">Données enregistrées avec succès.</div>}
 
-                  <form onSubmit={handleCreateMember} style={{ padding: 0, border: 'none', background: 'none' }}>
+                  <form onSubmit={editingMember ? handleUpdateMember : handleCreateMember} style={{ padding: 0, border: 'none', background: 'none' }}>
                     <div className="form-group">
                       <label>Nom Complet</label>
                       <input
@@ -784,19 +824,21 @@ export default function Page() {
                       />
                     </div>
 
-                    <div className="form-group">
-                      <label>Rôle dans le système</label>
-                      <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)}>
-                        <option value="employee">Collaborateur</option>
-                        <option value="hr">Administrateur RH</option>
-                      </select>
-                    </div>
+                    {!editingMember && (
+                      <div className="form-group">
+                        <label>Rôle dans le système</label>
+                        <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)}>
+                          <option value="employee">Collaborateur</option>
+                          <option value="hr">Administrateur RH</option>
+                        </select>
+                      </div>
+                    )}
 
                     <div className="form-group">
                       <label>Responsable Hiérarchique N+1</label>
                       <select value={newMemberManager} onChange={(e) => setNewMemberManager(e.target.value)}>
                         <option value="Aucun">Aucun (Directeur / RH)</option>
-                        {allMembers.map(m => (
+                        {allMembers.filter(m => m.employee_id !== editingMember?.employee_id).map(m => (
                           <option key={m.employee_id} value={m.employee_name}>{m.employee_name}</option>
                         ))}
                       </select>
@@ -823,9 +865,16 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <button type="submit" className="btn-accent" disabled={memberLoading}>
-                      {memberLoading ? 'Enregistrement...' : 'Enregistrer le compte'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button type="submit" className="btn-accent" style={{ flexGrow: 1 }} disabled={memberLoading}>
+                        {memberLoading ? 'Enregistrement...' : editingMember ? 'Sauvegarder' : 'Enregistrer'}
+                      </button>
+                      {editingMember && (
+                        <button type="button" className="btn-secondary" onClick={cancelEditMember} disabled={memberLoading}>
+                          Annuler
+                        </button>
+                      )}
+                    </div>
                   </form>
                 </div>
               </div>
@@ -838,7 +887,7 @@ export default function Page() {
                     <button 
                       onClick={handleCreditAll} 
                       className="btn-secondary btn-small"
-                      style={{ color: '#7c3aed', borderColor: '#e9d5ff', background: '#f5f3ff' }}
+                      style={{ color: 'var(--brand-orange)', borderColor: 'var(--brand-orange)', background: '#fff7ed' }}
                     >
                       📅 Créditer +2.5j CP (Début de mois)
                     </button>
@@ -853,6 +902,7 @@ export default function Page() {
                           <th>N+1 (Manager)</th>
                           <th>Ajuster CP</th>
                           <th>Ajuster Perm.</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -881,10 +931,26 @@ export default function Page() {
                               <input
                                 type="number"
                                 className="adjust-input"
-                                defaultValue={m.initial_perm || 5}
+                                defaultValue={m.initial_perm}
                                 onBlur={(e) => handleAdjustBalance(m.employee_id, 'perm', e.target.value)}
                                 disabled={adjustingId === m.employee_id}
                               />
+                            </td>
+                            <td>
+                              <div className="action-buttons-cell">
+                                <button 
+                                  className="btn-small btn-secondary" 
+                                  onClick={() => startEditMember(m)}
+                                >
+                                  Modifier
+                                </button>
+                                <button 
+                                  className="btn-small btn-danger" 
+                                  onClick={() => handleDeleteMember(m.employee_id)}
+                                >
+                                  Supprimer
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}

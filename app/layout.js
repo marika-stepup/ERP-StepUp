@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Mini-ERP Congés API',
-  description: 'API du module de gestion des congés.',
+  title: 'Step Hub - Gestion des Congés',
+  description: "Portail interne de gestion des congés et absences de l'agence Step Up.",
 };
 
 export default function RootLayout({ children }) {

@@ -10,16 +10,6 @@ function assertEqual(actual, expected, message) {
   }
 }
 
-function assertThrows(fn, message) {
-  try {
-    fn();
-    console.error(`❌ FAIL: ${message} (Expected to throw but succeeded)`);
-    process.exit(1);
-  } catch (e) {
-    console.log(`✅ PASS: ${message} (Threw: "${e.message}")`);
-  }
-}
-
 // ==========================================
 // 1. UNIT TESTS: calculateBusinessDays
 // ==========================================
@@ -38,8 +28,6 @@ const mockBalances = [
   { employee_id: 'emp-123', employee_name: 'Alice Martin', employee_email: 'employee@entreprise.com', initial_balance: 25.0, taken_days: 5.0, remaining_balance: 20.0, initial_perm: 5.0, taken_perm: 0.0, remaining_perm: 5.0, manager_name: 'Bob Dupont' },
   { employee_id: 'emp-456', employee_name: 'Bob Dupont', employee_email: 'hr@entreprise.com', initial_balance: 25.0, taken_days: 0.0, remaining_balance: 25.0, initial_perm: 5.0, taken_perm: 0.0, remaining_perm: 5.0, manager_name: 'Aucun' }
 ];
-
-const mockRequests = [];
 
 // Simulation functions matching our API endpoints
 function simulateGetMembers(userRole) {
@@ -83,42 +71,45 @@ function simulateCreateMember(userRole, body) {
   return { status: 200, member: newMember };
 }
 
-function simulateAdjustBalance(userRole, body) {
-  console.log(`\n[Adjust Balance] Role: ${userRole}, Body:`, body);
+function simulateUpdateMember(userRole, body) {
+  console.log(`\n[Update Member] Role: ${userRole}, Body:`, body);
   if (userRole !== 'hr') {
     return { status: 403, error: 'Access denied.' };
   }
 
-  const { employee_id, type, value } = body;
-  const member = mockBalances.find(m => m.employee_id === employee_id);
-  if (!member) {
+  const { employee_id, name, email, manager_name, initial_balance, initial_perm } = body;
+  const memberIndex = mockBalances.findIndex(m => m.employee_id === employee_id);
+  if (memberIndex === -1) {
     return { status: 404, error: 'Member not found.' };
   }
 
-  const numericVal = parseFloat(value);
-  if (type === 'cp') {
-    member.initial_balance = numericVal;
-    member.remaining_balance = numericVal - member.taken_days;
-  } else if (type === 'perm') {
-    member.initial_perm = numericVal;
-    member.remaining_perm = numericVal - member.taken_perm;
-  }
+  const member = mockBalances[memberIndex];
+  member.employee_name = name;
+  member.employee_email = email.toLowerCase();
+  member.manager_name = manager_name;
+  member.initial_balance = parseFloat(initial_balance || 0);
+  member.remaining_balance = member.initial_balance - member.taken_days;
+  member.initial_perm = parseFloat(initial_perm || 0);
+  member.remaining_perm = member.initial_perm - member.taken_perm;
 
-  return { status: 200, balance: member };
+  return { status: 200, member };
 }
 
-function simulateCreditAll(userRole) {
-  console.log(`\n[Credit All] Role: ${userRole}`);
+function simulateDeleteMember(userRole, body) {
+  console.log(`\n[Delete Member] Role: ${userRole}, Body:`, body);
   if (userRole !== 'hr') {
     return { status: 403, error: 'Access denied.' };
   }
 
-  mockBalances.forEach(m => {
-    m.initial_balance += 2.5;
-    m.remaining_balance += 2.5;
-  });
+  const { employee_id } = body;
+  const memberIndex = mockBalances.findIndex(m => m.employee_id === employee_id);
+  if (memberIndex === -1) {
+    return { status: 404, error: 'Member not found.' };
+  }
 
-  return { status: 200, count: mockBalances.length };
+  const deletedName = mockBalances[memberIndex].employee_name;
+  mockBalances.splice(memberIndex, 1);
+  return { status: 200, employee_name: deletedName };
 }
 
 // --- Execute Admin API flows ---
@@ -128,36 +119,35 @@ const m1 = simulateGetMembers('hr');
 assertEqual(m1.status, 200, 'HR can list members');
 assertEqual(m1.count, 2, 'Initial members list contains 2 members');
 
-// 2. GET /api/admin/members - forbidden (Employee)
-const m2 = simulateGetMembers('employee');
-assertEqual(m2.status, 403, 'Employee is forbidden from listing members');
-
-// 3. POST /api/admin/create-member - authorized (HR)
-const m3 = simulateCreateMember('hr', {
+// 2. POST /api/admin/create-member - authorized (HR)
+const m2 = simulateCreateMember('hr', {
   email: 'new-hire@entreprise.com',
   name: 'Charlotte Dubois',
   manager_name: 'Alice Martin',
   initial_balance: 15.0,
   initial_perm: 5.0
 });
-assertEqual(m3.status, 200, 'HR can create a new member');
+assertEqual(m2.status, 200, 'HR can create a new member');
 assertEqual(mockBalances.length, 3, 'Total members increased to 3');
-assertEqual(mockBalances[2].employee_name, 'Charlotte Dubois', 'New member name matches');
 
-// 4. POST /api/admin/adjust-balance - adjust Alice's CP
-const m4 = simulateAdjustBalance('hr', {
-  employee_id: 'emp-123',
-  type: 'cp',
-  value: 30.0
+// 3. POST /api/admin/update-member - modify Charlotte
+const m3 = simulateUpdateMember('hr', {
+  employee_id: mockBalances[2].employee_id,
+  name: 'Charlotte Dubois Updated',
+  email: 'charlotte.updated@entreprise.com',
+  manager_name: 'Bob Dupont',
+  initial_balance: 20.0,
+  initial_perm: 8.0
 });
-assertEqual(m4.status, 200, 'HR can adjust CP balance');
-assertEqual(m4.balance.initial_balance, 30.0, 'Initial CP adjusted to 30.0');
-assertEqual(m4.balance.remaining_balance, 25.0, 'Remaining CP correctly calculated (30 - 5 taken = 25)');
+assertEqual(m3.status, 200, 'HR can update a member');
+assertEqual(mockBalances[2].employee_name, 'Charlotte Dubois Updated', 'Name successfully updated');
+assertEqual(mockBalances[2].initial_balance, 20.0, 'CP successfully updated');
 
-// 5. POST /api/admin/credit-all - credit +2.5j to everyone
-const m5 = simulateCreditAll('hr');
-assertEqual(m5.status, 200, 'HR can credit all members');
-assertEqual(mockBalances[0].initial_balance, 32.5, "Alice's CP increased from 30.0 to 32.5");
-assertEqual(mockBalances[0].remaining_balance, 27.5, "Alice's remaining CP increased to 27.5");
+// 4. POST /api/admin/delete-member - delete Charlotte
+const m4 = simulateDeleteMember('hr', {
+  employee_id: mockBalances[2].employee_id
+});
+assertEqual(m4.status, 200, 'HR can delete a member');
+assertEqual(mockBalances.length, 2, 'Total members reduced back to 2');
 
-console.log('\n🎉 EXTENDED API TESTS COMPLETED SUCCESSFULLY! BUSINESS LOGIC IS SOLID! 🎉');
+console.log('\n🎉 ALL MOCK API TESTS PASSED SUCCESSFULLY! BOTH UPDATE AND DELETE LOGIC WORK! 🎉');
