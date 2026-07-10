@@ -20,6 +20,12 @@ export async function GET(req) {
       employee_id: row.get(LeaveBalancesColumns.employee_id),
       employee_name: row.get(LeaveBalancesColumns.employee_name),
       employee_email: row.get(LeaveBalancesColumns.employee_email),
+      role: row.get(LeaveBalancesColumns.role) || (
+        row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('hr@') ? 'hr' :
+        row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('manager@') ? 'manager' :
+        row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('director@') ? 'director' :
+        row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('directeur@') ? 'director' : 'employee'
+      ),
       initial_balance: parseFloat(row.get(LeaveBalancesColumns.initial_balance) || 0),
       taken_days: parseFloat(row.get(LeaveBalancesColumns.taken_days) || 0),
       remaining_balance: parseFloat(row.get(LeaveBalancesColumns.remaining_balance) || 0),

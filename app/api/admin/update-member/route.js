@@ -12,7 +12,7 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { employee_id, name, email, manager_name, initial_balance, initial_perm } = body;
+    const { employee_id, name, email, role, manager_name, initial_balance, initial_perm } = body;
 
     // Validation
     if (!employee_id || !name || !email) {
@@ -63,6 +63,7 @@ export async function POST(req) {
       // Update values using translated columns
       balanceRow.set(LeaveBalancesColumns.employee_name, name);
       balanceRow.set(LeaveBalancesColumns.employee_email, email.toLowerCase());
+      balanceRow.set(LeaveBalancesColumns.role, role || 'employee');
       balanceRow.set(LeaveBalancesColumns.manager_name, manager_name || 'Aucun');
       balanceRow.set(LeaveBalancesColumns.initial_balance, initialCP.toString());
       balanceRow.set(LeaveBalancesColumns.remaining_balance, newRemainingCP.toString());
@@ -77,6 +78,7 @@ export async function POST(req) {
           employee_id,
           employee_name: name,
           employee_email: email.toLowerCase(),
+          role: role || 'employee',
           manager_name: manager_name || 'Aucun',
           initial_balance: initialCP,
           remaining_balance: newRemainingCP,

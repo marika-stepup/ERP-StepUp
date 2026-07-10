@@ -49,6 +49,7 @@ export async function POST(req) {
         [LeaveBalancesColumns.employee_id]: employeeId,
         [LeaveBalancesColumns.employee_name]: name,
         [LeaveBalancesColumns.employee_email]: email.toLowerCase(),
+        [LeaveBalancesColumns.role]: role || 'employee',
         [LeaveBalancesColumns.initial_balance]: initialCP.toString(),
         [LeaveBalancesColumns.taken_days]: '0.0',
         [LeaveBalancesColumns.remaining_balance]: initialCP.toString(),

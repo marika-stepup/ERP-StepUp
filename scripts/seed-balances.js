@@ -55,7 +55,7 @@ async function run() {
       console.log(`Sheet "${SheetTabs.balances}" not found. Creating it...`);
       balanceSheet = await doc.addSheet({ title: SheetTabs.balances });
     }
-    
+
     // Set headers
     const balanceHeaders = Object.values(LeaveBalancesColumns);
     console.log(`Setting headers for ${SheetTabs.balances}:`, balanceHeaders);
@@ -66,6 +66,7 @@ async function run() {
         [LeaveBalancesColumns.employee_id]: '87327813-ad8a-4127-a9b3-4ede219ecef7',
         [LeaveBalancesColumns.employee_name]: 'Alice Martin',
         [LeaveBalancesColumns.employee_email]: 'employee@entreprise.com',
+        [LeaveBalancesColumns.role]: 'employee',
         [LeaveBalancesColumns.initial_balance]: formatSheetFloat(25.0),
         [LeaveBalancesColumns.taken_days]: formatSheetFloat(0.0),
         [LeaveBalancesColumns.remaining_balance]: formatSheetFloat(25.0),
@@ -78,6 +79,7 @@ async function run() {
         [LeaveBalancesColumns.employee_id]: 'e7b63926-98ab-4f4d-b643-258de48438df',
         [LeaveBalancesColumns.employee_name]: 'Bob Dupont',
         [LeaveBalancesColumns.employee_email]: 'hr@entreprise.com',
+        [LeaveBalancesColumns.role]: 'hr',
         [LeaveBalancesColumns.initial_balance]: formatSheetFloat(25.0),
         [LeaveBalancesColumns.taken_days]: formatSheetFloat(0.0),
         [LeaveBalancesColumns.remaining_balance]: formatSheetFloat(25.0),
@@ -109,7 +111,7 @@ async function run() {
       console.log(`Sheet "${SheetTabs.requests}" not found. Creating it...`);
       requestsSheet = await doc.addSheet({ title: SheetTabs.requests });
     }
-    
+
     const requestHeaders = Object.values(LeaveRequestsColumns);
     console.log(`Setting headers for ${SheetTabs.requests}:`, requestHeaders);
     await requestsSheet.setHeaderRow(requestHeaders);
@@ -121,7 +123,7 @@ async function run() {
       console.log(`Sheet "${SheetTabs.timeLogs}" not found. Creating it...`);
       logsSheet = await doc.addSheet({ title: SheetTabs.timeLogs });
     }
-    
+
     const logHeaders = Object.values(TimeLogsColumns);
     console.log(`Setting headers for ${SheetTabs.timeLogs}:`, logHeaders);
     await logsSheet.setHeaderRow(logHeaders);
