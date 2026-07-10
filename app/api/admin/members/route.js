@@ -1,18 +1,18 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
-  // 1. Authenticate user as 'hr'
-  const auth = await verifyRole(req, ['hr']);
+  // 1. Authenticate user (all authenticated roles can fetch member balances for the global dashboard)
+  const auth = await verifyRole(req, ['employee', 'manager', 'director', 'hr']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
 
   try {
     // 2. Fetch the Leave_Balances sheet
-    const balancesSheet = await getSheet('Leave_Balances');
+    const balancesSheet = await getSheet(SheetTabs.balances);
     const rows = await balancesSheet.getRows();
 
     // 3. Map sheet rows to JSON response

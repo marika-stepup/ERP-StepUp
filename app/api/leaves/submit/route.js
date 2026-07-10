@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
 import { calculateBusinessDays, generateUUID } from '../../../../lib/utils';
-import { LeaveBalancesColumns, LeaveRequestsColumns } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate and verify role 'employee' (which includes HR users acting as employees)
@@ -42,7 +42,7 @@ export async function POST(req) {
     // Use mutex to prevent race conditions during balance checks and creations
     const result = await runWithMutex(async () => {
       // 3. Verify in Leave_Balances sheet that balance is sufficient
-      const balancesSheet = await getSheet('Leave_Balances');
+      const balancesSheet = await getSheet(SheetTabs.balances);
       const balanceRows = await balancesSheet.getRows();
 
       const employeeBalanceRow = balanceRows.find(
@@ -73,7 +73,7 @@ export async function POST(req) {
       }
 
       // 4. Add new request row in Leave_Requests with status "Pending"
-      const requestsSheet = await getSheet('Leave_Requests');
+      const requestsSheet = await getSheet(SheetTabs.requests);
       const requestId = generateUUID();
       const nowStr = new Date().toISOString();
 

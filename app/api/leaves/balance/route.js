@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
   // 1. Authenticate user
@@ -13,7 +13,7 @@ export async function GET(req) {
 
   try {
     // 2. Fetch the Leave_Balances sheet
-    const balancesSheet = await getSheet('Leave_Balances');
+    const balancesSheet = await getSheet(SheetTabs.balances);
     const rows = await balancesSheet.getRows();
 
     // 3. Find the row for the logged-in user

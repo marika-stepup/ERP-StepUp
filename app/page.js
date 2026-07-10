@@ -270,7 +270,7 @@ export default function Page() {
     setEditingMember(m);
     setNewMemberName(m.employee_name);
     setNewMemberEmail(m.employee_email);
-    setNewMemberRole(m.role || 'employee');
+    setNewMemberRole(m.employee_email.includes('hr@') ? 'hr' : 'employee');
     setNewMemberManager(m.manager_name || 'Aucun');
     setNewMemberCP(m.initial_balance.toString());
     setNewMemberPerm((m.initial_perm || 5).toString());
@@ -309,7 +309,6 @@ export default function Page() {
           employee_id: editingMember.employee_id,
           name: newMemberName,
           email: newMemberEmail,
-          role: newMemberRole,
           manager_name: newMemberManager,
           initial_balance: parseFloat(newMemberCP || 0),
           initial_perm: parseFloat(newMemberPerm || 0)
@@ -496,13 +495,8 @@ export default function Page() {
         </div>
         <div className="session-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span><strong>{balance.employee_name || user?.email}</strong></span>
-          <span className={`badge-role ${userRole === 'hr' ? 'hr' :
-              userRole === 'manager' ? 'manager' :
-                userRole === 'director' ? 'director' : 'employee'
-            }`} style={{ marginLeft: '0.25rem' }}>
-            {userRole === 'hr' ? 'RH' :
-              userRole === 'manager' ? 'Manager' :
-                userRole === 'director' ? 'Directeur' : 'Salarié'}
+          <span className={`badge-role ${userRole === 'hr' ? 'hr' : 'employee'}`} style={{ marginLeft: '0.25rem' }}>
+            {userRole === 'hr' ? 'RH' : 'Salarié'}
           </span>
 
           {/* Dark Mode Switcher Icon */}
@@ -794,17 +788,7 @@ export default function Page() {
                       {allMembers.map((m) => (
                         <tr key={m.employee_id}>
                           <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <strong>{m.employee_name}</strong>
-                              <span className={`badge-role ${m.role === 'hr' ? 'hr' :
-                                  m.role === 'manager' ? 'manager' :
-                                    m.role === 'director' ? 'director' : 'employee'
-                                }`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem' }}>
-                                {m.role === 'hr' ? 'HR' :
-                                  m.role === 'manager' ? 'Manager' :
-                                    m.role === 'director' ? 'Directeur' : 'Salarié'}
-                              </span>
-                            </div>
+                            <strong>{m.employee_name}</strong>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.employee_email}</div>
                           </td>
                           <td>{m.manager_name || 'Aucun'}</td>
@@ -855,63 +839,52 @@ export default function Page() {
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {pendingRequests.map((req) => {
-                    const reqMember = allMembers.find(m => m.employee_id === req.employee_id || m.employee_name === req.employee_name);
-                    const reqRole = reqMember?.role || 'employee';
-                    return (
-                      <div key={req.request_id} className="validation-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                          <div>
-                            <strong style={{ fontSize: '1.1rem' }}>{req.employee_name}</strong>
-                            <span className={`badge-role ${reqRole === 'hr' ? 'hr' :
-                                reqRole === 'manager' ? 'manager' :
-                                  reqRole === 'director' ? 'director' : 'employee'
-                              }`} style={{ marginLeft: '0.5rem' }}>
-                              {reqRole === 'hr' ? 'HR' :
-                                reqRole === 'manager' ? 'Manager' :
-                                  reqRole === 'director' ? 'Directeur' : 'Salarié'}
-                            </span>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                              Type: <strong>{req.leave_type}</strong> | Jours demandés: <strong>{req.business_days} j</strong>
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Période de congé :</div>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                              Du {req.start_date} au {req.end_date}
-                            </div>
+                  {pendingRequests.map((req) => (
+                    <div key={req.request_id} className="validation-card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                        <div>
+                          <strong style={{ fontSize: '1.1rem' }}>{req.employee_name}</strong>
+                          <span className="badge-role employee" style={{ marginLeft: '0.5rem' }}>Salarié</span>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                            Type: <strong>{req.leave_type}</strong> | Jours demandés: <strong>{req.business_days} j</strong>
                           </div>
                         </div>
-
-                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
-                          <input
-                            type="text"
-                            placeholder="Commentaire de validation..."
-                            style={{ flexGrow: 1 }}
-                            value={hrComments[req.request_id] || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setHrComments(prev => ({ ...prev, [req.request_id]: val }));
-                            }}
-                          />
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button
-                              className="btn-small btn-approve"
-                              onClick={() => handleValidateLeave(req.request_id, 'Approuver')}
-                            >
-                              Accepter
-                            </button>
-                            <button
-                              className="btn-small btn-reject"
-                              onClick={() => handleValidateLeave(req.request_id, 'Refuser')}
-                            >
-                              Refuser
-                            </button>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Période de congé :</div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            Du {req.start_date} au {req.end_date}
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
+
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                        <input
+                          type="text"
+                          placeholder="Commentaire de validation..."
+                          style={{ flexGrow: 1 }}
+                          value={hrComments[req.request_id] || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setHrComments(prev => ({ ...prev, [req.request_id]: val }));
+                          }}
+                        />
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            className="btn-small btn-approve"
+                            onClick={() => handleValidateLeave(req.request_id, 'Approuver')}
+                          >
+                            Accepter
+                          </button>
+                          <button
+                            className="btn-small btn-reject"
+                            onClick={() => handleValidateLeave(req.request_id, 'Refuser')}
+                          >
+                            Refuser
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -955,8 +928,6 @@ export default function Page() {
                       <label>Rôle dans le système</label>
                       <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)}>
                         <option value="employee">Collaborateur</option>
-                        <option value="manager">Manager</option>
-                        <option value="director">Directeur</option>
                         <option value="hr">Administrateur RH</option>
                       </select>
                     </div>
@@ -1033,13 +1004,8 @@ export default function Page() {
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.employee_email}</div>
                             </td>
                             <td>
-                              <span className={`badge-role ${m.role === 'hr' ? 'hr' :
-                                  m.role === 'manager' ? 'manager' :
-                                    m.role === 'director' ? 'director' : 'employee'
-                                }`}>
-                                {m.role === 'hr' ? 'HR' :
-                                  m.role === 'manager' ? 'Manager' :
-                                    m.role === 'director' ? 'Directeur' : 'Salarié'}
+                              <span className={`badge-role ${m.employee_email.includes('hr@') ? 'hr' : 'employee'}`}>
+                                {m.employee_email.includes('hr@') ? 'HR' : 'Salarié'}
                               </span>
                             </td>
                             <td>{m.manager_name || 'Aucun'}</td>
@@ -1126,16 +1092,6 @@ export default function Page() {
                   required
                   disabled={memberLoading}
                 />
-              </div>
-
-              <div className="form-group">
-                <label>Rôle dans le système</label>
-                <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)} disabled={memberLoading}>
-                  <option value="employee">Collaborateur</option>
-                  <option value="manager">Manager</option>
-                  <option value="director">Directeur</option>
-                  <option value="hr">Administrateur RH</option>
-                </select>
               </div>
 
               <div className="form-group">

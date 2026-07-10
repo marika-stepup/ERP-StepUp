@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
 import { generateUUID } from '../../../../lib/utils';
-import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr'
@@ -28,7 +28,7 @@ export async function POST(req) {
 
     // Use mutex to prevent duplicates during creation
     const result = await runWithMutex(async () => {
-      const balancesSheet = await getSheet('Leave_Balances');
+      const balancesSheet = await getSheet(SheetTabs.balances);
       const rows = await balancesSheet.getRows();
 
       // Check if email already exists

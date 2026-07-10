@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, LeaveRequestsColumns } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate and verify role 'hr'
@@ -33,7 +33,7 @@ export async function POST(req) {
     // Use mutex to serialize database changes and prevent race conditions
     const result = await runWithMutex(async () => {
       // 2. Find request in Leave_Requests
-      const requestsSheet = await getSheet('Leave_Requests');
+      const requestsSheet = await getSheet(SheetTabs.requests);
       const requestRows = await requestsSheet.getRows();
 
       const targetRequestRow = requestRows.find(
@@ -63,7 +63,7 @@ export async function POST(req) {
 
       if (normalizedAction === 'approuver' || normalizedAction === 'approve') {
         // 3. Find employee balance row in Leave_Balances
-        const balancesSheet = await getSheet('Leave_Balances');
+        const balancesSheet = await getSheet(SheetTabs.balances);
         const balanceRows = await balancesSheet.getRows();
 
         const balanceRow = balanceRows.find(

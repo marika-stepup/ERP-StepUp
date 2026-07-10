@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex, withRetry } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr'
@@ -13,7 +13,7 @@ export async function POST(req) {
   try {
     // Use mutex to serialize operation and prevent race conditions
     const result = await runWithMutex(async () => {
-      const balancesSheet = await getSheet('Leave_Balances');
+      const balancesSheet = await getSheet(SheetTabs.balances);
       const rows = await balancesSheet.getRows();
 
       const updatedCount = rows.length;

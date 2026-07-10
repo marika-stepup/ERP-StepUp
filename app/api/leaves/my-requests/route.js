@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet } from '../../../../lib/googleSheets';
-import { LeaveRequestsColumns } from '../../../../lib/sheetsColumns';
+import { LeaveRequestsColumns, SheetTabs } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
   // 1. Authenticate user
@@ -13,7 +13,7 @@ export async function GET(req) {
 
   try {
     // 2. Fetch Leave_Requests
-    const requestsSheet = await getSheet('Leave_Requests');
+    const requestsSheet = await getSheet(SheetTabs.requests);
     const rows = await requestsSheet.getRows();
 
     // 3. Filter by employee_id
