@@ -7,7 +7,7 @@ export default function Page() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState('');
-  
+
   // Navigation
   const [activeTab, setActiveTab] = useState('mySpace'); // 'mySpace', 'globalDashboard', 'adminRH'
 
@@ -15,9 +15,9 @@ export default function Page() {
   const [darkMode, setDarkMode] = useState(false);
 
   // Business Data States
-  const [balance, setBalance] = useState({ 
+  const [balance, setBalance] = useState({
     initial_balance: 0, taken_days: 0, remaining_balance: 0,
-    initial_perm: 0, taken_perm: 0, remaining_perm: 0 
+    initial_perm: 0, taken_perm: 0, remaining_perm: 0
   });
   const [myRequests, setMyRequests] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
@@ -274,7 +274,7 @@ export default function Page() {
     setNewMemberManager(m.manager_name || 'Aucun');
     setNewMemberCP(m.initial_balance.toString());
     setNewMemberPerm((m.initial_perm || 5).toString());
-    
+
     // Clear alerts
     setMemberError(null);
     setMemberSuccess(false);
@@ -494,20 +494,20 @@ export default function Page() {
           <span className="logo-text">Step Hub</span>
         </div>
         <div className="session-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span>Collaborateur : <strong>{balance.employee_name || user?.email}</strong></span>
+          <span><strong>{balance.employee_name || user?.email}</strong></span>
           <span className={`badge-role ${userRole === 'hr' ? 'hr' : 'employee'}`} style={{ marginLeft: '0.25rem' }}>
             {userRole === 'hr' ? 'RH' : 'Salarié'}
           </span>
-          
+
           {/* Dark Mode Switcher Icon */}
-          <button 
+          <button
             onClick={toggleDarkMode}
             className="logout-btn-header"
-            style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              padding: '0.45rem', 
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.45rem',
               marginLeft: '0.75rem',
               borderRadius: '50%',
               width: '32px',
@@ -527,13 +527,13 @@ export default function Page() {
           </button>
 
           {/* Logout Icon Button */}
-          <button 
-            onClick={handleLogout} 
-            className="logout-btn-header" 
-            style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
+          <button
+            onClick={handleLogout}
+            className="logout-btn-header"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               padding: '0.45rem',
               borderRadius: '50%',
               width: '32px',
@@ -551,20 +551,20 @@ export default function Page() {
       <div className="app-container">
         {/* --- TABS SELECTOR --- */}
         <div className="nav-tabs">
-          <button 
+          <button
             className={`tab-button ${activeTab === 'mySpace' ? 'active' : ''}`}
             onClick={() => setActiveTab('mySpace')}
           >
             Mon espace
           </button>
-          <button 
+          <button
             className={`tab-button ${activeTab === 'globalDashboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('globalDashboard')}
           >
             Tableau de bord global
           </button>
           {userRole === 'hr' && (
-            <button 
+            <button
               className={`tab-button ${activeTab === 'adminRH' ? 'active' : ''}`}
               onClick={() => setActiveTab('adminRH')}
             >
@@ -600,7 +600,7 @@ export default function Page() {
 
               <div className="panel">
                 <h2 className="panel-title">➕ Déposer une demande</h2>
-                
+
                 {submitError && <div className="error-message">{submitError}</div>}
                 {submitSuccess && <div className="success-message">Votre demande a été soumise.</div>}
 
@@ -618,19 +618,19 @@ export default function Page() {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Date Début</label>
-                      <input 
-                        type="date" 
-                        value={startDate} 
-                        onChange={(e) => setStartDate(e.target.value)} 
-                        required 
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        required
                       />
                     </div>
                     <div className="form-group">
                       <label>Heure Début</label>
-                      <input 
-                        type="time" 
-                        value={startTime} 
-                        onChange={(e) => setStartTime(e.target.value)} 
+                      <input
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
                       />
                     </div>
                   </div>
@@ -638,28 +638,28 @@ export default function Page() {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Date Fin</label>
-                      <input 
-                        type="date" 
-                        value={endDate} 
-                        onChange={(e) => setEndDate(e.target.value)} 
-                        required 
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        required
                       />
                     </div>
                     <div className="form-group">
                       <label>Heure Fin</label>
-                      <input 
-                        type="time" 
-                        value={endTime} 
-                        onChange={(e) => setEndTime(e.target.value)} 
+                      <input
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
                       />
                     </div>
                   </div>
 
                   <div className="form-group">
                     <label>Nombre de jours déduits (facultatif)</label>
-                    <input 
-                      type="number" 
-                      placeholder="Ex: 1 ou 2.5" 
+                    <input
+                      type="number"
+                      placeholder="Ex: 1 ou 2.5"
                       step="0.5"
                       value={daysRequested}
                       onChange={(e) => setDaysRequested(e.target.value)}
@@ -668,9 +668,9 @@ export default function Page() {
 
                   <div className="form-group">
                     <label>Motif / Justification</label>
-                    <textarea 
-                      placeholder="Raison..." 
-                      value={reason} 
+                    <textarea
+                      placeholder="Raison..."
+                      value={reason}
                       onChange={(e) => setReason(e.target.value)}
                     />
                   </div>
@@ -686,7 +686,7 @@ export default function Page() {
             <div className="main-content">
               <div className="panel">
                 <h2 className="panel-title">🕒 Suivi de mes demandes</h2>
-                
+
                 {myRequests.length === 0 ? (
                   <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
                     Aucune demande enregistrée.
@@ -719,7 +719,7 @@ export default function Page() {
                                 req.status === 'Approved' ? 'status-approved' : 'status-rejected'
                                 }`}>
                                 {req.status === 'Pending' ? 'En attente' :
-                                 req.status === 'Approved' ? 'Approuvé' : 'Refusé'}
+                                  req.status === 'Approved' ? 'Approuvé' : 'Refusé'}
                               </span>
                             </td>
                             <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
@@ -823,7 +823,7 @@ export default function Page() {
         {/* ==================================================== */}
         {activeTab === 'adminRH' && userRole === 'hr' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            
+
             {/* Header Actions Alerts */}
             {hrError && <div className="error-message">{hrError}</div>}
             {hrSuccess && <div className="success-message">{hrSuccess}</div>}
@@ -895,7 +895,7 @@ export default function Page() {
               <div className="sidebar" style={{ width: '350px' }}>
                 <div className="panel">
                   <h2 className="panel-title">👤 Ajouter un Membre</h2>
-                  
+
                   {memberError && <div className="error-message">{memberError}</div>}
                   {memberSuccess && <div className="success-message">Données enregistrées avec succès.</div>}
 
@@ -975,8 +975,8 @@ export default function Page() {
                 <div className="panel">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <h2 className="panel-title" style={{ marginBottom: 0 }}>⚙️ Configuration des équipes & Droits</h2>
-                    <button 
-                      onClick={handleCreditAll} 
+                    <button
+                      onClick={handleCreditAll}
                       className="btn-secondary btn-small"
                       style={{ color: 'var(--brand-orange)', borderColor: 'var(--brand-orange)', background: '#fff7ed' }}
                     >
@@ -1147,16 +1147,16 @@ export default function Page() {
             <h2 className="modal-title">🛡️ {confirmModal.title}</h2>
             <p className="modal-message" style={{ marginBottom: '1.5rem' }}>{confirmModal.message}</p>
             <div className="modal-footer">
-              <button 
-                type="button" 
-                className="btn-accent" 
+              <button
+                type="button"
+                className="btn-accent"
                 onClick={confirmModal.onConfirm}
               >
                 Confirmer
               </button>
-              <button 
-                type="button" 
-                className="btn-secondary" 
+              <button
+                type="button"
+                className="btn-secondary"
                 onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
               >
                 Annuler

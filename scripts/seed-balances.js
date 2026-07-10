@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
-import { LeaveBalancesColumns, LeaveRequestsColumns } from '../lib/sheetsColumns.js';
+import { LeaveBalancesColumns, LeaveRequestsColumns, TimeLogsColumns, SheetTabs, formatSheetFloat } from '../lib/sheetsColumns.js';
 
 // 1. Manually parse .env.local
 const envPath = path.resolve('.env.local');
@@ -48,17 +48,17 @@ async function run() {
     await doc.loadInfo();
     console.log('Document title:', doc.title);
 
-    // --- 1. Initialize Leave_Balances sheet headers and seed ---
-    console.log('\n--- Initializing Leave_Balances... ---');
-    let balanceSheet = doc.sheetsByTitle['Leave_Balances'];
+    // --- 1. Initialize Leave_Balances (Soldes_Conges) sheet ---
+    console.log(`\n--- Initializing ${SheetTabs.balances}... ---`);
+    let balanceSheet = doc.sheetsByTitle[SheetTabs.balances];
     if (!balanceSheet) {
-      console.log('Sheet "Leave_Balances" not found. Creating it...');
-      balanceSheet = await doc.addSheet({ title: 'Leave_Balances' });
+      console.log(`Sheet "${SheetTabs.balances}" not found. Creating it...`);
+      balanceSheet = await doc.addSheet({ title: SheetTabs.balances });
     }
     
     // Set headers
     const balanceHeaders = Object.values(LeaveBalancesColumns);
-    console.log('Setting headers for Leave_Balances:', balanceHeaders);
+    console.log(`Setting headers for ${SheetTabs.balances}:`, balanceHeaders);
     await balanceSheet.setHeaderRow(balanceHeaders);
 
     const testUsers = [
@@ -66,29 +66,29 @@ async function run() {
         [LeaveBalancesColumns.employee_id]: '87327813-ad8a-4127-a9b3-4ede219ecef7',
         [LeaveBalancesColumns.employee_name]: 'Alice Martin',
         [LeaveBalancesColumns.employee_email]: 'employee@entreprise.com',
-        [LeaveBalancesColumns.initial_balance]: '25.0',
-        [LeaveBalancesColumns.taken_days]: '0.0',
-        [LeaveBalancesColumns.remaining_balance]: '25.0',
-        [LeaveBalancesColumns.initial_perm]: '5.0',
-        [LeaveBalancesColumns.taken_perm]: '0.0',
-        [LeaveBalancesColumns.remaining_perm]: '5.0',
+        [LeaveBalancesColumns.initial_balance]: formatSheetFloat(25.0),
+        [LeaveBalancesColumns.taken_days]: formatSheetFloat(0.0),
+        [LeaveBalancesColumns.remaining_balance]: formatSheetFloat(25.0),
+        [LeaveBalancesColumns.initial_perm]: formatSheetFloat(5.0),
+        [LeaveBalancesColumns.taken_perm]: formatSheetFloat(0.0),
+        [LeaveBalancesColumns.remaining_perm]: formatSheetFloat(5.0),
         [LeaveBalancesColumns.manager_name]: 'Bob Dupont'
       },
       {
         [LeaveBalancesColumns.employee_id]: 'e7b63926-98ab-4f4d-b643-258de48438df',
         [LeaveBalancesColumns.employee_name]: 'Bob Dupont',
         [LeaveBalancesColumns.employee_email]: 'hr@entreprise.com',
-        [LeaveBalancesColumns.initial_balance]: '25.0',
-        [LeaveBalancesColumns.taken_days]: '0.0',
-        [LeaveBalancesColumns.remaining_balance]: '25.0',
-        [LeaveBalancesColumns.initial_perm]: '5.0',
-        [LeaveBalancesColumns.taken_perm]: '0.0',
-        [LeaveBalancesColumns.remaining_perm]: '5.0',
+        [LeaveBalancesColumns.initial_balance]: formatSheetFloat(25.0),
+        [LeaveBalancesColumns.taken_days]: formatSheetFloat(0.0),
+        [LeaveBalancesColumns.remaining_balance]: formatSheetFloat(25.0),
+        [LeaveBalancesColumns.initial_perm]: formatSheetFloat(5.0),
+        [LeaveBalancesColumns.taken_perm]: formatSheetFloat(0.0),
+        [LeaveBalancesColumns.remaining_perm]: formatSheetFloat(5.0),
         [LeaveBalancesColumns.manager_name]: 'Aucun'
       }
     ];
 
-    console.log('Checking existing rows in Leave_Balances...');
+    console.log(`Checking existing rows in ${SheetTabs.balances}...`);
     const balanceRows = await balanceSheet.getRows();
 
     for (const user of testUsers) {
@@ -102,31 +102,31 @@ async function run() {
       }
     }
 
-    // --- 2. Initialize Leave_Requests sheet headers ---
-    console.log('\n--- Initializing Leave_Requests... ---');
-    let requestsSheet = doc.sheetsByTitle['Leave_Requests'];
+    // --- 2. Initialize Leave_Requests (Demandes_Conges) sheet ---
+    console.log(`\n--- Initializing ${SheetTabs.requests}... ---`);
+    let requestsSheet = doc.sheetsByTitle[SheetTabs.requests];
     if (!requestsSheet) {
-      console.log('Sheet "Leave_Requests" not found. Creating it...');
-      requestsSheet = await doc.addSheet({ title: 'Leave_Requests' });
+      console.log(`Sheet "${SheetTabs.requests}" not found. Creating it...`);
+      requestsSheet = await doc.addSheet({ title: SheetTabs.requests });
     }
     
     const requestHeaders = Object.values(LeaveRequestsColumns);
-    console.log('Setting headers for Leave_Requests:', requestHeaders);
+    console.log(`Setting headers for ${SheetTabs.requests}:`, requestHeaders);
     await requestsSheet.setHeaderRow(requestHeaders);
 
-    // --- 3. Initialize Time_Logs sheet headers ---
-    console.log('\n--- Initializing Time_Logs... ---');
-    let logsSheet = doc.sheetsByTitle['Time_Logs'];
+    // --- 3. Initialize Time_Logs (Pointages) sheet ---
+    console.log(`\n--- Initializing ${SheetTabs.timeLogs}... ---`);
+    let logsSheet = doc.sheetsByTitle[SheetTabs.timeLogs];
     if (!logsSheet) {
-      console.log('Sheet "Time_Logs" not found. Creating it...');
-      logsSheet = await doc.addSheet({ title: 'Time_Logs' });
+      console.log(`Sheet "${SheetTabs.timeLogs}" not found. Creating it...`);
+      logsSheet = await doc.addSheet({ title: SheetTabs.timeLogs });
     }
     
-    const logHeaders = ['log_id', 'employee_id', 'date', 'clock_in', 'clock_out', 'break_duration', 'total_hours', 'status', 'created_at'];
-    console.log('Setting headers for Time_Logs:', logHeaders);
+    const logHeaders = Object.values(TimeLogsColumns);
+    console.log(`Setting headers for ${SheetTabs.timeLogs}:`, logHeaders);
     await logsSheet.setHeaderRow(logHeaders);
 
-    console.log('\n🎉 ALL SHEET TABS SUCCESSFULLY INITIALIZED AND SEEDED WITH FRENCH HEADERS! 🎉');
+    console.log('\n🎉 ALL SHEET TABS SUCCESSFULLY INITIALIZED AND SEEDED WITH FRENCH HEADERS & NAMES! 🎉');
 
   } catch (error) {
     console.error('Error during Google Sheets seeding:', error);
