@@ -708,7 +708,7 @@ export default function Page() {
         <div className="session-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span><strong>{balance.employee_name || user?.email}</strong></span>
           <span className={`badge-role ${userRole === 'hr' ? 'hr' : userRole === 'manager' ? 'manager' : userRole === 'director' ? 'director' : 'employee'}`} style={{ marginLeft: '0.25rem' }}>
-            {userRole === 'hr' ? 'RH' : userRole === 'manager' ? 'Manager' : userRole === 'director' ? 'Directeur' : 'Salarié'}
+            {userRole === 'hr' ? 'Administrateur' : userRole === 'manager' ? 'Manager' : userRole === 'director' ? 'Directeur' : 'Collaborateur'}
           </span>
 
           {/* Dark Mode Switcher Icon */}
@@ -1261,7 +1261,7 @@ export default function Page() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                         <div>
                           <strong style={{ fontSize: '1.1rem' }}>{req.employee_name}</strong>
-                          <span className="badge-role employee" style={{ marginLeft: '0.5rem' }}>Salarié</span>
+                          <span className="badge-role employee" style={{ marginLeft: '0.5rem' }}>Collaborateur</span>
                           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                             Type: <strong>{req.leave_type}</strong> | Jours demandés: <strong>{req.business_days} j</strong>
                           </div>
@@ -1399,9 +1399,7 @@ export default function Page() {
                       <label>Rôle dans le système</label>
                       <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)}>
                         <option value="employee">Collaborateur</option>
-                        <option value="hr">Administrateur RH</option>
-                        <option value="manager">Manager</option>
-                        <option value="director">Directeur</option>
+                        <option value="hr">Administrateur</option>
                       </select>
                     </div>
 
@@ -1482,7 +1480,7 @@ export default function Page() {
                             </td>
                             <td>
                               <span className={`badge-role ${m.role === 'hr' ? 'hr' : m.role === 'manager' ? 'manager' : m.role === 'director' ? 'director' : 'employee'}`}>
-                                {m.role === 'hr' ? 'RH' : m.role === 'manager' ? 'Manager' : m.role === 'director' ? 'Directeur' : 'Salarié'}
+                                {m.role === 'hr' ? 'Administrateur' : m.role === 'manager' ? 'Manager' : m.role === 'director' ? 'Directeur' : 'Collaborateur'}
                               </span>
                             </td>
                             <td>{m.manager_name || 'Aucun'}</td>
@@ -1595,9 +1593,7 @@ export default function Page() {
                 <label>Rôle dans le système</label>
                 <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)} disabled={memberLoading}>
                   <option value="employee">Collaborateur</option>
-                  <option value="hr">Administrateur RH</option>
-                  <option value="manager">Manager</option>
-                  <option value="director">Directeur</option>
+                  <option value="hr">Administrateur</option>
                 </select>
               </div>
 
