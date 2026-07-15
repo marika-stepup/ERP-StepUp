@@ -853,3 +853,343 @@ button:disabled {
     transform: scale(1) translateY(0);
   }
 }
+
+/* Password field wrapper and toggle icon styling */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrapper input {
+  padding-right: 2.75rem !important;
+  width: 100%;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.85rem;
+  background: none !important;
+  border: none !important;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+  width: auto !important;
+  height: auto !important;
+  box-shadow: none !important;
+  min-height: unset !important;
+}
+
+.password-toggle-btn:hover {
+  color: var(--brand-orange) !important;
+  background: none !important;
+}
+
+/* ==================================================== */
+/* GANTT LEAVE SCHEDULER STYLING                        */
+/* ==================================================== */
+
+.gantt-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.gantt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.gantt-month-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.gantt-nav-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.gantt-nav-btn {
+  background: var(--panel-white);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.gantt-nav-btn:hover {
+  border-color: var(--brand-orange);
+  color: var(--brand-orange);
+  background: var(--warning-bg);
+}
+
+.gantt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  background: var(--background-light);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  align-items: center;
+}
+
+.gantt-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-secondary);
+}
+
+.gantt-legend-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid var(--border-light);
+}
+
+.gantt-legend-box.approved {
+  background: #3b82f6;
+  border-color: #2563eb;
+}
+
+.gantt-legend-box.pending {
+  background: #eab308;
+  border-color: #ca8a04;
+}
+
+.gantt-legend-box.overlap {
+  box-shadow: inset 0 0 0 2px var(--error-color);
+}
+
+.gantt-legend-box.weekend {
+  background: var(--border-light);
+}
+
+.gantt-legend-box.holiday {
+  background: #ffe4e6;
+  border-color: #fecaca;
+}
+
+body.dark .gantt-legend-box.holiday {
+  background: rgba(225, 29, 72, 0.15);
+  border-color: rgba(225, 29, 72, 0.3);
+}
+
+.gantt-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--panel-white);
+}
+
+.gantt-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.gantt-table th {
+  background: var(--background-light);
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 0.5rem;
+  text-align: center;
+  border-bottom: 2px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
+}
+
+.gantt-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
+  height: 42px;
+  vertical-align: middle;
+}
+
+/* Sticky columns */
+.gantt-col-name {
+  position: sticky;
+  left: 0;
+  background: var(--panel-white) !important;
+  z-index: 2;
+  min-width: 160px;
+  max-width: 160px;
+  text-align: left !important;
+  border-right: 1px solid var(--border-light) !important;
+  box-shadow: 3px 0 6px -3px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+}
+
+.gantt-col-service {
+  position: sticky;
+  left: 160px;
+  background: var(--panel-white) !important;
+  z-index: 2;
+  min-width: 120px;
+  max-width: 120px;
+  text-align: left !important;
+  border-right: 2px solid var(--border-light) !important;
+  box-shadow: 3px 0 6px -3px rgba(0, 0, 0, 0.15);
+}
+
+/* Table header sticky adjustment */
+.gantt-table th.gantt-col-name,
+.gantt-table th.gantt-col-service {
+  z-index: 3;
+  background: var(--background-light) !important;
+}
+
+.gantt-day-th {
+  min-width: 34px;
+  width: 34px;
+  text-align: center;
+  padding: 0.35rem 0 !important;
+}
+
+.gantt-day-num {
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: block;
+}
+
+.gantt-day-name {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: block;
+  text-transform: uppercase;
+}
+
+.gantt-cell {
+  min-width: 34px;
+  width: 34px;
+  text-align: center !important;
+  padding: 0 !important;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.gantt-cell.weekend {
+  background: var(--background-light);
+  opacity: 0.75;
+}
+
+.gantt-cell.holiday {
+  background: #ffe4e6 !important;
+}
+
+body.dark .gantt-cell.holiday {
+  background: rgba(225, 29, 72, 0.15) !important;
+}
+
+.gantt-cell.status-approved {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.gantt-cell.status-pending {
+  background: #eab308 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.gantt-cell.overlap {
+  box-shadow: inset 0 0 0 2px var(--error-color) !important;
+  z-index: 1;
+}
+
+/* End balance column */
+.gantt-col-balance {
+  min-width: 75px;
+  text-align: center !important;
+  font-weight: 600;
+  background: var(--panel-white);
+  border-left: 2px solid var(--border-light);
+}
+
+.gantt-table th.gantt-col-balance {
+  background: var(--background-light) !important;
+}
+
+.gantt-collaborator-name-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-collaborator-email {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* Service overlap alert card below timeline */
+.gantt-alerts-card {
+  margin-top: 1.5rem;
+  background: var(--panel-white);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.gantt-alerts-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gantt-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.gantt-alert-item {
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.gantt-alert-badge {
+  background: var(--brand-navy);
+  color: var(--panel-white);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}

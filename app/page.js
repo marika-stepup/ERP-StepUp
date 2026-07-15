@@ -3,6 +3,60 @@
 import { useEffect, useState } from 'react';
 import { supabaseClient } from '../lib/supabaseClient';
 
+// Helper to check Madagascar public holidays (fixed and variable)
+const isMadagascarHoliday = (dateStr) => {
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return false;
+  const y = date.getFullYear();
+  const m = date.getMonth(); // 0-indexed
+  const d = date.getDate();
+  
+  // Fixed holidays
+  if (m === 0 && d === 1) return true; // Jour de l'an
+  if (m === 2 && d === 29) return true; // Commémoration du 29 mars 1947
+  if (m === 4 && d === 1) return true; // Fête du travail
+  if (m === 5 && d === 26) return true; // Fête nationale / Indépendance
+  if (m === 7 && d === 15) return true; // Assomption
+  if (m === 10 && d === 1) return true; // Toussaint
+  if (m === 11 && d === 25) return true; // Noël
+  
+  // Variable holidays calculation (Easter, Ascension, Pentecost)
+  // Meeus/Jones/Butcher Algorithm
+  const a = y % 19;
+  const b = Math.floor(y / 100);
+  const c = y % 100;
+  const dVal = Math.floor(b / 4);
+  const eVal = b % 4;
+  const fVal = Math.floor((b + 8) / 25);
+  const gVal = Math.floor((b - fVal + 1) / 3);
+  const hVal = (19 * a + b - dVal - gVal + 15) % 30;
+  const iVal = Math.floor(c / 4);
+  const kVal = c % 4;
+  const lVal = (32 + 2 * eVal + 2 * iVal - hVal - kVal) % 7;
+  const mVal = Math.floor((a + 11 * hVal + 22 * lVal) / 451);
+  const easterMonth = Math.floor((hVal + lVal - 7 * mVal + 114) / 31);
+  const easterDay = ((hVal + lVal - 7 * mVal + 114) % 31) + 1;
+  
+  const easterSunday = new Date(y, easterMonth - 1, easterDay);
+  
+  // Easter Monday (Easter + 1 day)
+  const easterMonday = new Date(easterSunday);
+  easterMonday.setDate(easterSunday.getDate() + 1);
+  if (m === easterMonday.getMonth() && d === easterMonday.getDate()) return true;
+  
+  // Ascension Thursday (Easter + 39 days)
+  const ascension = new Date(easterSunday);
+  ascension.setDate(easterSunday.getDate() + 39);
+  if (m === ascension.getMonth() && d === ascension.getDate()) return true;
+  
+  // Pentecost Monday (Easter + 50 days)
+  const pentecost = new Date(easterSunday);
+  pentecost.setDate(easterSunday.getDate() + 50);
+  if (m === pentecost.getMonth() && d === pentecost.getDate()) return true;
+  
+  return false;
+};
+
 export default function Page() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +93,9 @@ export default function Page() {
   const [editingMember, setEditingMember] = useState(null); // When set, we are in Edit Modal
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberPassword, setNewMemberPassword] = useState('');
+  const [showNewMemberPassword, setShowNewMemberPassword] = useState(false);
+  const [newMemberService, setNewMemberService] = useState('Directeur');
   const [newMemberRole, setNewMemberRole] = useState('employee');
   const [newMemberManager, setNewMemberManager] = useState('Aucun');
   const [newMemberCP, setNewMemberCP] = useState('25');
@@ -46,6 +103,14 @@ export default function Page() {
   const [memberError, setMemberError] = useState(null);
   const [memberSuccess, setMemberSuccess] = useState(false);
   const [memberLoading, setMemberLoading] = useState(false);
+  const [allRequests, setAllRequests] = useState([]);
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  const getTodayDateString = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(getTodayDateString());
 
   // Adjustments & HR Actions
   const [hrComments, setHrComments] = useState({});
@@ -73,6 +138,136 @@ export default function Page() {
       }
     });
   };
+
+  // Calendar navigation & logic helpers
+  const handlePrevMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  
+  const firstDay = new Date(year, month, 1);
+  let firstDayOfWeek = firstDay.getDay();
+  firstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+  
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const prevMonthTotalDays = new Date(year, month, 0).getDate();
+  
+  const calendarGridDays = [];
+  
+  for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+    const dayNum = prevMonthTotalDays - i;
+    const d = new Date(year, month - 1, dayNum);
+    calendarGridDays.push({
+      dayNum,
+      isCurrentMonth: false,
+      dateString: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`,
+      isWeekend: d.getDay() === 0 || d.getDay() === 6
+    });
+  }
+  
+  for (let i = 1; i <= totalDays; i++) {
+    const d = new Date(year, month, i);
+    calendarGridDays.push({
+      dayNum: i,
+      isCurrentMonth: true,
+      dateString: `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
+      isWeekend: d.getDay() === 0 || d.getDay() === 6
+    });
+  }
+  
+  const remaining = 42 - calendarGridDays.length;
+  for (let i = 1; i <= remaining; i++) {
+    const d = new Date(year, month + 1, i);
+    calendarGridDays.push({
+      dayNum: i,
+      isCurrentMonth: false,
+      dateString: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
+      isWeekend: d.getDay() === 0 || d.getDay() === 6
+    });
+  }
+
+  const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`;
+  
+  const monthRequests = allRequests.filter(req => req.start_date <= monthEnd && req.end_date >= monthStart);
+
+  // Generate days in month array for Gantt chart
+  const daysInMonthArray = [];
+  for (let i = 1; i <= totalDays; i++) {
+    const d = new Date(year, month, i);
+    const dayOfWeek = d.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const dayNames = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
+    const dayNameAbbr = dayNames[dayOfWeek];
+    const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+    
+    daysInMonthArray.push({
+      dayNum: i,
+      dateString,
+      isWeekend,
+      dayNameAbbr
+    });
+  }
+
+  // Calculate conflicts per day and service for Gantt chart
+  const dayServiceConflicts = {};
+  daysInMonthArray.forEach(day => {
+    const dayReqs = allRequests.filter(req => 
+      day.dateString >= req.start_date && day.dateString <= req.end_date
+    );
+    const svcGroups = {};
+    dayReqs.forEach(req => {
+      const svc = req.service || 'Non spécifié';
+      if (!svcGroups[svc]) svcGroups[svc] = [];
+      svcGroups[svc].push(req.employee_id);
+    });
+    Object.keys(svcGroups).forEach(svc => {
+      const uniqueEmployees = [...new Set(svcGroups[svc])];
+      if (uniqueEmployees.length > 1) {
+        dayServiceConflicts[`${day.dateString}-${svc}`] = true;
+      }
+    });
+  });
+  
+  const getMonthOverlaps = () => {
+    const byService = {};
+    monthRequests.forEach(req => {
+      const svc = req.service || 'Non spécifié';
+      if (!byService[svc]) byService[svc] = [];
+      byService[svc].push(req);
+    });
+    
+    const overlapsList = [];
+    Object.keys(byService).forEach(svc => {
+      const reqs = byService[svc];
+      for (let i = 0; i < reqs.length; i++) {
+        for (let j = i + 1; j < reqs.length; j++) {
+          const r1 = reqs[i];
+          const r2 = reqs[j];
+          const oStart = r1.start_date > r2.start_date ? r1.start_date : r2.start_date;
+          const oEnd = r1.end_date < r2.end_date ? r1.end_date : r2.end_date;
+          if (oStart <= oEnd) {
+            const isDup = overlapsList.some(o => 
+              (o.r1.request_id === r1.request_id && o.r2.request_id === r2.request_id) ||
+              (o.r1.request_id === r2.request_id && o.r2.request_id === r1.request_id)
+            );
+            if (!isDup) {
+              overlapsList.push({ service: svc, r1, r2, start: oStart, end: oEnd });
+            }
+          }
+        }
+      }
+    });
+    return overlapsList;
+  };
+  
+  const activeMonthOverlaps = getMonthOverlaps();
 
   // 1. Initial Session Check & Dark Mode check
   useEffect(() => {
@@ -151,18 +346,26 @@ export default function Page() {
         setMyRequests(myRequestsData.requests || []);
       }
 
-      // 2c. Fetch admin/global data if HR
-      if (userRole === 'hr') {
-        // Members list
-        const membersRes = await fetch('/api/admin/members', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (membersRes.ok) {
-          const membersData = await membersRes.json();
-          setAllMembers(membersData.members || []);
-        }
+      // 2c. Fetch global members list (accessible to all roles for the global dashboard)
+      const membersRes = await fetch('/api/admin/members', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (membersRes.ok) {
+        const membersData = await membersRes.json();
+        setAllMembers(membersData.members || []);
+      }
 
-        // Pending requests
+      // Fetch all leave requests for the calendar (accessible to all roles)
+      const allRequestsRes = await fetch('/api/leaves/all', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (allRequestsRes.ok) {
+        const allRequestsData = await allRequestsRes.json();
+        setAllRequests(allRequestsData.requests || []);
+      }
+
+      // 2d. Fetch pending requests if authorized (HR, Manager, Director)
+      if (userRole === 'hr' || userRole === 'manager' || userRole === 'director') {
         const pendingRes = await fetch('/api/leaves/pending', {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -242,7 +445,9 @@ export default function Page() {
           role: newMemberRole,
           manager_name: newMemberManager,
           initial_balance: parseFloat(newMemberCP || 0),
-          initial_perm: parseFloat(newMemberPerm || 0)
+          initial_perm: parseFloat(newMemberPerm || 0),
+          password: newMemberPassword,
+          service: newMemberService
         })
       });
 
@@ -253,9 +458,12 @@ export default function Page() {
         setMemberSuccess(true);
         setNewMemberName('');
         setNewMemberEmail('');
+        setNewMemberPassword('');
+        setShowNewMemberPassword(false);
         setNewMemberCP('25');
         setNewMemberPerm('5');
         setNewMemberManager('Aucun');
+        setNewMemberService('Directeur');
         fetchDashboardData();
       }
     } catch (err) {
@@ -270,10 +478,11 @@ export default function Page() {
     setEditingMember(m);
     setNewMemberName(m.employee_name);
     setNewMemberEmail(m.employee_email);
-    setNewMemberRole(m.employee_email.includes('hr@') ? 'hr' : 'employee');
+    setNewMemberRole(m.role || 'employee');
     setNewMemberManager(m.manager_name || 'Aucun');
     setNewMemberCP(m.initial_balance.toString());
     setNewMemberPerm((m.initial_perm || 5).toString());
+    setNewMemberService(m.service || 'Non spécifié');
 
     // Clear alerts
     setMemberError(null);
@@ -289,6 +498,7 @@ export default function Page() {
     setNewMemberManager('Aucun');
     setNewMemberCP('25');
     setNewMemberPerm('5');
+    setNewMemberService('Directeur');
   };
 
   // 7. Update Member Details (HR Admin)
@@ -309,9 +519,11 @@ export default function Page() {
           employee_id: editingMember.employee_id,
           name: newMemberName,
           email: newMemberEmail,
+          role: newMemberRole,
           manager_name: newMemberManager,
           initial_balance: parseFloat(newMemberCP || 0),
-          initial_perm: parseFloat(newMemberPerm || 0)
+          initial_perm: parseFloat(newMemberPerm || 0),
+          service: newMemberService
         })
       });
 
@@ -495,8 +707,8 @@ export default function Page() {
         </div>
         <div className="session-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span><strong>{balance.employee_name || user?.email}</strong></span>
-          <span className={`badge-role ${userRole === 'hr' ? 'hr' : 'employee'}`} style={{ marginLeft: '0.25rem' }}>
-            {userRole === 'hr' ? 'RH' : 'Salarié'}
+          <span className={`badge-role ${userRole === 'hr' ? 'hr' : userRole === 'manager' ? 'manager' : userRole === 'director' ? 'director' : 'employee'}`} style={{ marginLeft: '0.25rem' }}>
+            {userRole === 'hr' ? 'RH' : userRole === 'manager' ? 'Manager' : userRole === 'director' ? 'Directeur' : 'Salarié'}
           </span>
 
           {/* Dark Mode Switcher Icon */}
@@ -563,7 +775,7 @@ export default function Page() {
           >
             Tableau de bord global
           </button>
-          {userRole === 'hr' && (
+          {(userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
             <button
               className={`tab-button ${activeTab === 'adminRH' ? 'active' : ''}`}
               onClick={() => setActiveTab('adminRH')}
@@ -715,11 +927,11 @@ export default function Page() {
                             </td>
                             <td><strong>{req.business_days} j</strong></td>
                             <td>
-                              <span className={`status-badge ${req.status === 'Pending' ? 'status-pending' :
-                                req.status === 'Approved' ? 'status-approved' : 'status-rejected'
+                              <span className={`status-badge ${req.status === 'En attente' ? 'status-pending' :
+                                req.status === 'Approuvé' ? 'status-approved' : 'status-rejected'
                                 }`}>
-                                {req.status === 'Pending' ? 'En attente' :
-                                  req.status === 'Approved' ? 'Approuvé' : 'Refusé'}
+                                {req.status === 'En attente' ? 'En attente' :
+                                  req.status === 'Approuvé' ? 'Approuvé' : 'Refusé'}
                               </span>
                             </td>
                             <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
@@ -768,7 +980,7 @@ export default function Page() {
               <h2 className="panel-title">📊 Soldes Globaux & Responsables (N+1)</h2>
               <p className="panel-subtitle">Visualisation en temps réel des congés restants et de l'organigramme.</p>
 
-              {userRole !== 'hr' && allMembers.length === 0 ? (
+              {allMembers.length === 0 ? (
                 <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
                   Chargement des soldes...
                 </p>
@@ -807,12 +1019,217 @@ export default function Page() {
               )}
             </div>
 
-            {/* Planning Simplifié */}
+            {/* Calendrier des départs & Superpositions en format Gantt */}
             <div className="panel">
-              <h2 className="panel-title">📅 Planning des congés & Absences</h2>
-              <p className="panel-subtitle">Visualisation chronologique des départs.</p>
-              <div style={{ background: '#f8fafc', padding: '2rem', borderRadius: '12px', border: '1px dashed var(--border-light)', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                Aucune absence planifiée pour les 30 prochains jours.
+              <h2 className="panel-title">📅 Calendrier des départs & Superpositions</h2>
+              <p className="panel-subtitle">Visualisation mensuelle sous forme de planning Gantt et détection des conflits par service.</p>
+              
+              <div className="gantt-container">
+                {/* Gantt Header Nav */}
+                <div className="gantt-header">
+                  <span className="gantt-month-title">
+                    {currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                  </span>
+                  <div className="gantt-nav-buttons">
+                    <button type="button" className="gantt-nav-btn" onClick={handlePrevMonth} title="Mois précédent">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                      </svg>
+                    </button>
+                    <button type="button" className="gantt-nav-btn" onClick={handleNextMonth} title="Mois suivant">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div className="gantt-legend">
+                  <div className="gantt-legend-item">
+                    <span className="gantt-legend-box approved"></span>
+                    <span>Approuvé (CP / Perm)</span>
+                  </div>
+                  <div className="gantt-legend-item">
+                    <span className="gantt-legend-box pending"></span>
+                    <span>En attente</span>
+                  </div>
+                  <div className="gantt-legend-item">
+                    <span className="gantt-legend-box overlap"></span>
+                    <span>Superposition de Service</span>
+                  </div>
+                  <div className="gantt-legend-item">
+                    <span className="gantt-legend-box weekend"></span>
+                    <span>Week-end</span>
+                  </div>
+                  <div className="gantt-legend-item">
+                    <span className="gantt-legend-box holiday" style={{ backgroundColor: '#ffe4e6' }}></span>
+                    <span>Jour Férié</span>
+                  </div>
+                </div>
+
+                {/* Scrollable Timeline Grid */}
+                <div className="gantt-scroll-wrapper">
+                  <table className="gantt-table">
+                    <thead>
+                      <tr>
+                        <th colSpan={daysInMonthArray.length + 3} style={{
+                          background: '#15803d', // Green background like Excel screenshot
+                          color: '#ffffff',
+                          fontSize: '1rem',
+                          fontWeight: '700',
+                          padding: '0.6rem',
+                          textAlign: 'center',
+                          textTransform: 'capitalize'
+                        }}>
+                          {currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                        </th>
+                      </tr>
+                      <tr>
+                        <th className="gantt-col-name" style={{ backgroundColor: 'var(--background-light)' }}>Collaborateur</th>
+                        <th className="gantt-col-service" style={{ backgroundColor: 'var(--background-light)' }}>Service</th>
+                        {daysInMonthArray.map(day => {
+                          const isHoliday = isMadagascarHoliday(day.dateString);
+                          return (
+                            <th key={day.dayNum} className="gantt-day-th" style={{
+                              backgroundColor: day.isWeekend ? 'var(--border-light)' : isHoliday ? '#ffe4e6' : 'transparent'
+                            }}>
+                              <span className="gantt-day-num">{day.dayNum}</span>
+                              <span className="gantt-day-name">{day.dayNameAbbr}</span>
+                            </th>
+                          );
+                        })}
+                        <th className="gantt-col-balance" style={{ backgroundColor: 'var(--background-light)' }}>Solde CP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allMembers.length === 0 ? (
+                        <tr>
+                          <td colSpan={daysInMonthArray.length + 3} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                            Aucun collaborateur trouvé.
+                          </td>
+                        </tr>
+                      ) : (
+                        (() => {
+                          const servicesOrder = [
+                            'Directeur',
+                            'Admin',
+                            'Team leader',
+                            'Web',
+                            'Graphiste',
+                            'SEO',
+                            'SEA & Data analyst',
+                            'Marketing de croissance',
+                            'Community management'
+                          ];
+                          
+                          const sortedMembers = [...allMembers].sort((a, b) => {
+                            const indexA = servicesOrder.indexOf(a.service);
+                            const indexB = servicesOrder.indexOf(b.service);
+                            
+                            if (indexA !== -1 && indexB !== -1) {
+                              return indexA - indexB;
+                            }
+                            if (indexA !== -1) return -1;
+                            if (indexB !== -1) return 1;
+                            return a.employee_name.localeCompare(b.employee_name);
+                          });
+
+                          return sortedMembers.map(m => {
+                            const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id);
+                          
+                          return (
+                            <tr key={m.employee_id}>
+                              <td className="gantt-col-name">
+                                <div className="gantt-collaborator-name-wrapper">
+                                  <span>{m.employee_name}</span>
+                                  <span className="gantt-collaborator-email">{m.employee_email}</span>
+                                </div>
+                              </td>
+                              <td className="gantt-col-service">
+                                {m.service || 'Non spécifié'}
+                              </td>
+                              {daysInMonthArray.map(day => {
+                                const isWeekend = day.isWeekend;
+                                const isHoliday = isMadagascarHoliday(day.dateString);
+                                
+                                // Find if employee has a leave request covering this day
+                                const activeReq = employeeReqs.find(req => 
+                                  day.dateString >= req.start_date && day.dateString <= req.end_date
+                                );
+                                
+                                let cellClass = 'gantt-cell';
+                                let cellText = '';
+                                let cellTitle = '';
+                                
+                                if (isWeekend) {
+                                  cellClass += ' weekend';
+                                } else if (isHoliday) {
+                                  cellClass += ' holiday';
+                                  cellTitle = 'Jour Férié';
+                                } else if (activeReq) {
+                                  if (activeReq.status === 'Approuvé') {
+                                    cellClass += ' status-approved';
+                                    cellText = '1';
+                                  } else {
+                                    cellClass += ' status-pending';
+                                    cellText = '1';
+                                  }
+                                  
+                                  // Check if service conflict/overlap exists on this day
+                                  const svc = m.service || 'Non spécifié';
+                                  if (dayServiceConflicts[`${day.dateString}-${svc}`]) {
+                                    cellClass += ' overlap';
+                                    cellTitle = `⚠️ Attention : Superposition dans le service ${svc} !\n`;
+                                  }
+                                  
+                                  cellTitle += `${m.employee_name} - ${activeReq.leave_type} (${activeReq.status})`;
+                                }
+                                
+                                return (
+                                  <td
+                                    key={day.dayNum}
+                                    className={cellClass}
+                                    title={cellTitle}
+                                  >
+                                    {cellText}
+                                  </td>
+                                );
+                              })}
+                              <td className="gantt-col-balance" style={{ textAlign: 'center' }}>
+                                <strong style={{ color: 'var(--brand-orange)' }}>{m.remaining_balance}j</strong>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      })()
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Overlaps alert cards */}
+                {activeMonthOverlaps.length > 0 && (
+                  <div className="gantt-alerts-card">
+                    <h3 className="gantt-alerts-title">
+                      ⚠️ Alertes Superpositions de Service ({currentDate.toLocaleDateString('fr-FR', { month: 'long' })})
+                    </h3>
+                    <div className="gantt-alerts-list">
+                      {activeMonthOverlaps.map((overlap, idx) => (
+                        <div key={idx} className="gantt-alert-item">
+                          <div>
+                            <span className="gantt-alert-badge">{overlap.service}</span>{' '}
+                            <strong>{overlap.r1.employee_name}</strong> et{' '}
+                            <strong>{overlap.r2.employee_name}</strong> ont des congés superposés.
+                          </div>
+                          <div>
+                            Période commune : du <strong>{new Date(overlap.start).toLocaleDateString('fr-FR')}</strong> au <strong>{new Date(overlap.end).toLocaleDateString('fr-FR')}</strong>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -821,7 +1238,7 @@ export default function Page() {
         {/* ==================================================== */}
         {/* 3. TAB CONTENT: ADMINISTRATION RH                    */}
         {/* ==================================================== */}
-        {activeTab === 'adminRH' && userRole === 'hr' && (
+        {activeTab === 'adminRH' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
             {/* Header Actions Alerts */}
@@ -925,10 +1342,66 @@ export default function Page() {
                     </div>
 
                     <div className="form-group">
+                      <label>Service / Département</label>
+                      <select
+                        value={newMemberService}
+                        onChange={(e) => setNewMemberService(e.target.value)}
+                        disabled={memberLoading}
+                        required
+                      >
+                        <option value="Directeur">Directeur</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Team leader">Team leader</option>
+                        <option value="Web">Web</option>
+                        <option value="Graphiste">Graphiste</option>
+                        <option value="SEO">SEO</option>
+                        <option value="SEA & Data analyst">SEA & Data analyst</option>
+                        <option value="Marketing de croissance">Marketing de croissance</option>
+                        <option value="Community management">Community management</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Mot de passe d'accès</label>
+                      <div className="password-input-wrapper">
+                        <input
+                          type={showNewMemberPassword ? 'text' : 'password'}
+                          placeholder="•••••••• (min 6 caractères)"
+                          value={newMemberPassword}
+                          onChange={(e) => setNewMemberPassword(e.target.value)}
+                          required
+                          disabled={memberLoading}
+                          minLength={6}
+                          style={{ paddingRight: '2.75rem' }}
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle-btn"
+                          onClick={() => setShowNewMemberPassword(!showNewMemberPassword)}
+                          disabled={memberLoading}
+                          aria-label={showNewMemberPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                        >
+                          {showNewMemberPassword ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.815 7.815 3 3m-3-3-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="form-group">
                       <label>Rôle dans le système</label>
                       <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)}>
                         <option value="employee">Collaborateur</option>
                         <option value="hr">Administrateur RH</option>
+                        <option value="manager">Manager</option>
+                        <option value="director">Directeur</option>
                       </select>
                     </div>
 
@@ -989,6 +1462,7 @@ export default function Page() {
                       <thead>
                         <tr>
                           <th>Membre</th>
+                          <th>Service</th>
                           <th>Rôle</th>
                           <th>N+1 (Manager)</th>
                           <th>Ajuster CP</th>
@@ -1004,8 +1478,11 @@ export default function Page() {
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.employee_email}</div>
                             </td>
                             <td>
-                              <span className={`badge-role ${m.employee_email.includes('hr@') ? 'hr' : 'employee'}`}>
-                                {m.employee_email.includes('hr@') ? 'HR' : 'Salarié'}
+                              <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{m.service || 'Non spécifié'}</span>
+                            </td>
+                            <td>
+                              <span className={`badge-role ${m.role === 'hr' ? 'hr' : m.role === 'manager' ? 'manager' : m.role === 'director' ? 'director' : 'employee'}`}>
+                                {m.role === 'hr' ? 'RH' : m.role === 'manager' ? 'Manager' : m.role === 'director' ? 'Directeur' : 'Salarié'}
                               </span>
                             </td>
                             <td>{m.manager_name || 'Aucun'}</td>
@@ -1092,6 +1569,36 @@ export default function Page() {
                   required
                   disabled={memberLoading}
                 />
+              </div>
+
+              <div className="form-group">
+                <label>Service / Département</label>
+                <select
+                  value={newMemberService}
+                  onChange={(e) => setNewMemberService(e.target.value)}
+                  disabled={memberLoading}
+                  required
+                >
+                  <option value="Directeur">Directeur</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Team leader">Team leader</option>
+                  <option value="Web">Web</option>
+                  <option value="Graphiste">Graphiste</option>
+                  <option value="SEO">SEO</option>
+                  <option value="SEA & Data analyst">SEA & Data analyst</option>
+                  <option value="Marketing de croissance">Marketing de croissance</option>
+                  <option value="Community management">Community management</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Rôle dans le système</label>
+                <select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)} disabled={memberLoading}>
+                  <option value="employee">Collaborateur</option>
+                  <option value="hr">Administrateur RH</option>
+                  <option value="manager">Manager</option>
+                  <option value="director">Directeur</option>
+                </select>
               </div>
 
               <div className="form-group">

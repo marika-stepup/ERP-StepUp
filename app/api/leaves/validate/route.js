@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs, parseSheetFloat, formatSheetFloat } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
-  // 1. Authenticate and verify role 'hr'
-  const auth = await verifyRole(req, ['hr']);
+  // 1. Authenticate and verify role 'hr', 'manager' or 'director'
+  const auth = await verifyRole(req, ['hr', 'manager', 'director']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -17,7 +17,7 @@ export async function POST(req) {
     // Validate inputs
     if (!request_id || !action) {
       return NextResponse.json(
-        { error: 'Missing required fields: request_id, action.' },
+        { error: 'Champs obligatoires manquants : request_id, action.' },
         { status: 400 }
       );
     }
@@ -25,7 +25,7 @@ export async function POST(req) {
     const normalizedAction = action.trim().toLowerCase();
     if (!['approuver', 'refuser', 'approve', 'reject'].includes(normalizedAction)) {
       return NextResponse.json(
-        { error: "Invalid action. Use 'Approuver' or 'Refuser'." },
+        { error: "Action invalide. Utilisez 'Approuver' ou 'Refuser'." },
         { status: 400 }
       );
     }
@@ -42,22 +42,22 @@ export async function POST(req) {
 
       if (!targetRequestRow) {
         return {
-          error: `Leave request with ID "${request_id}" not found.`,
+          error: `Demande de congés avec l'identifiant "${request_id}" introuvable.`,
           status: 404
         };
       }
 
       // Check if already processed
       const currentStatus = targetRequestRow.get(LeaveRequestsColumns.status);
-      if (currentStatus !== 'Pending') {
+      if (currentStatus !== 'En attente') {
         return {
-          error: `This request has already been processed. Current status: ${currentStatus}.`,
+          error: `Cette demande a déjà été traitée. Statut actuel : ${currentStatus}.`,
           status: 400
         };
       }
 
       const employeeId = targetRequestRow.get(LeaveRequestsColumns.employee_id);
-      const businessDays = parseFloat(targetRequestRow.get(LeaveRequestsColumns.business_days) || 0);
+      const businessDays = parseSheetFloat(targetRequestRow.get(LeaveRequestsColumns.business_days));
       const leaveType = targetRequestRow.get(LeaveRequestsColumns.leave_type) || '';
       const nowStr = new Date().toISOString();
 
@@ -72,7 +72,7 @@ export async function POST(req) {
 
         if (!balanceRow) {
           return {
-            error: `Leave balance record not found for employee ID: ${employeeId}. Cannot approve request.`,
+            error: `Aucun solde de congés trouvé pour l'identifiant employé : ${employeeId}. Impossible d'approuver la demande.`,
             status: 404
           };
         }
@@ -83,14 +83,14 @@ export async function POST(req) {
         const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
         const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
 
-        const initialBalanceValue = parseFloat(balanceRow.get(initialCol) || 0);
-        const currentTakenValue = parseFloat(balanceRow.get(takenCol) || 0);
-        const currentRemainingValue = parseFloat(balanceRow.get(remainingCol) || 0);
+        const initialBalanceValue = parseSheetFloat(balanceRow.get(initialCol));
+        const currentTakenValue = parseSheetFloat(balanceRow.get(takenCol));
+        const currentRemainingValue = parseSheetFloat(balanceRow.get(remainingCol));
 
         // Re-verify balance
         if (currentRemainingValue < businessDays) {
           return {
-            error: `Cannot approve request. Employee only has ${currentRemainingValue} remaining days, requested ${businessDays} days.`,
+            error: `Impossible d'approuver la demande. L'employé dispose de seulement ${currentRemainingValue} jours restants, demandés ${businessDays} jours.`,
             status: 400
           };
         }
@@ -100,19 +100,19 @@ export async function POST(req) {
         const newRemaining = initialBalanceValue - newTaken;
 
         // Update Leave_Balances row
-        balanceRow.set(takenCol, newTaken.toString());
-        balanceRow.set(remainingCol, newRemaining.toString());
+        balanceRow.set(takenCol, formatSheetFloat(newTaken));
+        balanceRow.set(remainingCol, formatSheetFloat(newRemaining));
         await balanceRow.save();
 
-        // Update Leave_Requests status to "Approved"
-        targetRequestRow.set(LeaveRequestsColumns.status, 'Approved');
+        // Update Leave_Requests status to "Approuvé"
+        targetRequestRow.set(LeaveRequestsColumns.status, 'Approuvé');
         targetRequestRow.set(LeaveRequestsColumns.hr_comment, hr_comment || 'Approuvé');
         targetRequestRow.set(LeaveRequestsColumns.updated_at, nowStr);
         await targetRequestRow.save();
 
         return {
           success: true,
-          status: 'Approved',
+          status: 'Approuvé',
           data: {
             request_id,
             employee_id: employeeId,
@@ -124,15 +124,15 @@ export async function POST(req) {
 
       } else {
         // Refuse request
-        // Update Leave_Requests status to "Rejected"
-        targetRequestRow.set(LeaveRequestsColumns.status, 'Rejected');
+        // Update Leave_Requests status to "Refusé"
+        targetRequestRow.set(LeaveRequestsColumns.status, 'Refusé');
         targetRequestRow.set(LeaveRequestsColumns.hr_comment, hr_comment || 'Refusé');
         targetRequestRow.set(LeaveRequestsColumns.updated_at, nowStr);
         await targetRequestRow.save();
 
         return {
           success: true,
-          status: 'Rejected',
+          status: 'Refusé',
           data: {
             request_id,
             employee_id: employeeId,
@@ -147,14 +147,14 @@ export async function POST(req) {
     }
 
     return NextResponse.json({
-      message: `Leave request has been successfully ${result.status === 'Approved' ? 'approved' : 'rejected'}.`,
+      message: `La demande de congés a été ${result.status === 'Approuvé' ? 'approuvée' : 'refusée'} avec succès.`,
       data: result.data
     });
 
   } catch (error) {
     console.error('Error validating leave request:', error);
     return NextResponse.json(
-      { error: 'Internal server error while validating the leave request.' },
+      { error: 'Erreur interne du serveur lors de la validation de la demande de congés.' },
       { status: 500 }
     );
   }

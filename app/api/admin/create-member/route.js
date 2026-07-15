@@ -1,25 +1,60 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
+import { verifyRole, getSupabaseClient } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { generateUUID } from '../../../../lib/utils';
-import { LeaveBalancesColumns, SheetTabs } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs, formatSheetFloat } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
-  // 1. Authenticate user as 'hr'
-  const auth = await verifyRole(req, ['hr']);
+  // 1. Authenticate user as 'hr', 'manager' or 'director'
+  const auth = await verifyRole(req, ['hr', 'manager', 'director']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
 
   try {
     const body = await req.json();
-    const { email, name, role, manager_name, initial_balance, initial_perm } = body;
+    const { email, name, role, manager_name, initial_balance, initial_perm, password, service } = body;
 
     // Validation
-    if (!email || !name) {
+    if (!email || !name || !password) {
       return NextResponse.json(
-        { error: 'Missing required fields: email, name.' },
+        { error: 'Champs obligatoires manquants : email, name, password.' },
         { status: 400 }
+      );
+    }
+
+    if (password.trim().length < 6) {
+      return NextResponse.json(
+        { error: 'Le mot de passe doit contenir au moins 6 caractères.' },
+        { status: 400 }
+      );
+    }
+
+    // Register user in Supabase Auth first
+    const supabase = getSupabaseClient();
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+          role: role || 'employee'
+        }
+      }
+    });
+
+    if (signUpError) {
+      console.error('Supabase signup error:', signUpError);
+      return NextResponse.json(
+        { error: `Erreur d'enregistrement dans Supabase : ${signUpError.message}` },
+        { status: 400 }
+      );
+    }
+
+    const employeeId = signUpData.user?.id;
+    if (!employeeId) {
+      return NextResponse.json(
+        { error: "Impossible d'obtenir l'ID de l'utilisateur créé dans Supabase." },
+        { status: 500 }
       );
     }
 
@@ -38,25 +73,24 @@ export async function POST(req) {
 
       if (exists) {
         return {
-          error: `A member with email "${email}" already exists in the system.`,
+          error: `Un membre avec l'e-mail "${email}" existe déjà dans le système.`,
           status: 400
         };
       }
 
-      // Add new member row using French columns mapping
-      const employeeId = generateUUID();
       await balancesSheet.addRow({
         [LeaveBalancesColumns.employee_id]: employeeId,
         [LeaveBalancesColumns.employee_name]: name,
         [LeaveBalancesColumns.employee_email]: email.toLowerCase(),
         [LeaveBalancesColumns.role]: role || 'employee',
-        [LeaveBalancesColumns.initial_balance]: initialCP.toString(),
-        [LeaveBalancesColumns.taken_days]: '0.0',
-        [LeaveBalancesColumns.remaining_balance]: initialCP.toString(),
-        [LeaveBalancesColumns.initial_perm]: initialPermissions.toString(),
-        [LeaveBalancesColumns.taken_perm]: '0.0',
-        [LeaveBalancesColumns.remaining_perm]: initialPermissions.toString(),
-        [LeaveBalancesColumns.manager_name]: manager_name || 'Aucun'
+        [LeaveBalancesColumns.initial_balance]: formatSheetFloat(initialCP),
+        [LeaveBalancesColumns.taken_days]: formatSheetFloat(0),
+        [LeaveBalancesColumns.remaining_balance]: formatSheetFloat(initialCP),
+        [LeaveBalancesColumns.initial_perm]: formatSheetFloat(initialPermissions),
+        [LeaveBalancesColumns.taken_perm]: formatSheetFloat(0),
+        [LeaveBalancesColumns.remaining_perm]: formatSheetFloat(initialPermissions),
+        [LeaveBalancesColumns.manager_name]: manager_name || 'Aucun',
+        [LeaveBalancesColumns.service]: service || 'Non spécifié'
       });
 
       return {
@@ -68,7 +102,8 @@ export async function POST(req) {
           role: role || 'employee',
           manager_name: manager_name || 'Aucun',
           initial_balance: initialCP,
-          initial_perm: initialPermissions
+          initial_perm: initialPermissions,
+          service: service || 'Non spécifié'
         }
       };
     });
@@ -78,14 +113,14 @@ export async function POST(req) {
     }
 
     return NextResponse.json({
-      message: 'New member created successfully.',
+      message: 'Nouveau membre créé avec succès.',
       member: result.data
     });
 
   } catch (error) {
     console.error('Error creating new member:', error);
     return NextResponse.json(
-      { error: 'Internal server error while creating new member.' },
+      { error: 'Erreur interne du serveur lors de la création du nouveau membre.' },
       { status: 500 }
     );
   }

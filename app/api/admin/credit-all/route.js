@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex, withRetry } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, formatSheetFloat } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
-  // 1. Authenticate user as 'hr'
-  const auth = await verifyRole(req, ['hr']);
+  // 1. Authenticate user as 'hr', 'manager' or 'director'
+  const auth = await verifyRole(req, ['hr', 'manager', 'director']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -20,14 +20,14 @@ export async function POST(req) {
 
       // Loop and update each row
       for (const row of rows) {
-        const currentInitial = parseFloat(row.get(LeaveBalancesColumns.initial_balance) || 0);
-        const currentTaken = parseFloat(row.get(LeaveBalancesColumns.taken_days) || 0);
+        const currentInitial = parseSheetFloat(row.get(LeaveBalancesColumns.initial_balance));
+        const currentTaken = parseSheetFloat(row.get(LeaveBalancesColumns.taken_days));
         
         const newInitial = currentInitial + 2.5;
         const newRemaining = newInitial - currentTaken;
 
-        row.set(LeaveBalancesColumns.initial_balance, newInitial.toString());
-        row.set(LeaveBalancesColumns.remaining_balance, newRemaining.toString());
+        row.set(LeaveBalancesColumns.initial_balance, formatSheetFloat(newInitial));
+        row.set(LeaveBalancesColumns.remaining_balance, formatSheetFloat(newRemaining));
 
         // Save with retry
         await withRetry(() => row.save());
@@ -43,14 +43,14 @@ export async function POST(req) {
     });
 
     return NextResponse.json({
-      message: `Successfully credited +2.5 days of paid leave (CP) to all ${result.updated_count} members.`,
+      message: `Crédit de +2,5 jours de congés payés (CP) effectué avec succès pour les ${result.updated_count} membres.`,
       updated_count: result.updated_count
     });
 
   } catch (error) {
     console.error('Error crediting all members:', error);
     return NextResponse.json(
-      { error: 'Internal server error while crediting members.' },
+      { error: 'Erreur interne du serveur lors du crédit des membres.' },
       { status: 500 }
     );
   }

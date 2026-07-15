@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, formatSheetFloat } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
-  // 1. Authenticate user as 'hr'
-  const auth = await verifyRole(req, ['hr']);
+  // 1. Authenticate user as 'hr', 'manager' or 'director'
+  const auth = await verifyRole(req, ['hr', 'manager', 'director']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -17,7 +17,7 @@ export async function POST(req) {
     // Validation
     if (!employee_id || !type || value === undefined) {
       return NextResponse.json(
-        { error: 'Missing required fields: employee_id, type, value.' },
+        { error: 'Champs obligatoires manquants : employee_id, type, value.' },
         { status: 400 }
       );
     }
@@ -25,7 +25,7 @@ export async function POST(req) {
     const normalizedType = type.toLowerCase();
     if (normalizedType !== 'cp' && normalizedType !== 'perm') {
       return NextResponse.json(
-        { error: "Invalid type. Use 'cp' or 'perm'." },
+        { error: "Type invalide. Utilisez 'cp' ou 'perm'." },
         { status: 400 }
       );
     }
@@ -33,7 +33,7 @@ export async function POST(req) {
     const numericValue = parseFloat(value);
     if (isNaN(numericValue) || numericValue < 0) {
       return NextResponse.json(
-        { error: 'Value must be a valid non-negative number.' },
+        { error: 'La valeur doit être un nombre positif valide.' },
         { status: 400 }
       );
     }
@@ -50,17 +50,17 @@ export async function POST(req) {
 
       if (!balanceRow) {
         return {
-          error: `Member with ID or Email "${employee_id}" not found.`,
+          error: `Membre avec l'identifiant ou l'e-mail "${employee_id}" introuvable.`,
           status: 404
         };
       }
 
       if (normalizedType === 'cp') {
-        const currentTaken = parseFloat(balanceRow.get(LeaveBalancesColumns.taken_days) || 0);
+        const currentTaken = parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_days));
         const newRemaining = numericValue - currentTaken;
 
-        balanceRow.set(LeaveBalancesColumns.initial_balance, numericValue.toString());
-        balanceRow.set(LeaveBalancesColumns.remaining_balance, newRemaining.toString());
+        balanceRow.set(LeaveBalancesColumns.initial_balance, formatSheetFloat(numericValue));
+        balanceRow.set(LeaveBalancesColumns.remaining_balance, formatSheetFloat(newRemaining));
         await balanceRow.save();
 
         return {
@@ -74,11 +74,11 @@ export async function POST(req) {
           }
         };
       } else {
-        const currentTaken = parseFloat(balanceRow.get(LeaveBalancesColumns.taken_perm) || 0);
+        const currentTaken = parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_perm));
         const newRemaining = numericValue - currentTaken;
 
-        balanceRow.set(LeaveBalancesColumns.initial_perm, numericValue.toString());
-        balanceRow.set(LeaveBalancesColumns.remaining_perm, newRemaining.toString());
+        balanceRow.set(LeaveBalancesColumns.initial_perm, formatSheetFloat(numericValue));
+        balanceRow.set(LeaveBalancesColumns.remaining_perm, formatSheetFloat(newRemaining));
         await balanceRow.save();
 
         return {
@@ -99,14 +99,14 @@ export async function POST(req) {
     }
 
     return NextResponse.json({
-      message: 'Member balance adjusted successfully.',
+      message: 'Solde du membre ajusté avec succès.',
       balance: result.data
     });
 
   } catch (error) {
     console.error('Error adjusting balance:', error);
     return NextResponse.json(
-      { error: 'Internal server error while adjusting balance.' },
+      { error: 'Erreur interne du serveur lors de l\'ajustement du solde.' },
       { status: 500 }
     );
   }

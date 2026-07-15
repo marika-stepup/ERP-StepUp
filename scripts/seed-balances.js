@@ -27,7 +27,15 @@ const envConfig = fs.readFileSync(envPath, 'utf8')
 
 const spreadsheetId = envConfig.GOOGLE_SHEET_ID;
 const email = envConfig.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const privateKey = envConfig.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+let privateKey = envConfig.GOOGLE_PRIVATE_KEY;
+if (privateKey) {
+  if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+    privateKey = privateKey.slice(1, -1);
+  } else if (privateKey.startsWith("'") && privateKey.endsWith("'")) {
+    privateKey = privateKey.slice(1, -1);
+  }
+  privateKey = privateKey.replace(/\\n/g, '\n');
+}
 
 if (!spreadsheetId || !email || !privateKey) {
   console.error('Error: Missing Google Sheets environment variables in .env.local.');

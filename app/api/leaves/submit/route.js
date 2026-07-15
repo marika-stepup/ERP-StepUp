@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
 import { calculateBusinessDays, generateUUID } from '../../../../lib/utils';
-import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs, parseSheetFloat, formatSheetFloat, formatDateToFrench } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate and verify role 'employee' (which includes HR users acting as employees)
@@ -19,7 +19,7 @@ export async function POST(req) {
     // Validation of mandatory fields
     if (!start_date || !end_date || !leave_type) {
       return NextResponse.json(
-        { error: 'Missing required fields: start_date, end_date, leave_type.' },
+        { error: 'Champs obligatoires manquants : start_date, end_date, leave_type.' },
         { status: 400 }
       );
     }
@@ -34,7 +34,7 @@ export async function POST(req) {
 
     if (businessDays <= 0) {
       return NextResponse.json(
-        { error: 'Requested range does not contain any business days.' },
+        { error: 'La période demandée ne contient aucun jour ouvré.' },
         { status: 400 }
       );
     }
@@ -52,7 +52,7 @@ export async function POST(req) {
 
       if (!employeeBalanceRow) {
         return {
-          error: `No leave balance record found for employee: ${employee.email}. Please contact HR.`,
+          error: `Aucun solde de congés trouvé pour l'employé : ${employee.email}. Veuillez contacter les RH.`,
           status: 404
         };
       }
@@ -63,7 +63,7 @@ export async function POST(req) {
         ? LeaveBalancesColumns.remaining_perm 
         : LeaveBalancesColumns.remaining_balance;
       
-      const remainingBalance = parseFloat(employeeBalanceRow.get(balanceField) || 0);
+      const remainingBalance = parseSheetFloat(employeeBalanceRow.get(balanceField));
 
       if (remainingBalance < businessDays) {
         return {
@@ -81,11 +81,11 @@ export async function POST(req) {
         [LeaveRequestsColumns.request_id]: requestId,
         [LeaveRequestsColumns.employee_id]: employee.id,
         [LeaveRequestsColumns.employee_name]: employeeBalanceRow.get(LeaveBalancesColumns.employee_name) || employee.name || 'Utilisateur',
-        [LeaveRequestsColumns.start_date]: start_date,
-        [LeaveRequestsColumns.end_date]: end_date,
-        [LeaveRequestsColumns.business_days]: businessDays.toString(),
+        [LeaveRequestsColumns.start_date]: formatDateToFrench(start_date),
+        [LeaveRequestsColumns.end_date]: formatDateToFrench(end_date),
+        [LeaveRequestsColumns.business_days]: formatSheetFloat(businessDays),
         [LeaveRequestsColumns.leave_type]: leave_type,
-        [LeaveRequestsColumns.status]: 'Pending',
+        [LeaveRequestsColumns.status]: 'En attente',
         [LeaveRequestsColumns.created_at]: nowStr,
         [LeaveRequestsColumns.updated_at]: nowStr,
         [LeaveRequestsColumns.hr_comment]: ''
@@ -101,7 +101,7 @@ export async function POST(req) {
           end_date,
           business_days: businessDays,
           leave_type,
-          status: 'Pending',
+          status: 'En attente',
           created_at: nowStr
         }
       };
@@ -112,14 +112,14 @@ export async function POST(req) {
     }
 
     return NextResponse.json({
-      message: 'Leave request submitted successfully.',
+      message: 'Demande de congés soumise avec succès.',
       request: result.data
     });
 
   } catch (error) {
     console.error('Error submitting leave request:', error);
     return NextResponse.json(
-      { error: 'Internal server error while processing the leave request.' },
+      { error: 'Erreur interne du serveur lors de la soumission de la demande de congés.' },
       { status: 500 }
     );
   }

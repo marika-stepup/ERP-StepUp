@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs, parseSheetFloat } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
   // 1. Authenticate user (all authenticated roles can fetch member balances for the global dashboard)
@@ -26,15 +26,16 @@ export async function GET(req) {
         row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('director@') ? 'director' :
         row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('directeur@') ? 'director' : 'employee'
       ),
-      initial_balance: parseFloat(row.get(LeaveBalancesColumns.initial_balance) || 0),
-      taken_days: parseFloat(row.get(LeaveBalancesColumns.taken_days) || 0),
-      remaining_balance: parseFloat(row.get(LeaveBalancesColumns.remaining_balance) || 0),
+      initial_balance: parseSheetFloat(row.get(LeaveBalancesColumns.initial_balance)),
+      taken_days: parseSheetFloat(row.get(LeaveBalancesColumns.taken_days)),
+      remaining_balance: parseSheetFloat(row.get(LeaveBalancesColumns.remaining_balance)),
       // Permissions support
-      initial_perm: parseFloat(row.get(LeaveBalancesColumns.initial_perm) || 0),
-      taken_perm: parseFloat(row.get(LeaveBalancesColumns.taken_perm) || 0),
-      remaining_perm: parseFloat(row.get(LeaveBalancesColumns.remaining_perm) || 0),
+      initial_perm: parseSheetFloat(row.get(LeaveBalancesColumns.initial_perm)),
+      taken_perm: parseSheetFloat(row.get(LeaveBalancesColumns.taken_perm)),
+      remaining_perm: parseSheetFloat(row.get(LeaveBalancesColumns.remaining_perm)),
       // Hierarchy manager
-      manager_name: row.get(LeaveBalancesColumns.manager_name) || 'Aucun'
+      manager_name: row.get(LeaveBalancesColumns.manager_name) || 'Aucun',
+      service: row.get(LeaveBalancesColumns.service) || 'Non spécifié'
     }));
 
     return NextResponse.json({
@@ -46,7 +47,7 @@ export async function GET(req) {
   } catch (error) {
     console.error('Error fetching members list:', error);
     return NextResponse.json(
-      { error: 'Internal server error while fetching members list.' },
+      { error: 'Erreur interne du serveur lors de la récupération de la liste des membres.' },
       { status: 500 }
     );
   }

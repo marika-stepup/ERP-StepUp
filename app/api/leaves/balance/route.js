@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs, parseSheetFloat } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
   // 1. Authenticate user
@@ -33,7 +33,7 @@ export async function GET(req) {
         initial_perm: 5.0,
         taken_perm: 0.0,
         remaining_perm: 5.0,
-        warning: 'Initial balance row not seeded in Google Sheets yet.'
+        warning: 'Ligne de solde initial non encore initialisée dans Google Sheets.'
       });
     }
 
@@ -41,18 +41,18 @@ export async function GET(req) {
       employee_id: balanceRow.get(LeaveBalancesColumns.employee_id),
       employee_name: balanceRow.get(LeaveBalancesColumns.employee_name),
       employee_email: balanceRow.get(LeaveBalancesColumns.employee_email),
-      initial_balance: parseFloat(balanceRow.get(LeaveBalancesColumns.initial_balance) || 0),
-      taken_days: parseFloat(balanceRow.get(LeaveBalancesColumns.taken_days) || 0),
-      remaining_balance: parseFloat(balanceRow.get(LeaveBalancesColumns.remaining_balance) || 0),
-      initial_perm: parseFloat(balanceRow.get(LeaveBalancesColumns.initial_perm) || 0),
-      taken_perm: parseFloat(balanceRow.get(LeaveBalancesColumns.taken_perm) || 0),
-      remaining_perm: parseFloat(balanceRow.get(LeaveBalancesColumns.remaining_perm) || 0)
+      initial_balance: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.initial_balance)),
+      taken_days: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_days)),
+      remaining_balance: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.remaining_balance)),
+      initial_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.initial_perm)),
+      taken_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_perm)),
+      remaining_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.remaining_perm))
     });
 
   } catch (error) {
     console.error('Error fetching balance:', error);
     return NextResponse.json(
-      { error: 'Internal server error while fetching balance.' },
+      { error: 'Erreur interne du serveur lors de la récupération du solde.' },
       { status: 500 }
     );
   }
