@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
 import { calculateBusinessDays, generateUUID } from '../../../../lib/utils';
-import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs, parseSheetFloat, formatSheetFloat, formatDateToFrench } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs, parseSheetFloat, formatSheetFloat, formatDateToFrench, parseDateFromFrench } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate and verify role 'employee' (which includes HR users acting as employees)

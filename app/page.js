@@ -71,6 +71,8 @@ export default function Page() {
 
   // Navigation
   const [activeTab, setActiveTab] = useState('mySpace'); // 'mySpace', 'globalDashboard', 'adminRH'
+  const [ganttServiceFilter, setGanttServiceFilter] = useState('Tous');
+  const [adminServiceFilter, setAdminServiceFilter] = useState('Tous');
 
   // Dark/Light Mode state
   const [darkMode, setDarkMode] = useState(false);
@@ -283,6 +285,23 @@ export default function Page() {
   };
 
   const activeMonthOverlaps = getMonthOverlaps();
+
+  const servicesOrder = [
+    'Direction',
+    'Admin',
+    'Team leader',
+    'Web',
+    'Graphiste',
+    'SEO',
+    'SEA & Data analyst',
+    'Marketing de croissance',
+    'Community management'
+  ];
+
+  const uniqueServices = ['Tous', ...new Set([
+    ...servicesOrder,
+    ...allMembers.map(m => (m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié')
+  ])];
 
   // 1. Initial Session Check & Dark Mode check
   useEffect(() => {
@@ -1136,7 +1155,7 @@ export default function Page() {
 
             {/* Calendrier des départs & Superpositions en format Gantt */}
             <div className="panel">
-              <h2 className="panel-title">📅 Calendrier des départs & Superpositions</h2>
+              <h2 className="panel-title">Calendrier des départs et superpositions</h2>
               <p className="panel-subtitle">Visualisation mensuelle sous forme de planning Gantt et détection des conflits par service.</p>
 
               <div className="gantt-container">
@@ -1145,17 +1164,31 @@ export default function Page() {
                   <span className="gantt-month-title">
                     {currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
                   </span>
-                  <div className="gantt-nav-buttons">
-                    <button type="button" className="gantt-nav-btn" onClick={handlePrevMonth} title="Mois précédent">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                      </svg>
-                    </button>
-                    <button type="button" className="gantt-nav-btn" onClick={handleNextMonth} title="Mois suivant">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                      </svg>
-                    </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Service</label>
+                      <select
+                        value={ganttServiceFilter}
+                        onChange={(e) => setGanttServiceFilter(e.target.value)}
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--panel-white)', minWidth: '160px' }}
+                      >
+                        {uniqueServices.map(svc => (
+                          <option key={svc} value={svc}>{svc === 'Tous' ? 'Tous les services' : svc}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="gantt-nav-buttons">
+                      <button type="button" className="gantt-nav-btn" onClick={handlePrevMonth} title="Mois précédent">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                        </svg>
+                      </button>
+                      <button type="button" className="gantt-nav-btn" onClick={handleNextMonth} title="Mois suivant">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1253,7 +1286,23 @@ export default function Page() {
                             return a.employee_name.localeCompare(b.employee_name);
                           });
 
-                          return sortedMembers.map(m => {
+                          const filteredMembers = sortedMembers.filter(m => {
+                            if (ganttServiceFilter === 'Tous') return true;
+                            const svc = (m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié';
+                            return svc === ganttServiceFilter;
+                          });
+
+                          if (filteredMembers.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={daysInMonthArray.length + 4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                  Aucun collaborateur trouvé pour ce service.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return filteredMembers.map(m => {
                             const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id);
 
                             return (
@@ -1362,27 +1411,36 @@ export default function Page() {
                 </div>
 
                 {/* Overlaps alert cards */}
-                {activeMonthOverlaps.length > 0 && (
-                  <div className="gantt-alerts-card">
-                    <h3 className="gantt-alerts-title">
-                      ⚠️ Alertes Superpositions de Service ({currentDate.toLocaleDateString('fr-FR', { month: 'long' })})
-                    </h3>
-                    <div className="gantt-alerts-list">
-                      {activeMonthOverlaps.map((overlap, idx) => (
-                        <div key={idx} className="gantt-alert-item">
-                          <div>
-                            <span className="gantt-alert-badge">{overlap.service}</span>{' '}
-                            <strong>{overlap.r1.employee_name}</strong> et{' '}
-                            <strong>{overlap.r2.employee_name}</strong> ont des congés superposés.
+                {(() => {
+                  const filteredOverlaps = activeMonthOverlaps.filter(overlap => {
+                    if (ganttServiceFilter === 'Tous') return true;
+                    return overlap.service === ganttServiceFilter;
+                  });
+
+                  if (filteredOverlaps.length === 0) return null;
+
+                  return (
+                    <div className="gantt-alerts-card">
+                      <h3 className="gantt-alerts-title">
+                        ⚠️ Alertes Superpositions de Service ({currentDate.toLocaleDateString('fr-FR', { month: 'long' })})
+                      </h3>
+                      <div className="gantt-alerts-list">
+                        {filteredOverlaps.map((overlap, idx) => (
+                          <div key={idx} className="gantt-alert-item">
+                            <div>
+                              <span className="gantt-alert-badge">{overlap.service}</span>{' '}
+                              <strong>{overlap.r1.employee_name}</strong> et{' '}
+                              <strong>{overlap.r2.employee_name}</strong> ont des congés superposés.
+                            </div>
+                            <div>
+                              Période commune : du <strong>{new Date(overlap.start).toLocaleDateString('fr-FR')}</strong> au <strong>{new Date(overlap.end).toLocaleDateString('fr-FR')}</strong>
+                            </div>
                           </div>
-                          <div>
-                            Période commune : du <strong>{new Date(overlap.start).toLocaleDateString('fr-FR')}</strong> au <strong>{new Date(overlap.end).toLocaleDateString('fr-FR')}</strong>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -1400,7 +1458,7 @@ export default function Page() {
 
             {/* Validation Panel */}
             <div className="panel" style={{ borderTop: '4px solid var(--brand-orange)' }}>
-              <h2 className="panel-title">🛡️ Suivi et Validation Finale RH</h2>
+              <h2 className="panel-title">Suivi et validation finale RH</h2>
               <p className="panel-subtitle">Valider ou refuser les demandes de congé de l'entreprise.</p>
 
               {pendingRequests.length === 0 ? (
@@ -1620,7 +1678,19 @@ export default function Page() {
               <div className="main-content">
                 <div className="panel">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-                    <h2 className="panel-title" style={{ marginBottom: 0 }}>⚙️ Configuration des équipes & Droits</h2>
+                    <h2 className="panel-title" style={{ marginBottom: 0 }}>Configuration des équipes et droits</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Service</label>
+                      <select
+                        value={adminServiceFilter}
+                        onChange={(e) => setAdminServiceFilter(e.target.value)}
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--panel-white)', minWidth: '160px' }}
+                      >
+                        {uniqueServices.map(svc => (
+                          <option key={svc} value={svc}>{svc === 'Tous' ? 'Tous les services' : svc}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="table-container">
@@ -1638,90 +1708,108 @@ export default function Page() {
                         </tr>
                       </thead>
                       <tbody>
-                        {allMembers.map((m) => (
-                          <tr key={m.employee_id}>
-                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
-                                <button
-                                  className="btn-icon-edit"
-                                  onClick={() => startEditMember(m)}
-                                  title="Modifier"
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--text-secondary)',
-                                    cursor: 'pointer',
-                                    padding: '0.35rem',
-                                    borderRadius: '6px',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.83 20.082a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                                  </svg>
-                                </button>
-                                <button
-                                  className="btn-icon-delete"
-                                  onClick={() => handleDeleteMember(m.employee_id)}
-                                  title="Supprimer"
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--error-color)',
-                                    cursor: 'pointer',
-                                    padding: '0.35rem',
-                                    borderRadius: '6px',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </td>
-                            <td>
-                              <strong>{m.employee_name}</strong>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.employee_email}</div>
-                            </td>
-                            <td>
-                              <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
-                                {(m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié'}
-                              </span>
-                            </td>
-                            <td>
-                              <span className={`badge-role ${m.role === 'hr' ? 'hr' : m.role === 'manager' ? 'manager' : m.role === 'director' ? 'director' : 'employee'}`}>
-                                {m.role === 'hr' ? 'Administrateur' : m.role === 'manager' ? 'Manager' : m.role === 'director' ? 'Directeur' : 'Collaborateur'}
-                              </span>
-                            </td>
-                            <td>{m.manager_name || 'Aucun'}</td>
-                            <td style={{ fontSize: '0.85rem' }}>
-                              {m.hire_date ? new Date(m.hire_date).toLocaleDateString('fr-FR') : '-'}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                className="adjust-input"
-                                defaultValue={m.initial_balance}
-                                onBlur={(e) => handleAdjustBalance(m.employee_id, 'cp', e.target.value)}
-                                disabled={adjustingId === m.employee_id}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                className="adjust-input"
-                                defaultValue={m.initial_perm}
-                                onBlur={(e) => handleAdjustBalance(m.employee_id, 'perm', e.target.value)}
-                                disabled={adjustingId === m.employee_id}
-                              />
-                            </td>
-                          </tr>
-                        ))}
+                        {(() => {
+                          const filtered = allMembers.filter(m => {
+                            if (adminServiceFilter === 'Tous') return true;
+                            const svc = (m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié';
+                            return svc === adminServiceFilter;
+                          });
+
+                          if (filtered.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                  Aucun collaborateur trouvé pour ce service.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return filtered.map((m) => (
+                            <tr key={m.employee_id}>
+                              <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                                  <button
+                                    className="btn-icon-edit"
+                                    onClick={() => startEditMember(m)}
+                                    title="Modifier"
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--text-secondary)',
+                                      cursor: 'pointer',
+                                      padding: '0.35rem',
+                                      borderRadius: '6px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.83 20.082a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    className="btn-icon-delete"
+                                    onClick={() => handleDeleteMember(m.employee_id)}
+                                    title="Supprimer"
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--error-color)',
+                                      cursor: 'pointer',
+                                      padding: '0.35rem',
+                                      borderRadius: '6px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </td>
+                              <td>
+                                <strong>{m.employee_name}</strong>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.employee_email}</div>
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
+                                  {(m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié'}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={`badge-role ${m.role === 'hr' ? 'hr' : m.role === 'manager' ? 'manager' : m.role === 'director' ? 'director' : 'employee'}`}>
+                                  {m.role === 'hr' ? 'Administrateur' : m.role === 'manager' ? 'Manager' : m.role === 'director' ? 'Directeur' : 'Collaborateur'}
+                                </span>
+                              </td>
+                              <td>{m.manager_name || 'Aucun'}</td>
+                              <td style={{ fontSize: '0.85rem' }}>
+                                {m.hire_date ? new Date(m.hire_date).toLocaleDateString('fr-FR') : '-'}
+                              </td>
+                              <td>
+                                <input
+                                  type="number"
+                                  className="adjust-input"
+                                  defaultValue={m.initial_balance}
+                                  onBlur={(e) => handleAdjustBalance(m.employee_id, 'cp', e.target.value)}
+                                  disabled={adjustingId === m.employee_id}
+                                />
+                              </td>
+                              <td>
+                                <input
+                                  type="number"
+                                  className="adjust-input"
+                                  defaultValue={m.initial_perm}
+                                  onBlur={(e) => handleAdjustBalance(m.employee_id, 'perm', e.target.value)}
+                                  disabled={adjustingId === m.employee_id}
+                                />
+                              </td>
+                            </tr>
+                          ));
+                        })()}
                       </tbody>
                     </table>
                   </div>
