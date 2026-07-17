@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs, parseSheetFloat } from '../../../../lib/sheetsColumns';
+import { getSheet, runWithMutex, autoCreditContractAnniversaries } from '../../../../lib/googleSheets';
+import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, parseDateFromFrench } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
   // 1. Authenticate user
@@ -12,6 +12,11 @@ export async function GET(req) {
   const user = auth.user;
 
   try {
+    // Run automatic anniversary crediting with mutex to avoid race conditions
+    await runWithMutex(async () => {
+      await autoCreditContractAnniversaries();
+    });
+
     // 2. Fetch the Leave_Balances sheet
     const balancesSheet = await getSheet(SheetTabs.balances);
     const rows = await balancesSheet.getRows();
@@ -33,6 +38,7 @@ export async function GET(req) {
         initial_perm: 5.0,
         taken_perm: 0.0,
         remaining_perm: 5.0,
+        hire_date: '',
         warning: 'Ligne de solde initial non encore initialisée dans Google Sheets.'
       });
     }
@@ -46,7 +52,8 @@ export async function GET(req) {
       remaining_balance: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.remaining_balance)),
       initial_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.initial_perm)),
       taken_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_perm)),
-      remaining_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.remaining_perm))
+      remaining_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.remaining_perm)),
+      hire_date: parseDateFromFrench(balanceRow.get(LeaveBalancesColumns.hire_date)) || ''
     });
 
   } catch (error) {

@@ -13,10 +13,11 @@ function assertEqual(actual, expected, message) {
 // ==========================================
 // 1. UNIT TESTS: calculateBusinessDays
 // ==========================================
-console.log('--- Testing calculateBusinessDays ---');
-assertEqual(calculateBusinessDays('2026-07-13', '2026-07-17'), 5, '5 working days in a week');
-assertEqual(calculateBusinessDays('2026-07-10', '2026-07-13'), 2, '2 working days between Friday and Monday');
-assertEqual(calculateBusinessDays('2026-07-11', '2026-07-12'), 0, '0 working days over a weekend');
+console.log('--- Testing calculateBusinessDays (Friday-Saturday Rule) ---');
+assertEqual(calculateBusinessDays('2026-07-13', '2026-07-17'), 6, '5 working days + 1 Saturday (Friday included)');
+assertEqual(calculateBusinessDays('2026-07-10', '2026-07-13'), 3, '2 working days + 1 Saturday (Friday included)');
+assertEqual(calculateBusinessDays('2026-07-11', '2026-07-12'), 0, '0 working days over weekend (no Friday)');
+assertEqual(calculateBusinessDays('2026-07-17', '2026-07-17'), 2, 'Friday alone counts as 2 days (Friday + Saturday)');
 
 // ==========================================
 // 2. MOCK INTEGRATION TESTS FOR NEW ENDPOINTS

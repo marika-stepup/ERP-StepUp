@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs, parseSheetFloat } from '../../../../lib/sheetsColumns';
+import { getSheet, runWithMutex, autoCreditContractAnniversaries } from '../../../../lib/googleSheets';
+import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, parseDateFromFrench } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
   // 1. Authenticate user (all authenticated roles can fetch member balances for the global dashboard)
@@ -11,6 +11,11 @@ export async function GET(req) {
   }
 
   try {
+    // Run automatic anniversary crediting with mutex to avoid race conditions
+    await runWithMutex(async () => {
+      await autoCreditContractAnniversaries();
+    });
+
     // 2. Fetch the Leave_Balances sheet
     const balancesSheet = await getSheet(SheetTabs.balances);
     const rows = await balancesSheet.getRows();
@@ -35,7 +40,9 @@ export async function GET(req) {
       remaining_perm: parseSheetFloat(row.get(LeaveBalancesColumns.remaining_perm)),
       // Hierarchy manager
       manager_name: row.get(LeaveBalancesColumns.manager_name) || 'Aucun',
-      service: row.get(LeaveBalancesColumns.service) || 'Non spécifié'
+      service: row.get(LeaveBalancesColumns.service) || 'Non spécifié',
+      // Hire date
+      hire_date: parseDateFromFrench(row.get(LeaveBalancesColumns.hire_date)) || ''
     }));
 
     return NextResponse.json({

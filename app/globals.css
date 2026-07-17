@@ -346,6 +346,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-width: 0;
 }
 
 /* BALANCES STATS CARDS (Brand Themed) */
@@ -1033,8 +1034,8 @@ body.dark .gantt-legend-box.holiday {
   left: 0;
   background: var(--panel-white) !important;
   z-index: 2;
-  min-width: 160px;
-  max-width: 160px;
+  min-width: 130px;
+  max-width: 130px;
   text-align: left !important;
   border-right: 1px solid var(--border-light) !important;
   box-shadow: 3px 0 6px -3px rgba(0, 0, 0, 0.15);
@@ -1043,11 +1044,11 @@ body.dark .gantt-legend-box.holiday {
 
 .gantt-col-service {
   position: sticky;
-  left: 160px;
+  left: 130px;
   background: var(--panel-white) !important;
   z-index: 2;
-  min-width: 120px;
-  max-width: 120px;
+  min-width: 100px;
+  max-width: 100px;
   text-align: left !important;
   border-right: 2px solid var(--border-light) !important;
   box-shadow: 3px 0 6px -3px rgba(0, 0, 0, 0.15);
@@ -1061,20 +1062,20 @@ body.dark .gantt-legend-box.holiday {
 }
 
 .gantt-day-th {
-  min-width: 34px;
-  width: 34px;
+  min-width: 25px;
+  width: 25px;
   text-align: center;
   padding: 0.35rem 0 !important;
 }
 
 .gantt-day-num {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 700;
   display: block;
 }
 
 .gantt-day-name {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 500;
   color: var(--text-secondary);
   display: block;
@@ -1082,8 +1083,8 @@ body.dark .gantt-legend-box.holiday {
 }
 
 .gantt-cell {
-  min-width: 34px;
-  width: 34px;
+  min-width: 25px;
+  width: 25px;
   text-align: center !important;
   padding: 0 !important;
   position: relative;
@@ -1124,7 +1125,8 @@ body.dark .gantt-cell.holiday {
 
 /* End balance column */
 .gantt-col-balance {
-  min-width: 75px;
+  min-width: 60px;
+  max-width: 60px;
   text-align: center !important;
   font-weight: 600;
   background: var(--panel-white);
@@ -1192,4 +1194,67 @@ body.dark .gantt-cell.holiday {
   border-radius: 4px;
   font-size: 0.7rem;
   font-weight: 600;
+}
+
+/* Premium Header KPI styles */
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.85; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.kpi-badge-hover {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kpi-badge-hover:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.4) !important;
+  background-color: rgba(249, 115, 22, 0.15) !important;
+}
+
+.kpi-pulse-icon {
+  animation: pulse 2s infinite ease-in-out;
+  display: inline-block;
+}
+
+/* Responsive adjustments for layouts */
+@media (max-width: 1024px) {
+  .split-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sidebar {
+    width: 100% !important;
+  }
+}
+
+.btn-icon-edit {
+  transition: all 0.2s ease;
+}
+.btn-icon-edit:hover {
+  color: var(--brand-orange) !important;
+  background-color: rgba(255, 122, 0, 0.1) !important;
+}
+
+.btn-icon-delete {
+  transition: all 0.2s ease;
+}
+.btn-icon-delete:hover {
+  color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* Compact admin table optimization to prevent scrollbar */
+.admin-table th,
+.admin-table td {
+  padding: 0.6rem 0.5rem !important;
+  font-size: 0.82rem !important;
+}
+
+.admin-table .adjust-input {
+  width: 55px;
+  padding: 0.25rem;
+  font-size: 0.8rem;
 }

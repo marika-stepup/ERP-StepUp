@@ -10,7 +10,7 @@ const isMadagascarHoliday = (dateStr) => {
   const y = date.getFullYear();
   const m = date.getMonth(); // 0-indexed
   const d = date.getDate();
-  
+
   // Fixed holidays
   if (m === 0 && d === 1) return true; // Jour de l'an
   if (m === 2 && d === 29) return true; // Commémoration du 29 mars 1947
@@ -19,7 +19,7 @@ const isMadagascarHoliday = (dateStr) => {
   if (m === 7 && d === 15) return true; // Assomption
   if (m === 10 && d === 1) return true; // Toussaint
   if (m === 11 && d === 25) return true; // Noël
-  
+
   // Variable holidays calculation (Easter, Ascension, Pentecost)
   // Meeus/Jones/Butcher Algorithm
   const a = y % 19;
@@ -36,24 +36,24 @@ const isMadagascarHoliday = (dateStr) => {
   const mVal = Math.floor((a + 11 * hVal + 22 * lVal) / 451);
   const easterMonth = Math.floor((hVal + lVal - 7 * mVal + 114) / 31);
   const easterDay = ((hVal + lVal - 7 * mVal + 114) % 31) + 1;
-  
+
   const easterSunday = new Date(y, easterMonth - 1, easterDay);
-  
+
   // Easter Monday (Easter + 1 day)
   const easterMonday = new Date(easterSunday);
   easterMonday.setDate(easterSunday.getDate() + 1);
   if (m === easterMonday.getMonth() && d === easterMonday.getDate()) return true;
-  
+
   // Ascension Thursday (Easter + 39 days)
   const ascension = new Date(easterSunday);
   ascension.setDate(easterSunday.getDate() + 39);
   if (m === ascension.getMonth() && d === ascension.getDate()) return true;
-  
+
   // Pentecost Monday (Easter + 50 days)
   const pentecost = new Date(easterSunday);
   pentecost.setDate(easterSunday.getDate() + 50);
   if (m === pentecost.getMonth() && d === pentecost.getDate()) return true;
-  
+
   return false;
 };
 
@@ -95,11 +95,12 @@ export default function Page() {
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberPassword, setNewMemberPassword] = useState('');
   const [showNewMemberPassword, setShowNewMemberPassword] = useState(false);
-  const [newMemberService, setNewMemberService] = useState('Directeur');
+  const [newMemberService, setNewMemberService] = useState('Direction');
   const [newMemberRole, setNewMemberRole] = useState('employee');
   const [newMemberManager, setNewMemberManager] = useState('Aucun');
   const [newMemberCP, setNewMemberCP] = useState('25');
   const [newMemberPerm, setNewMemberPerm] = useState('5');
+  const [newMemberHireDate, setNewMemberHireDate] = useState('');
   const [memberError, setMemberError] = useState(null);
   const [memberSuccess, setMemberSuccess] = useState(false);
   const [memberLoading, setMemberLoading] = useState(false);
@@ -150,16 +151,16 @@ export default function Page() {
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
-  
+
   const firstDay = new Date(year, month, 1);
   let firstDayOfWeek = firstDay.getDay();
   firstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-  
+
   const totalDays = new Date(year, month + 1, 0).getDate();
   const prevMonthTotalDays = new Date(year, month, 0).getDate();
-  
+
   const calendarGridDays = [];
-  
+
   for (let i = firstDayOfWeek - 1; i >= 0; i--) {
     const dayNum = prevMonthTotalDays - i;
     const d = new Date(year, month - 1, dayNum);
@@ -170,7 +171,7 @@ export default function Page() {
       isWeekend: d.getDay() === 0 || d.getDay() === 6
     });
   }
-  
+
   for (let i = 1; i <= totalDays; i++) {
     const d = new Date(year, month, i);
     calendarGridDays.push({
@@ -180,7 +181,7 @@ export default function Page() {
       isWeekend: d.getDay() === 0 || d.getDay() === 6
     });
   }
-  
+
   const remaining = 42 - calendarGridDays.length;
   for (let i = 1; i <= remaining; i++) {
     const d = new Date(year, month + 1, i);
@@ -194,7 +195,7 @@ export default function Page() {
 
   const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
   const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`;
-  
+
   const monthRequests = allRequests.filter(req => req.start_date <= monthEnd && req.end_date >= monthStart);
 
   // Generate days in month array for Gantt chart
@@ -206,7 +207,7 @@ export default function Page() {
     const dayNames = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
     const dayNameAbbr = dayNames[dayOfWeek];
     const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-    
+
     daysInMonthArray.push({
       dayNum: i,
       dateString,
@@ -218,7 +219,7 @@ export default function Page() {
   // Calculate conflicts per day and service for Gantt chart
   const dayServiceConflicts = {};
   daysInMonthArray.forEach(day => {
-    const dayReqs = allRequests.filter(req => 
+    const dayReqs = allRequests.filter(req =>
       day.dateString >= req.start_date && day.dateString <= req.end_date
     );
     const svcGroups = {};
@@ -234,7 +235,7 @@ export default function Page() {
       }
     });
   });
-  
+
   const getMonthOverlaps = () => {
     const byService = {};
     monthRequests.forEach(req => {
@@ -242,7 +243,7 @@ export default function Page() {
       if (!byService[svc]) byService[svc] = [];
       byService[svc].push(req);
     });
-    
+
     const overlapsList = [];
     Object.keys(byService).forEach(svc => {
       const reqs = byService[svc];
@@ -253,7 +254,7 @@ export default function Page() {
           const oStart = r1.start_date > r2.start_date ? r1.start_date : r2.start_date;
           const oEnd = r1.end_date < r2.end_date ? r1.end_date : r2.end_date;
           if (oStart <= oEnd) {
-            const isDup = overlapsList.some(o => 
+            const isDup = overlapsList.some(o =>
               (o.r1.request_id === r1.request_id && o.r2.request_id === r2.request_id) ||
               (o.r1.request_id === r2.request_id && o.r2.request_id === r1.request_id)
             );
@@ -266,7 +267,7 @@ export default function Page() {
     });
     return overlapsList;
   };
-  
+
   const activeMonthOverlaps = getMonthOverlaps();
 
   // 1. Initial Session Check & Dark Mode check
@@ -447,7 +448,8 @@ export default function Page() {
           initial_balance: parseFloat(newMemberCP || 0),
           initial_perm: parseFloat(newMemberPerm || 0),
           password: newMemberPassword,
-          service: newMemberService
+          service: newMemberService,
+          hire_date: newMemberHireDate
         })
       });
 
@@ -462,8 +464,9 @@ export default function Page() {
         setShowNewMemberPassword(false);
         setNewMemberCP('25');
         setNewMemberPerm('5');
+        setNewMemberHireDate('');
         setNewMemberManager('Aucun');
-        setNewMemberService('Directeur');
+        setNewMemberService('Direction');
         fetchDashboardData();
       }
     } catch (err) {
@@ -483,6 +486,7 @@ export default function Page() {
     setNewMemberCP(m.initial_balance.toString());
     setNewMemberPerm((m.initial_perm || 5).toString());
     setNewMemberService(m.service || 'Non spécifié');
+    setNewMemberHireDate(m.hire_date || '');
 
     // Clear alerts
     setMemberError(null);
@@ -498,7 +502,8 @@ export default function Page() {
     setNewMemberManager('Aucun');
     setNewMemberCP('25');
     setNewMemberPerm('5');
-    setNewMemberService('Directeur');
+    setNewMemberService('Direction');
+    setNewMemberHireDate('');
   };
 
   // 7. Update Member Details (HR Admin)
@@ -523,7 +528,8 @@ export default function Page() {
           manager_name: newMemberManager,
           initial_balance: parseFloat(newMemberCP || 0),
           initial_perm: parseFloat(newMemberPerm || 0),
-          service: newMemberService
+          service: newMemberService,
+          hire_date: newMemberHireDate
         })
       });
 
@@ -705,7 +711,36 @@ export default function Page() {
           <img src="/Logo Step Up.png" alt="Step Hub Logo" className="logo-img" />
           <span className="logo-text">Step Hub</span>
         </div>
-        <div className="session-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+        {/* KPI badge in header */}
+        {(userRole === 'hr' || userRole === 'manager' || userRole === 'director') && pendingRequests.length > 0 && (
+          <div
+            onClick={() => setActiveTab('adminRH')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              backgroundColor: 'var(--warning-bg)',
+              color: 'var(--warning-color)',
+              border: '1px solid var(--warning-border)',
+              padding: '0.35rem 0.85rem',
+              borderRadius: '9999px',
+              fontSize: '0.85rem',
+              fontWeight: '700',
+              cursor: 'pointer',
+              marginLeft: 'auto',
+              marginRight: '1.5rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+            }}
+            className="kpi-badge-hover"
+            title="Gérer les demandes de congé en attente"
+          >
+            <span className="kpi-pulse-icon">⏳</span>
+            <span>{pendingRequests.length} en attente</span>
+          </div>
+        )}
+
+        <div className="session-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: (userRole === 'hr' || userRole === 'manager' || userRole === 'director') && pendingRequests.length > 0 ? '0' : 'auto' }}>
           <span><strong>{balance.employee_name || user?.email}</strong></span>
           <span className={`badge-role ${userRole === 'hr' ? 'hr' : userRole === 'manager' ? 'manager' : userRole === 'director' ? 'director' : 'employee'}`} style={{ marginLeft: '0.25rem' }}>
             {userRole === 'hr' ? 'Administrateur' : userRole === 'manager' ? 'Manager' : userRole === 'director' ? 'Directeur' : 'Collaborateur'}
@@ -975,55 +1010,13 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Soldes Globaux Table */}
-            <div className="panel">
-              <h2 className="panel-title">📊 Soldes Globaux & Responsables (N+1)</h2>
-              <p className="panel-subtitle">Visualisation en temps réel des congés restants et de l'organigramme.</p>
 
-              {allMembers.length === 0 ? (
-                <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  Chargement des soldes...
-                </p>
-              ) : (
-                <div className="table-container">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Membre</th>
-                        <th>N+1 (Manager)</th>
-                        <th>Solde CP Restant</th>
-                        <th>Solde Perm. Restant</th>
-                        <th>Statut Général</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allMembers.map((m) => (
-                        <tr key={m.employee_id}>
-                          <td>
-                            <strong>{m.employee_name}</strong>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.employee_email}</div>
-                          </td>
-                          <td>{m.manager_name || 'Aucun'}</td>
-                          <td><strong style={{ color: 'var(--brand-orange)' }}>{m.remaining_balance}j</strong> / {m.initial_balance}j</td>
-                          <td><strong>{m.remaining_perm}j</strong> / {m.initial_perm}j</td>
-                          <td>
-                            <span className="status-badge status-approved" style={{ fontSize: '0.7rem' }}>
-                              Actif
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
 
             {/* Calendrier des départs & Superpositions en format Gantt */}
             <div className="panel">
               <h2 className="panel-title">📅 Calendrier des départs & Superpositions</h2>
               <p className="panel-subtitle">Visualisation mensuelle sous forme de planning Gantt et détection des conflits par service.</p>
-              
+
               <div className="gantt-container">
                 {/* Gantt Header Nav */}
                 <div className="gantt-header">
@@ -1073,7 +1066,7 @@ export default function Page() {
                   <table className="gantt-table">
                     <thead>
                       <tr>
-                        <th colSpan={daysInMonthArray.length + 3} style={{
+                        <th colSpan={daysInMonthArray.length + 4} style={{
                           background: '#15803d', // Green background like Excel screenshot
                           color: '#ffffff',
                           fontSize: '1rem',
@@ -1100,19 +1093,20 @@ export default function Page() {
                           );
                         })}
                         <th className="gantt-col-balance" style={{ backgroundColor: 'var(--background-light)' }}>Solde CP</th>
+                        <th className="gantt-col-balance" style={{ backgroundColor: 'var(--background-light)' }}>Solde Perm.</th>
                       </tr>
                     </thead>
                     <tbody>
                       {allMembers.length === 0 ? (
                         <tr>
-                          <td colSpan={daysInMonthArray.length + 3} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                          <td colSpan={daysInMonthArray.length + 4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                             Aucun collaborateur trouvé.
                           </td>
                         </tr>
                       ) : (
                         (() => {
                           const servicesOrder = [
-                            'Directeur',
+                            'Direction',
                             'Admin',
                             'Team leader',
                             'Web',
@@ -1122,11 +1116,13 @@ export default function Page() {
                             'Marketing de croissance',
                             'Community management'
                           ];
-                          
+
                           const sortedMembers = [...allMembers].sort((a, b) => {
-                            const indexA = servicesOrder.indexOf(a.service);
-                            const indexB = servicesOrder.indexOf(b.service);
-                            
+                            const serviceA = a.service === 'Directeur' ? 'Direction' : a.service;
+                            const serviceB = b.service === 'Directeur' ? 'Direction' : b.service;
+                            const indexA = servicesOrder.indexOf(serviceA);
+                            const indexB = servicesOrder.indexOf(serviceB);
+
                             if (indexA !== -1 && indexB !== -1) {
                               return indexA - indexB;
                             }
@@ -1137,72 +1133,75 @@ export default function Page() {
 
                           return sortedMembers.map(m => {
                             const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id);
-                          
-                          return (
-                            <tr key={m.employee_id}>
-                              <td className="gantt-col-name">
-                                <div className="gantt-collaborator-name-wrapper">
-                                  <span>{m.employee_name}</span>
-                                  <span className="gantt-collaborator-email">{m.employee_email}</span>
-                                </div>
-                              </td>
-                              <td className="gantt-col-service">
-                                {m.service || 'Non spécifié'}
-                              </td>
-                              {daysInMonthArray.map(day => {
-                                const isWeekend = day.isWeekend;
-                                const isHoliday = isMadagascarHoliday(day.dateString);
-                                
-                                // Find if employee has a leave request covering this day
-                                const activeReq = employeeReqs.find(req => 
-                                  day.dateString >= req.start_date && day.dateString <= req.end_date
-                                );
-                                
-                                let cellClass = 'gantt-cell';
-                                let cellText = '';
-                                let cellTitle = '';
-                                
-                                if (isWeekend) {
-                                  cellClass += ' weekend';
-                                } else if (isHoliday) {
-                                  cellClass += ' holiday';
-                                  cellTitle = 'Jour Férié';
-                                } else if (activeReq) {
-                                  if (activeReq.status === 'Approuvé') {
-                                    cellClass += ' status-approved';
-                                    cellText = '1';
-                                  } else {
-                                    cellClass += ' status-pending';
-                                    cellText = '1';
+
+                            return (
+                              <tr key={m.employee_id}>
+                                <td className="gantt-col-name">
+                                  <div className="gantt-collaborator-name-wrapper">
+                                    <span>{m.employee_name}</span>
+                                    <span className="gantt-collaborator-email">{m.employee_email}</span>
+                                  </div>
+                                </td>
+                                <td className="gantt-col-service">
+                                  {(m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié'}
+                                </td>
+                                {daysInMonthArray.map(day => {
+                                  const isWeekend = day.isWeekend;
+                                  const isHoliday = isMadagascarHoliday(day.dateString);
+
+                                  // Find if employee has a leave request covering this day
+                                  const activeReq = employeeReqs.find(req =>
+                                    day.dateString >= req.start_date && day.dateString <= req.end_date
+                                  );
+
+                                  let cellClass = 'gantt-cell';
+                                  let cellText = '';
+                                  let cellTitle = '';
+
+                                  if (isWeekend) {
+                                    cellClass += ' weekend';
+                                  } else if (isHoliday) {
+                                    cellClass += ' holiday';
+                                    cellTitle = 'Jour Férié';
+                                  } else if (activeReq) {
+                                    if (activeReq.status === 'Approuvé') {
+                                      cellClass += ' status-approved';
+                                      cellText = '1';
+                                    } else {
+                                      cellClass += ' status-pending';
+                                      cellText = '1';
+                                    }
+
+                                    // Check if service conflict/overlap exists on this day
+                                    const svc = m.service || 'Non spécifié';
+                                    if (dayServiceConflicts[`${day.dateString}-${svc}`]) {
+                                      cellClass += ' overlap';
+                                      cellTitle = `⚠️ Attention : Superposition dans le service ${svc} !\n`;
+                                    }
+
+                                    cellTitle += `${m.employee_name} - ${activeReq.leave_type} (${activeReq.status})`;
                                   }
-                                  
-                                  // Check if service conflict/overlap exists on this day
-                                  const svc = m.service || 'Non spécifié';
-                                  if (dayServiceConflicts[`${day.dateString}-${svc}`]) {
-                                    cellClass += ' overlap';
-                                    cellTitle = `⚠️ Attention : Superposition dans le service ${svc} !\n`;
-                                  }
-                                  
-                                  cellTitle += `${m.employee_name} - ${activeReq.leave_type} (${activeReq.status})`;
-                                }
-                                
-                                return (
-                                  <td
-                                    key={day.dayNum}
-                                    className={cellClass}
-                                    title={cellTitle}
-                                  >
-                                    {cellText}
-                                  </td>
-                                );
-                              })}
-                              <td className="gantt-col-balance" style={{ textAlign: 'center' }}>
-                                <strong style={{ color: 'var(--brand-orange)' }}>{m.remaining_balance}j</strong>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      })()
+
+                                  return (
+                                    <td
+                                      key={day.dayNum}
+                                      className={cellClass}
+                                      title={cellTitle}
+                                    >
+                                      {cellText}
+                                    </td>
+                                  );
+                                })}
+                                <td className="gantt-col-balance" style={{ textAlign: 'center' }}>
+                                  <strong style={{ color: 'var(--brand-orange)' }}>{m.remaining_balance}j</strong>
+                                </td>
+                                <td className="gantt-col-balance" style={{ textAlign: 'center' }}>
+                                  <strong>{m.remaining_perm}j</strong>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        })()
                       )}
                     </tbody>
                   </table>
@@ -1321,7 +1320,7 @@ export default function Page() {
                       <label>Nom Complet</label>
                       <input
                         type="text"
-                        placeholder="Ex: Jean Dupont"
+                        placeholder="Ex: Rakotoarisoa Dany"
                         value={newMemberName}
                         onChange={(e) => setNewMemberName(e.target.value)}
                         required
@@ -1333,7 +1332,7 @@ export default function Page() {
                       <label>Adresse Email</label>
                       <input
                         type="email"
-                        placeholder="jean.dupont@entreprise.com"
+                        placeholder="votre@mail.com"
                         value={newMemberEmail}
                         onChange={(e) => setNewMemberEmail(e.target.value)}
                         required
@@ -1349,7 +1348,7 @@ export default function Page() {
                         disabled={memberLoading}
                         required
                       >
-                        <option value="Directeur">Directeur</option>
+                        <option value="Direction">Direction</option>
                         <option value="Admin">Admin</option>
                         <option value="Team leader">Team leader</option>
                         <option value="Web">Web</option>
@@ -1413,6 +1412,17 @@ export default function Page() {
                       </select>
                     </div>
 
+                    <div className="form-group">
+                      <label>Date d'embauche</label>
+                      <input
+                        type="date"
+                        value={newMemberHireDate}
+                        onChange={(e) => setNewMemberHireDate(e.target.value)}
+                        required
+                        disabled={memberLoading}
+                      />
+                    </div>
+
                     <div className="form-row">
                       <div className="form-group">
                         <label>Solde Initial CP</label>
@@ -1456,27 +1466,74 @@ export default function Page() {
                   </div>
 
                   <div className="table-container">
-                    <table>
+                    <table className="admin-table">
                       <thead>
                         <tr>
+                          <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
                           <th>Membre</th>
                           <th>Service</th>
                           <th>Rôle</th>
                           <th>N+1 (Manager)</th>
+                          <th>Date d'embauche</th>
                           <th>Ajuster CP</th>
                           <th>Ajuster Perm.</th>
-                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {allMembers.map((m) => (
                           <tr key={m.employee_id}>
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                                <button
+                                  className="btn-icon-edit"
+                                  onClick={() => startEditMember(m)}
+                                  title="Modifier"
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    padding: '0.35rem',
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.83 20.082a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                  </svg>
+                                </button>
+                                <button
+                                  className="btn-icon-delete"
+                                  onClick={() => handleDeleteMember(m.employee_id)}
+                                  title="Supprimer"
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--error-color)',
+                                    cursor: 'pointer',
+                                    padding: '0.35rem',
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
                             <td>
                               <strong>{m.employee_name}</strong>
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.employee_email}</div>
                             </td>
                             <td>
-                              <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{m.service || 'Non spécifié'}</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
+                                {(m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié'}
+                              </span>
                             </td>
                             <td>
                               <span className={`badge-role ${m.role === 'hr' ? 'hr' : m.role === 'manager' ? 'manager' : m.role === 'director' ? 'director' : 'employee'}`}>
@@ -1484,6 +1541,9 @@ export default function Page() {
                               </span>
                             </td>
                             <td>{m.manager_name || 'Aucun'}</td>
+                            <td style={{ fontSize: '0.85rem' }}>
+                              {m.hire_date ? new Date(m.hire_date).toLocaleDateString('fr-FR') : '-'}
+                            </td>
                             <td>
                               <input
                                 type="number"
@@ -1501,22 +1561,6 @@ export default function Page() {
                                 onBlur={(e) => handleAdjustBalance(m.employee_id, 'perm', e.target.value)}
                                 disabled={adjustingId === m.employee_id}
                               />
-                            </td>
-                            <td>
-                              <div className="action-buttons-cell">
-                                <button
-                                  className="btn-small btn-secondary"
-                                  onClick={() => startEditMember(m)}
-                                >
-                                  Modifier
-                                </button>
-                                <button
-                                  className="btn-small btn-danger"
-                                  onClick={() => handleDeleteMember(m.employee_id)}
-                                >
-                                  Supprimer
-                                </button>
-                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1577,7 +1621,7 @@ export default function Page() {
                   disabled={memberLoading}
                   required
                 >
-                  <option value="Directeur">Directeur</option>
+                  <option value="Direction">Direction</option>
                   <option value="Admin">Admin</option>
                   <option value="Team leader">Team leader</option>
                   <option value="Web">Web</option>
@@ -1605,6 +1649,17 @@ export default function Page() {
                     <option key={m.employee_id} value={m.employee_name}>{m.employee_name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="form-group">
+                <label>Date d'embauche</label>
+                <input
+                  type="date"
+                  value={newMemberHireDate}
+                  onChange={(e) => setNewMemberHireDate(e.target.value)}
+                  required
+                  disabled={memberLoading}
+                />
               </div>
 
               <div className="form-row">

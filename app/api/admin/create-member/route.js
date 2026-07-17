@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseClient } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs, formatSheetFloat } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, SheetTabs, formatSheetFloat, formatDateToFrench } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr', 'manager' or 'director'
@@ -12,7 +12,7 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { email, name, role, manager_name, initial_balance, initial_perm, password, service } = body;
+    const { email, name, role, manager_name, initial_balance, initial_perm, password, service, hire_date } = body;
 
     // Validation
     if (!email || !name || !password) {
@@ -90,7 +90,9 @@ export async function POST(req) {
         [LeaveBalancesColumns.taken_perm]: formatSheetFloat(0),
         [LeaveBalancesColumns.remaining_perm]: formatSheetFloat(initialPermissions),
         [LeaveBalancesColumns.manager_name]: manager_name || 'Aucun',
-        [LeaveBalancesColumns.service]: service || 'Non spécifié'
+        [LeaveBalancesColumns.service]: service || 'Non spécifié',
+        [LeaveBalancesColumns.hire_date]: hire_date ? formatDateToFrench(hire_date) : '',
+        [LeaveBalancesColumns.last_anniversary_credited]: hire_date ? formatDateToFrench(hire_date) : ''
       });
 
       return {
@@ -103,7 +105,8 @@ export async function POST(req) {
           manager_name: manager_name || 'Aucun',
           initial_balance: initialCP,
           initial_perm: initialPermissions,
-          service: service || 'Non spécifié'
+          service: service || 'Non spécifié',
+          hire_date: hire_date || ''
         }
       };
     });
