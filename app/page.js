@@ -569,30 +569,34 @@ export default function Page() {
     }
   };
 
-  const handleDeleteLeave = async (requestId) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette demande de congé ?')) return;
+  const handleDeleteLeave = (requestId) => {
+    triggerConfirm(
+      'Suppression de la demande',
+      'Êtes-vous sûr de vouloir supprimer cette demande de congé ?',
+      async () => {
+        try {
+          const res = await fetch('/api/leaves/delete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              request_id: requestId
+            })
+          });
 
-    try {
-      const res = await fetch('/api/leaves/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          request_id: requestId
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || 'Erreur lors de la suppression.');
-      } else {
-        fetchDashboardData();
+          const data = await res.json();
+          if (!res.ok) {
+            alert(data.error || 'Erreur lors de la suppression.');
+          } else {
+            fetchDashboardData();
+          }
+        } catch (err) {
+          alert('Une erreur réseau est survenue.');
+        }
       }
-    } catch (err) {
-      alert('Une erreur réseau est survenue.');
-    }
+    );
   };
 
   // 7. Update Member Details (HR Admin)
