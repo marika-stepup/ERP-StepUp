@@ -1502,7 +1502,7 @@ export default function Page() {
               {/* Add user form */}
               <div className="sidebar" style={{ width: '350px' }}>
                 <div className="panel">
-                  <h2 className="panel-title">👤 Ajouter un Membre</h2>
+                  <h2 className="panel-title">👤 Ajouter un membre</h2>
 
                   {memberError && <div className="error-message">{memberError}</div>}
                   {memberSuccess && <div className="success-message">Données enregistrées avec succès.</div>}
