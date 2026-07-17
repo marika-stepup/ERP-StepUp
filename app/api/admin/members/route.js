@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex, autoCreditContractAnniversaries } from '../../../../lib/googleSheets';
+import { getSheet, runWithMutex, autoCreditContractAnniversaries, autoCreditMonthlyLeaves } from '../../../../lib/googleSheets';
 import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, parseDateFromFrench } from '../../../../lib/sheetsColumns';
 
 export async function GET(req) {
@@ -11,17 +11,24 @@ export async function GET(req) {
   }
 
   try {
-    // Run automatic anniversary crediting with mutex to avoid race conditions
+    // Run automatic anniversary & monthly crediting with mutex to avoid race conditions
     await runWithMutex(async () => {
       await autoCreditContractAnniversaries();
+      await autoCreditMonthlyLeaves();
     });
 
     // 2. Fetch the Leave_Balances sheet
     const balancesSheet = await getSheet(SheetTabs.balances);
     const rows = await balancesSheet.getRows();
 
+    // Filter out system configuration rows
+    const employeeRows = rows.filter(row => {
+      const empId = row.get(LeaveBalancesColumns.employee_id);
+      return empId && !empId.startsWith('SYSTEM_');
+    });
+
     // 3. Map sheet rows to JSON response
-    const members = rows.map((row) => ({
+    const members = employeeRows.map((row) => ({
       employee_id: row.get(LeaveBalancesColumns.employee_id),
       employee_name: row.get(LeaveBalancesColumns.employee_name),
       employee_email: row.get(LeaveBalancesColumns.employee_email),

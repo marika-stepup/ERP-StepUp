@@ -708,34 +708,6 @@ export default function Page() {
     }
   };
 
-  // 10. Credit +2.5j CP to all members
-  const handleCreditAll = async () => {
-    triggerConfirm(
-      'Créditer les collaborateurs',
-      'Voulez-vous vraiment créditer de +2.5j de CP TOUS les collaborateurs du système ?',
-      async () => {
-        setHrError(null);
-        setHrSuccess(null);
-
-        try {
-          const res = await fetch('/api/admin/credit-all', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` }
-          });
-
-          const data = await res.json();
-          if (!res.ok) {
-            setHrError(data.error || 'Erreur lors du crédit global.');
-          } else {
-            setHrSuccess(data.message);
-            fetchDashboardData();
-          }
-        } catch (err) {
-          setHrError('Une erreur réseau est survenue.');
-        }
-      }
-    );
-  };
 
   // 11. Approve/Reject Leave Request
   const handleValidateLeave = async (requestId, action) => {
@@ -1610,13 +1582,6 @@ export default function Page() {
                 <div className="panel">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <h2 className="panel-title" style={{ marginBottom: 0 }}>⚙️ Configuration des équipes & Droits</h2>
-                    <button
-                      onClick={handleCreditAll}
-                      className="btn-secondary btn-small"
-                      style={{ color: 'var(--brand-orange)', borderColor: 'var(--brand-orange)', background: '#fff7ed' }}
-                    >
-                      📅 Créditer +2.5j CP (Début de mois)
-                    </button>
                   </div>
 
                   <div className="table-container">
