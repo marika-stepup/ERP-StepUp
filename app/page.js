@@ -1272,15 +1272,47 @@ export default function Page() {
                                   const isHoliday = isMadagascarHoliday(day.dateString);
 
                                   // Find if employee has a leave request covering this day
-                                  const activeReq = employeeReqs.find(req =>
+                                  let activeReq = employeeReqs.find(req =>
                                     day.dateString >= req.start_date && day.dateString <= req.end_date
                                   );
+
+                                  // Special rule: Saturday formatted as a leave day if a CP request covers it or ended on the preceding Friday
+                                  let isSaturdayCP = false;
+                                  let saturdayReq = null;
+
+                                  if (day.dayNameAbbr === 'sam') {
+                                    if (activeReq && (activeReq.leave_type === 'CP' || activeReq.leave_type === 'Congés Payés')) {
+                                      isSaturdayCP = true;
+                                      saturdayReq = activeReq;
+                                    } else {
+                                      const parts = day.dateString.split('-');
+                                      const y = parseInt(parts[0], 10);
+                                      const mVal = parseInt(parts[1], 10) - 1;
+                                      const dVal = parseInt(parts[2], 10);
+                                      const currD = new Date(y, mVal, dVal);
+                                      currD.setDate(currD.getDate() - 1);
+                                      const prevDateString = `${currD.getFullYear()}-${String(currD.getMonth() + 1).padStart(2, '0')}-${String(currD.getDate()).padStart(2, '0')}`;
+
+                                      const endedOnFriday = employeeReqs.find(req =>
+                                        req.end_date === prevDateString &&
+                                        (req.leave_type === 'CP' || req.leave_type === 'Congés Payés')
+                                      );
+                                      if (endedOnFriday) {
+                                        isSaturdayCP = true;
+                                        saturdayReq = endedOnFriday;
+                                      }
+                                    }
+                                  }
+
+                                  if (isSaturdayCP && saturdayReq) {
+                                    activeReq = saturdayReq;
+                                  }
 
                                   let cellClass = 'gantt-cell';
                                   let cellText = '';
                                   let cellTitle = '';
 
-                                  if (isWeekend) {
+                                  if (isWeekend && !isSaturdayCP) {
                                     cellClass += ' weekend';
                                   } else if (isHoliday) {
                                     cellClass += ' holiday';
@@ -1377,55 +1409,62 @@ export default function Page() {
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {pendingRequests.map((req) => (
-                    <div key={req.request_id} className="validation-card">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                        <div>
-                          <strong style={{ fontSize: '1.1rem' }}>{req.employee_name}</strong>
-                          <span className="badge-role employee" style={{ marginLeft: '0.5rem' }}>Collaborateur</span>
-                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                            Type: <strong>{req.leave_type}</strong> | Jours demandés: <strong>{req.business_days} j</strong>
-                          </div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
-                            Demande soumise le : <strong>{req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}</strong>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Période de congé :</div>
-                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                            Du {req.start_date} au {req.end_date}
-                          </div>
-                        </div>
-                      </div>
+                  {pendingRequests.map((req) => {
+                    const employeeMember = allMembers.find(m => m.employee_id === req.employee_id);
+                    const currentUserMember = allMembers.find(m => m.employee_email?.toLowerCase() === user?.email?.toLowerCase());
+                    const isN1 = employeeMember && currentUserMember && employeeMember.manager_name !== 'Aucun' && employeeMember.manager_name === currentUserMember.employee_name;
 
-                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
-                        <input
-                          type="text"
-                          placeholder="Commentaire de validation..."
-                          style={{ flexGrow: 1 }}
-                          value={hrComments[req.request_id] || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setHrComments(prev => ({ ...prev, [req.request_id]: val }));
-                          }}
-                        />
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            className="btn-small btn-approve"
-                            onClick={() => handleValidateLeave(req.request_id, 'Approuver')}
-                          >
-                            Accepter
-                          </button>
-                          <button
-                            className="btn-small btn-reject"
-                            onClick={() => handleValidateLeave(req.request_id, 'Refuser')}
-                          >
-                            Refuser
-                          </button>
+                    return (
+                      <div key={req.request_id} className="validation-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                          <div>
+                            <strong style={{ fontSize: '1.1rem' }}>{req.employee_name}</strong>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                              Type: <strong>{req.leave_type}</strong> | Jours demandés: <strong>{req.business_days} j</strong>
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
+                              Demande soumise le : <strong>{req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}</strong>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Période de congé :</div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                              Du {req.start_date} au {req.end_date}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                          <input
+                            type="text"
+                            placeholder="Commentaire de validation..."
+                            style={{ flexGrow: 1 }}
+                            value={hrComments[req.request_id] || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setHrComments(prev => ({ ...prev, [req.request_id]: val }));
+                            }}
+                          />
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              className="btn-small btn-approve"
+                              disabled={!isN1}
+                              onClick={() => handleValidateLeave(req.request_id, 'Approuver')}
+                            >
+                              Accepter
+                            </button>
+                            <button
+                              className="btn-small btn-reject"
+                              disabled={!isN1}
+                              onClick={() => handleValidateLeave(req.request_id, 'Refuser')}
+                            >
+                              Refuser
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

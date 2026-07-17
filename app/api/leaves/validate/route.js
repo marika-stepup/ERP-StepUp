@@ -61,21 +61,45 @@ export async function POST(req) {
       const leaveType = targetRequestRow.get(LeaveRequestsColumns.leave_type) || '';
       const nowStr = new Date().toISOString();
 
+      // Find employee balance row in Leave_Balances
+      const balancesSheet = await getSheet(SheetTabs.balances);
+      const balanceRows = await balancesSheet.getRows();
+
+      const balanceRow = balanceRows.find(
+        (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
+      );
+
+      if (!balanceRow) {
+        return {
+          error: `Aucun solde de congés trouvé pour l'identifiant employé : ${employeeId}.`,
+          status: 404
+        };
+      }
+
+      // Check manager hierarchy constraint: current user must be the N+1 manager of the requester
+      const managerName = balanceRow.get(LeaveBalancesColumns.manager_name);
+      const currentUserEmail = auth.user.email;
+      const currentUserRow = balanceRows.find(
+        (row) => row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === currentUserEmail?.toLowerCase()
+      );
+
+      if (!currentUserRow) {
+        return {
+          error: `Utilisateur actuel non trouvé dans la liste des membres.`,
+          status: 403
+        };
+      }
+
+      const currentUserName = currentUserRow.get(LeaveBalancesColumns.employee_name);
+
+      if (!managerName || managerName === 'Aucun' || managerName !== currentUserName) {
+        return {
+          error: `Accès refusé. Seul le N+1 (Manager) de l'employé est autorisé à approuver ou refuser cette demande.`,
+          status: 403
+        };
+      }
+
       if (normalizedAction === 'approuver' || normalizedAction === 'approve') {
-        // 3. Find employee balance row in Leave_Balances
-        const balancesSheet = await getSheet(SheetTabs.balances);
-        const balanceRows = await balancesSheet.getRows();
-
-        const balanceRow = balanceRows.find(
-          (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
-        );
-
-        if (!balanceRow) {
-          return {
-            error: `Aucun solde de congés trouvé pour l'identifiant employé : ${employeeId}. Impossible d'approuver la demande.`,
-            status: 404
-          };
-        }
 
         // Determine column fields depending on CP or Permission type
         const isPermission = leaveType.toLowerCase().includes('perm');
