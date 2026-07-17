@@ -112,6 +112,12 @@ export default function Page() {
   const [memberSuccess, setMemberSuccess] = useState(false);
   const [memberLoading, setMemberLoading] = useState(false);
   const [allRequests, setAllRequests] = useState([]);
+  const [editingLeave, setEditingLeave] = useState(null);
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editLeaveType, setEditLeaveType] = useState('Congés Payés');
+  const [editLeaveError, setEditLeaveError] = useState(null);
+  const [editLeaveLoading, setEditLeaveLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const getTodayDateString = () => {
@@ -512,6 +518,81 @@ export default function Page() {
     setNewMemberPerm('5');
     setNewMemberService('Direction');
     setNewMemberHireDate('');
+  };
+
+  // 6.5 Leave Edit/Delete Actions
+  const startEditLeave = (req) => {
+    setEditingLeave(req);
+    const parseDateToInputVal = (dStr) => {
+      if (!dStr) return '';
+      const parts = dStr.split('/');
+      if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      return dStr;
+    };
+    setEditStartDate(parseDateToInputVal(req.start_date));
+    setEditEndDate(parseDateToInputVal(req.end_date));
+    setEditLeaveType(req.leave_type);
+    setEditLeaveError(null);
+  };
+
+  const handleUpdateLeave = async (e) => {
+    e.preventDefault();
+    setEditLeaveError(null);
+    setEditLeaveLoading(true);
+
+    try {
+      const res = await fetch('/api/leaves/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          request_id: editingLeave.request_id,
+          start_date: editStartDate,
+          end_date: editEndDate,
+          leave_type: editLeaveType
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setEditLeaveError(data.error || 'Erreur lors de la modification.');
+      } else {
+        setEditingLeave(null);
+        fetchDashboardData();
+      }
+    } catch (err) {
+      setEditLeaveError('Une erreur réseau est survenue.');
+    } finally {
+      setEditLeaveLoading(false);
+    }
+  };
+
+  const handleDeleteLeave = async (requestId) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette demande de congé ?')) return;
+
+    try {
+      const res = await fetch('/api/leaves/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          request_id: requestId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Erreur lors de la suppression.');
+      } else {
+        fetchDashboardData();
+      }
+    } catch (err) {
+      alert('Une erreur réseau est survenue.');
+    }
   };
 
   // 7. Update Member Details (HR Admin)
@@ -948,9 +1029,10 @@ export default function Page() {
                   </p>
                 ) : (
                   <div className="table-container">
-                    <table>
+                    <table className="admin-table">
                       <thead>
                         <tr>
+                          <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
                           <th>Type</th>
                           <th>Dates</th>
                           <th>Durée</th>
@@ -963,6 +1045,54 @@ export default function Page() {
                       <tbody>
                         {myRequests.map((req) => (
                           <tr key={req.request_id}>
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              {req.status === 'En attente' ? (
+                                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                                  <button
+                                    className="btn-icon-edit"
+                                    onClick={() => startEditLeave(req)}
+                                    title="Modifier la demande"
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--text-secondary)',
+                                      cursor: 'pointer',
+                                      padding: '0.35rem',
+                                      borderRadius: '6px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.83 20.082a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    className="btn-icon-delete"
+                                    onClick={() => handleDeleteLeave(req.request_id)}
+                                    title="Supprimer la demande"
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--error-color)',
+                                      cursor: 'pointer',
+                                      padding: '0.35rem',
+                                      borderRadius: '6px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>-</span>
+                              )}
+                            </td>
                             <td>
                               <strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong>
                             </td>
@@ -1746,6 +1876,69 @@ export default function Page() {
                   {memberLoading ? 'Envoi...' : 'Sauvegarder'}
                 </button>
                 <button type="button" className="btn-secondary" onClick={cancelEditMember} disabled={memberLoading}>
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 4.5 MODAL: EDIT LEAVE REQUEST POPUP                 */}
+      {/* ==================================================== */}
+      {editingLeave && (
+        <div className="modal-backdrop">
+          <div className="modal-content">
+            <h2 className="modal-title">📝 Modifier la Demande</h2>
+            <p className="modal-message" style={{ marginBottom: '1.25rem' }}>
+              Mettez à jour les dates ou le type de congé pour cette demande.
+            </p>
+
+            {editLeaveError && <div className="error-message">{editLeaveError}</div>}
+
+            <form onSubmit={handleUpdateLeave} style={{ padding: 0, border: 'none', background: 'none', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label>Date de Début</label>
+                <input
+                  type="date"
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                  required
+                  disabled={editLeaveLoading}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Date de Fin</label>
+                <input
+                  type="date"
+                  value={editEndDate}
+                  onChange={(e) => setEditEndDate(e.target.value)}
+                  required
+                  disabled={editLeaveLoading}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Type de congé / Permission</label>
+                <select
+                  value={editLeaveType}
+                  onChange={(e) => setEditLeaveType(e.target.value)}
+                  disabled={editLeaveLoading}
+                  required
+                >
+                  <option value="Congés Payés">Congés Payés</option>
+                  <option value="Congés RTT">Congés RTT</option>
+                  <option value="Permission Exceptionnelle">Permission Exceptionnelle</option>
+                </select>
+              </div>
+
+              <div className="modal-footer">
+                <button type="submit" className="btn-accent" style={{ minWidth: '110px' }} disabled={editLeaveLoading}>
+                  {editLeaveLoading ? 'Envoi...' : 'Sauvegarder'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setEditingLeave(null)} disabled={editLeaveLoading}>
                   Annuler
                 </button>
               </div>
