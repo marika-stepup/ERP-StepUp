@@ -1457,44 +1457,6 @@ export default function Page() {
                 </div>
               )}
 
-              {/* Historique des décisions validation */}
-              <div style={{ marginTop: '2.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--brand-navy)' }}>📜 Historique des congés approuvés</h3>
-                <p className="panel-subtitle" style={{ marginBottom: '1.25rem' }}>Historique global des demandes déjà traitées par les RH.</p>
-
-                {allRequests.filter(req => req.status === 'Approuvé').length === 0 ? (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Aucune demande approuvée pour le moment.</p>
-                ) : (
-                  <div className="table-container">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Collaborateur</th>
-                          <th>Type</th>
-                          <th>Dates</th>
-                          <th>Durée</th>
-                          <th>Demandé le</th>
-                          <th>Validé le</th>
-                          <th>Commentaire RH</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allRequests.filter(req => req.status === 'Approuvé').map((req) => (
-                          <tr key={req.request_id}>
-                            <td><strong>{req.employee_name}</strong></td>
-                            <td><strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong></td>
-                            <td>Du {formatDateStr(req.start_date)} au {formatDateStr(req.end_date)}</td>
-                            <td><strong>{req.business_days} j</strong></td>
-                            <td>{req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}</td>
-                            <td>{req.updated_at ? new Date(req.updated_at).toLocaleDateString('fr-FR') : '-'}</td>
-                            <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{req.hr_comment || '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Split creation form & adjustment table */}
