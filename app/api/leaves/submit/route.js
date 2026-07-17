@@ -72,8 +72,31 @@ export async function POST(req) {
         };
       }
 
-      // 4. Add new request row in Leave_Requests with status "Pending"
+      // 3.5 Check for duplicate / overlapping requests
       const requestsSheet = await getSheet(SheetTabs.requests);
+      const requestRows = await requestsSheet.getRows();
+      const employeeRequests = requestRows.filter(
+        (row) => row.get(LeaveRequestsColumns.employee_id) === employee.id &&
+                 row.get(LeaveRequestsColumns.status) !== 'Refusé'
+      );
+
+      const newStart = start_date;
+      const newEnd = end_date;
+
+      const hasOverlap = employeeRequests.some(row => {
+        const existingStart = parseDateFromFrench(row.get(LeaveRequestsColumns.start_date));
+        const existingEnd = parseDateFromFrench(row.get(LeaveRequestsColumns.end_date));
+        return (newStart <= existingEnd) && (newEnd >= existingStart);
+      });
+
+      if (hasOverlap) {
+        return {
+          error: 'Vous avez déjà une demande en attente ou approuvée sur cette période.',
+          status: 400
+        };
+      }
+
+      // 4. Add new request row in Leave_Requests with status "Pending"
       const requestId = generateUUID();
       const nowStr = new Date().toISOString();
 

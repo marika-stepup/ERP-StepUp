@@ -57,6 +57,13 @@ const isMadagascarHoliday = (dateStr) => {
   return false;
 };
 
+const formatDateStr = (str) => {
+  if (!str) return '-';
+  const parts = str.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return str;
+};
+
 export default function Page() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -251,6 +258,7 @@ export default function Page() {
         for (let j = i + 1; j < reqs.length; j++) {
           const r1 = reqs[i];
           const r2 = reqs[j];
+          if (r1.employee_id === r2.employee_id) continue;
           const oStart = r1.start_date > r2.start_date ? r1.start_date : r2.start_date;
           const oEnd = r1.end_date < r2.end_date ? r1.end_date : r2.end_date;
           if (oStart <= oEnd) {
@@ -946,6 +954,8 @@ export default function Page() {
                           <th>Type</th>
                           <th>Dates</th>
                           <th>Durée</th>
+                          <th>Demandé le</th>
+                          <th>Traité le</th>
                           <th>Statut</th>
                           <th>Commentaire RH</th>
                         </tr>
@@ -961,6 +971,12 @@ export default function Page() {
                               Au {req.end_date}
                             </td>
                             <td><strong>{req.business_days} j</strong></td>
+                            <td>
+                              {req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}
+                            </td>
+                            <td>
+                              {req.status !== 'En attente' && req.updated_at ? new Date(req.updated_at).toLocaleDateString('fr-FR') : '-'}
+                            </td>
                             <td>
                               <span className={`status-badge ${req.status === 'En attente' ? 'status-pending' :
                                 req.status === 'Approuvé' ? 'status-approved' : 'status-rejected'
@@ -1264,6 +1280,9 @@ export default function Page() {
                           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                             Type: <strong>{req.leave_type}</strong> | Jours demandés: <strong>{req.business_days} j</strong>
                           </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
+                            Demande soumise le : <strong>{req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}</strong>
+                          </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Période de congé :</div>
@@ -1303,6 +1322,45 @@ export default function Page() {
                   ))}
                 </div>
               )}
+
+              {/* Historique des décisions validation */}
+              <div style={{ marginTop: '2.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--brand-navy)' }}>📜 Historique des congés approuvés</h3>
+                <p className="panel-subtitle" style={{ marginBottom: '1.25rem' }}>Historique global des demandes déjà traitées par les RH.</p>
+
+                {allRequests.filter(req => req.status === 'Approuvé').length === 0 ? (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Aucune demande approuvée pour le moment.</p>
+                ) : (
+                  <div className="table-container">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Collaborateur</th>
+                          <th>Type</th>
+                          <th>Dates</th>
+                          <th>Durée</th>
+                          <th>Demandé le</th>
+                          <th>Validé le</th>
+                          <th>Commentaire RH</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allRequests.filter(req => req.status === 'Approuvé').map((req) => (
+                          <tr key={req.request_id}>
+                            <td><strong>{req.employee_name}</strong></td>
+                            <td><strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong></td>
+                            <td>Du {formatDateStr(req.start_date)} au {formatDateStr(req.end_date)}</td>
+                            <td><strong>{req.business_days} j</strong></td>
+                            <td>{req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}</td>
+                            <td>{req.updated_at ? new Date(req.updated_at).toLocaleDateString('fr-FR') : '-'}</td>
+                            <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{req.hr_comment || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Split creation form & adjustment table */}
