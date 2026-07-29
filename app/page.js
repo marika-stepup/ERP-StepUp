@@ -363,6 +363,11 @@ export default function Page() {
     );
 
     memberApprovedLeaves.forEach(req => {
+      const isNoDeduct = req.leave_type.toLowerCase().includes('sans solde') || 
+                         req.leave_type.toLowerCase().includes('rattraper') || 
+                         req.leave_type.toLowerCase().includes('maladie');
+      if (isNoDeduct) return;
+
       const isPermission = req.leave_type.toLowerCase().includes('perm');
       const reqStart = new Date(req.start_date);
       if (reqStart > targetEnd) {
@@ -983,8 +988,10 @@ export default function Page() {
                     <label>Type de congé</label>
                     <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
                       <option value="CP">Congé Payé</option>
-                      <option value="Maladie">Congé Maladie</option>
+                      <option value="Congé Sans Solde">Congé Sans Solde</option>
                       <option value="Permission">Permission Spéciale</option>
+                      <option value="Permission à rattraper">Permission à rattraper</option>
+                      <option value="Maladie">Congé Maladie</option>
                     </select>
                   </div>
 
@@ -1794,8 +1801,6 @@ export default function Page() {
                           <th>Rôle</th>
                           <th>N+1 (Manager)</th>
                           <th>Date d'embauche</th>
-                          <th>Ajuster CP</th>
-                          <th>Ajuster Perm.</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1809,7 +1814,7 @@ export default function Page() {
                           if (filtered.length === 0) {
                             return (
                               <tr>
-                                <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                   Aucun collaborateur trouvé pour ce service.
                                 </td>
                               </tr>
@@ -1879,24 +1884,6 @@ export default function Page() {
                               <td style={{ fontSize: '0.85rem' }}>
                                 {m.hire_date ? new Date(m.hire_date).toLocaleDateString('fr-FR') : '-'}
                               </td>
-                              <td>
-                                <input
-                                  type="number"
-                                  className="adjust-input"
-                                  defaultValue={m.initial_balance}
-                                  onBlur={(e) => handleAdjustBalance(m.employee_id, 'cp', e.target.value)}
-                                  disabled={adjustingId === m.employee_id}
-                                />
-                              </td>
-                              <td>
-                                <input
-                                  type="number"
-                                  className="adjust-input"
-                                  defaultValue={m.initial_perm}
-                                  onBlur={(e) => handleAdjustBalance(m.employee_id, 'perm', e.target.value)}
-                                  disabled={adjustingId === m.employee_id}
-                                />
-                              </td>
                             </tr>
                           ));
                         })()}
@@ -1904,109 +1891,108 @@ export default function Page() {
                     </table>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Historique et gestion de tous les congés */}
-            <div className="panel" style={{ marginTop: '1.5rem' }}>
-              <h2 className="panel-title">Gestion globale des demandes de congé</h2>
-              <p className="panel-subtitle">Modifier, supprimer ou consulter toutes les demandes (validées, en attente ou refusées).</p>
-              
-              <div className="table-container">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
-                      <th>Collaborateur</th>
-                      <th>Type</th>
-                      <th>Dates</th>
-                      <th>Durée</th>
-                      <th>Statut</th>
-                      <th>Commentaire RH</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allRequests.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                          Aucune demande de congé enregistrée.
-                        </td>
-                      </tr>
-                    ) : (
-                      allRequests.map((req) => (
-                        <tr key={req.request_id}>
-                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
-                              <button
-                                className="btn-icon-edit"
-                                onClick={() => startEditLeave(req)}
-                                title="Modifier la demande"
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: 'var(--text-secondary)',
-                                  cursor: 'pointer',
-                                  padding: '0.35rem',
-                                  borderRadius: '6px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                }}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.83 20.082a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                                </svg>
-                              </button>
-                              <button
-                                className="btn-icon-delete"
-                                onClick={() => handleDeleteLeave(req.request_id)}
-                                title="Supprimer la demande"
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: 'var(--error-color)',
-                                  cursor: 'pointer',
-                                  padding: '0.35rem',
-                                  borderRadius: '6px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                }}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                </svg>
-                              </button>
-                            </div>
-                          </td>
-                          <td>
-                            <strong>{allMembers.find(m => m.employee_id === req.employee_id)?.employee_first_name || req.employee_name}</strong>
-                          </td>
-                          <td>
-                            <strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong>
-                          </td>
-                          <td>
-                            Du {req.start_date} au {req.end_date}
-                          </td>
-                          <td><strong>{req.business_days} j</strong></td>
-                          <td>
-                            <span className={`status-badge ${req.status === 'En attente' ? 'status-pending' :
-                              req.status === 'Approuvé' ? 'status-approved' : 'status-rejected'
-                              }`}>
-                              {req.status}
-                            </span>
-                          </td>
-                          <td>
-                            {req.hr_comment || '-'}
-                          </td>
+                {/* Historique et gestion de tous les congés */}
+                <div className="panel">
+                  <h2 className="panel-title">Gestion globale des demandes de congé</h2>
+                  <p className="panel-subtitle">Modifier, supprimer ou consulter toutes les demandes (validées, en attente ou refusées).</p>
+                  
+                  <div className="table-container">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
+                          <th>Collaborateur</th>
+                          <th>Type</th>
+                          <th>Dates</th>
+                          <th>Durée</th>
+                          <th>Statut</th>
+                          <th>Commentaire RH</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {allRequests.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                              Aucune demande de congé enregistrée.
+                            </td>
+                          </tr>
+                        ) : (
+                          allRequests.map((req) => (
+                            <tr key={req.request_id}>
+                              <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                                  <button
+                                    className="btn-icon-edit"
+                                    onClick={() => startEditLeave(req)}
+                                    title="Modifier la demande"
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--text-secondary)',
+                                      cursor: 'pointer',
+                                      padding: '0.35rem',
+                                      borderRadius: '6px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.83 20.082a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    className="btn-icon-delete"
+                                    onClick={() => handleDeleteLeave(req.request_id)}
+                                    title="Supprimer la demande"
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--error-color)',
+                                      cursor: 'pointer',
+                                      padding: '0.35rem',
+                                      borderRadius: '6px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </td>
+                              <td>
+                                <strong>{allMembers.find(m => m.employee_id === req.employee_id)?.employee_first_name || req.employee_name}</strong>
+                              </td>
+                              <td>
+                                <strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong>
+                              </td>
+                              <td>
+                                Du {req.start_date} au {req.end_date}
+                              </td>
+                              <td><strong>{req.business_days} j</strong></td>
+                              <td>
+                                <span className={`status-badge ${req.status === 'En attente' ? 'status-pending' :
+                                  req.status === 'Approuvé' ? 'status-approved' : 'status-rejected'
+                                  }`}>
+                                  {req.status}
+                                </span>
+                              </td>
+                              <td>
+                                {req.hr_comment || '-'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
-
           </div>
         )}
       </div>
@@ -2189,8 +2175,13 @@ export default function Page() {
                   disabled={editLeaveLoading}
                   required
                 >
-                  <option value="Congés Payés">Congés Payés</option>
-                  <option value="Permission Exceptionnelle">Permission Exceptionnelle</option>
+                  <option value="CP">Congé Payé</option>
+                  <option value="Congés Payés">Congés Payés (Ancien)</option>
+                  <option value="Congé Sans Solde">Congé Sans Solde</option>
+                  <option value="Permission">Permission Spéciale</option>
+                  <option value="Permission Exceptionnelle">Permission Exceptionnelle (Ancien)</option>
+                  <option value="Permission à rattraper">Permission à rattraper</option>
+                  <option value="Maladie">Congé Maladie</option>
                 </select>
               </div>
 

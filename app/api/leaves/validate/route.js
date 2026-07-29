@@ -101,32 +101,38 @@ export async function POST(req) {
 
       if (normalizedAction === 'approuver' || normalizedAction === 'approve') {
 
-        // Determine column fields depending on CP or Permission type
         const isPermission = leaveType.toLowerCase().includes('perm');
-        const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
-        const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
-        const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
+        const isNoDeduct = leaveType.toLowerCase().includes('sans solde') || 
+                           leaveType.toLowerCase().includes('rattraper') || 
+                           leaveType.toLowerCase().includes('maladie');
 
-        const initialBalanceValue = parseSheetFloat(balanceRow.get(initialCol));
-        const currentTakenValue = parseSheetFloat(balanceRow.get(takenCol));
-        const currentRemainingValue = parseSheetFloat(balanceRow.get(remainingCol));
+        if (!isNoDeduct) {
+          // Determine column fields depending on CP or Permission type
+          const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
+          const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
+          const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
 
-        // Re-verify balance
-        if (currentRemainingValue < businessDays) {
-          return {
-            error: `Impossible d'approuver la demande. L'employé dispose de seulement ${currentRemainingValue} jours restants, demandés ${businessDays} jours.`,
-            status: 400
-          };
+          const initialBalanceValue = parseSheetFloat(balanceRow.get(initialCol));
+          const currentTakenValue = parseSheetFloat(balanceRow.get(takenCol));
+          const currentRemainingValue = parseSheetFloat(balanceRow.get(remainingCol));
+
+          // Re-verify balance
+          if (currentRemainingValue < businessDays) {
+            return {
+              error: `Impossible d'approuver la demande. L'employé dispose de seulement ${currentRemainingValue} jours restants, demandés ${businessDays} jours.`,
+              status: 400
+            };
+          }
+
+          // Calculate updates
+          const newTaken = currentTakenValue + businessDays;
+          const newRemaining = initialBalanceValue - newTaken;
+
+          // Update Leave_Balances row
+          balanceRow.set(takenCol, formatSheetFloat(newTaken));
+          balanceRow.set(remainingCol, formatSheetFloat(newRemaining));
+          await balanceRow.save();
         }
-
-        // Calculate updates
-        const newTaken = currentTakenValue + businessDays;
-        const newRemaining = initialBalanceValue - newTaken;
-
-        // Update Leave_Balances row
-        balanceRow.set(takenCol, formatSheetFloat(newTaken));
-        balanceRow.set(remainingCol, formatSheetFloat(newRemaining));
-        await balanceRow.save();
 
         // Update Leave_Requests status to "Approuvé"
         targetRequestRow.set(LeaveRequestsColumns.status, 'Approuvé');
@@ -140,9 +146,7 @@ export async function POST(req) {
           data: {
             request_id,
             employee_id: employeeId,
-            business_days: businessDays,
-            new_taken_days: newTaken,
-            new_remaining_balance: newRemaining
+            business_days: businessDays
           }
         };
 

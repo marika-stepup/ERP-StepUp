@@ -70,46 +70,57 @@ export async function POST(req) {
       const oldBusinessDays = parseSheetFloat(targetRow.get(LeaveRequestsColumns.business_days));
 
       if (requestStatus === 'Approuvé') {
-        // Revert old CP or Permission
-        const oldIsPermission = oldLeaveType.toLowerCase().includes('perm');
-        const oldInitialCol = oldIsPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
-        const oldTakenCol = oldIsPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
-        const oldRemainingCol = oldIsPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
+        const oldIsNoDeduct = oldLeaveType.toLowerCase().includes('sans solde') || 
+                              oldLeaveType.toLowerCase().includes('rattraper') || 
+                              oldLeaveType.toLowerCase().includes('maladie');
+        if (!oldIsNoDeduct) {
+          // Revert old CP or Permission
+          const oldIsPermission = oldLeaveType.toLowerCase().includes('perm');
+          const oldInitialCol = oldIsPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
+          const oldTakenCol = oldIsPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
+          const oldRemainingCol = oldIsPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
 
-        const oldInitialVal = parseSheetFloat(employeeBalanceRow.get(oldInitialCol));
-        const oldTakenVal = parseSheetFloat(employeeBalanceRow.get(oldTakenCol));
+          const oldInitialVal = parseSheetFloat(employeeBalanceRow.get(oldInitialCol));
+          const oldTakenVal = parseSheetFloat(employeeBalanceRow.get(oldTakenCol));
 
-        const revertedTaken = oldTakenVal - oldBusinessDays;
-        const revertedRemaining = oldInitialVal - revertedTaken;
+          const revertedTaken = oldTakenVal - oldBusinessDays;
+          const revertedRemaining = oldInitialVal - revertedTaken;
 
-        employeeBalanceRow.set(oldTakenCol, formatSheetFloat(revertedTaken));
-        employeeBalanceRow.set(oldRemainingCol, formatSheetFloat(revertedRemaining));
+          employeeBalanceRow.set(oldTakenCol, formatSheetFloat(revertedTaken));
+          employeeBalanceRow.set(oldRemainingCol, formatSheetFloat(revertedRemaining));
+        }
       }
 
       // Evaluate balance for the new request
-      const isPermission = leave_type.toLowerCase().includes('perm');
-      const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
-      const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
-      const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
+      const isNoDeduct = leave_type.toLowerCase().includes('sans solde') || 
+                         leave_type.toLowerCase().includes('rattraper') || 
+                         leave_type.toLowerCase().includes('maladie');
 
-      const initialBalanceValue = parseSheetFloat(employeeBalanceRow.get(initialCol));
-      const remainingBalance = parseSheetFloat(employeeBalanceRow.get(remainingCol));
+      if (!isNoDeduct) {
+        const isPermission = leave_type.toLowerCase().includes('perm');
+        const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
+        const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
+        const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
 
-      if (remainingBalance < businessDays) {
-        return {
-          error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingBalance} j.`,
-          status: 400
-        };
-      }
+        const initialBalanceValue = parseSheetFloat(employeeBalanceRow.get(initialCol));
+        const remainingBalance = parseSheetFloat(employeeBalanceRow.get(remainingCol));
 
-      if (requestStatus === 'Approuvé') {
-        // Deduct new CP or Permission
-        const currentTakenValue = parseSheetFloat(employeeBalanceRow.get(takenCol));
-        const newTaken = currentTakenValue + businessDays;
-        const newRemaining = initialBalanceValue - newTaken;
+        if (remainingBalance < businessDays) {
+          return {
+            error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingBalance} j.`,
+            status: 400
+          };
+        }
 
-        employeeBalanceRow.set(takenCol, formatSheetFloat(newTaken));
-        employeeBalanceRow.set(remainingCol, formatSheetFloat(newRemaining));
+        if (requestStatus === 'Approuvé') {
+          // Deduct new CP or Permission
+          const currentTakenValue = parseSheetFloat(employeeBalanceRow.get(takenCol));
+          const newTaken = currentTakenValue + businessDays;
+          const newRemaining = initialBalanceValue - newTaken;
+
+          employeeBalanceRow.set(takenCol, formatSheetFloat(newTaken));
+          employeeBalanceRow.set(remainingCol, formatSheetFloat(newRemaining));
+        }
       }
 
       // Save balance updates

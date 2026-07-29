@@ -43,34 +43,40 @@ export async function POST(req) {
 
       // If the request was approved and is deleted by admin, restore employee balance
       if (requestStatus === 'Approuvé') {
-        const employeeId = targetRow.get(LeaveRequestsColumns.employee_id);
-        const businessDays = parseSheetFloat(targetRow.get(LeaveRequestsColumns.business_days));
         const leaveType = targetRow.get(LeaveRequestsColumns.leave_type) || '';
+        const isNoDeduct = leaveType.toLowerCase().includes('sans solde') || 
+                           leaveType.toLowerCase().includes('rattraper') || 
+                           leaveType.toLowerCase().includes('maladie');
 
-        const balancesSheet = await getSheet(SheetTabs.balances);
-        const balanceRows = await balancesSheet.getRows();
-        const balanceRow = balanceRows.find(
-          (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
-        );
+        if (!isNoDeduct) {
+          const employeeId = targetRow.get(LeaveRequestsColumns.employee_id);
+          const businessDays = parseSheetFloat(targetRow.get(LeaveRequestsColumns.business_days));
 
-        if (!balanceRow) {
-          return { error: `Aucun solde de congés trouvé pour l'employé lors de la suppression.`, status: 404 };
+          const balancesSheet = await getSheet(SheetTabs.balances);
+          const balanceRows = await balancesSheet.getRows();
+          const balanceRow = balanceRows.find(
+            (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
+          );
+
+          if (!balanceRow) {
+            return { error: `Aucun solde de congés trouvé pour l'employé lors de la suppression.`, status: 404 };
+          }
+
+          const isPermission = leaveType.toLowerCase().includes('perm');
+          const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
+          const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
+          const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
+
+          const initialBalanceValue = parseSheetFloat(balanceRow.get(initialCol));
+          const currentTakenValue = parseSheetFloat(balanceRow.get(takenCol));
+
+          const newTaken = currentTakenValue - businessDays;
+          const newRemaining = initialBalanceValue - newTaken;
+
+          balanceRow.set(takenCol, formatSheetFloat(newTaken));
+          balanceRow.set(remainingCol, formatSheetFloat(newRemaining));
+          await balanceRow.save();
         }
-
-        const isPermission = leaveType.toLowerCase().includes('perm');
-        const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
-        const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
-        const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
-
-        const initialBalanceValue = parseSheetFloat(balanceRow.get(initialCol));
-        const currentTakenValue = parseSheetFloat(balanceRow.get(takenCol));
-
-        const newTaken = currentTakenValue - businessDays;
-        const newRemaining = initialBalanceValue - newTaken;
-
-        balanceRow.set(takenCol, formatSheetFloat(newTaken));
-        balanceRow.set(remainingCol, formatSheetFloat(newRemaining));
-        await balanceRow.save();
       }
 
       // Delete row

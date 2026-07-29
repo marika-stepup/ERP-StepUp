@@ -59,17 +59,23 @@ export async function POST(req) {
 
       // Check balance depending on leave type (Permission vs normal CP/RTT)
       const isPermission = leave_type.toLowerCase().includes('perm');
-      const balanceField = isPermission 
-        ? LeaveBalancesColumns.remaining_perm 
-        : LeaveBalancesColumns.remaining_balance;
+      const isNoDeduct = leave_type.toLowerCase().includes('sans solde') || 
+                         leave_type.toLowerCase().includes('rattraper') || 
+                         leave_type.toLowerCase().includes('maladie');
       
-      const remainingBalance = parseSheetFloat(employeeBalanceRow.get(balanceField));
+      if (!isNoDeduct) {
+        const balanceField = isPermission 
+          ? LeaveBalancesColumns.remaining_perm 
+          : LeaveBalancesColumns.remaining_balance;
+        
+        const remainingBalance = parseSheetFloat(employeeBalanceRow.get(balanceField));
 
-      if (remainingBalance < businessDays) {
-        return {
-          error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingBalance} j.`,
-          status: 400
-        };
+        if (remainingBalance < businessDays) {
+          return {
+            error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingBalance} j.`,
+            status: 400
+          };
+        }
       }
 
       // 3.5 Check for duplicate / overlapping requests
