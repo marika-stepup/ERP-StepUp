@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex, autoCreditContractAnniversaries } from '../../../../lib/googleSheets';
 import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, parseDateFromFrench } from '../../../../lib/sheetsColumns';
+import { splitFullName } from '../../../../lib/utils';
 
 export async function GET(req) {
   // 1. Authenticate user
@@ -28,9 +29,11 @@ export async function GET(req) {
     );
 
     if (!balanceRow) {
+      const splitUser = splitFullName(user.user_metadata?.full_name || 'Utilisateur');
       return NextResponse.json({
         employee_id: user.id,
-        employee_name: user.user_metadata?.full_name || 'Utilisateur',
+        employee_name: splitUser.lastName || 'Utilisateur',
+        employee_first_name: splitUser.firstName || 'Utilisateur',
         employee_email: user.email,
         initial_balance: 25.0,
         taken_days: 0.0,
@@ -43,9 +46,19 @@ export async function GET(req) {
       });
     }
 
+    let name = balanceRow.get(LeaveBalancesColumns.employee_name) || '';
+    let firstName = balanceRow.get(LeaveBalancesColumns.employee_first_name) || '';
+
+    if (!firstName && name) {
+      const split = splitFullName(name);
+      firstName = split.firstName;
+      name = split.lastName || name;
+    }
+
     return NextResponse.json({
       employee_id: balanceRow.get(LeaveBalancesColumns.employee_id),
-      employee_name: balanceRow.get(LeaveBalancesColumns.employee_name),
+      employee_name: name,
+      employee_first_name: firstName,
       employee_email: balanceRow.get(LeaveBalancesColumns.employee_email),
       initial_balance: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.initial_balance)),
       taken_days: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_days)),

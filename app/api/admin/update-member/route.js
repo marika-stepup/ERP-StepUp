@@ -12,12 +12,12 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { employee_id, name, email, role, manager_name, initial_balance, initial_perm, service, hire_date } = body;
+    const { employee_id, name, firstName, email, role, manager_name, initial_balance, initial_perm, service, hire_date } = body;
 
     // Validation
-    if (!employee_id || !name || !email) {
+    if (!employee_id || !name || !firstName || !email) {
       return NextResponse.json(
-        { error: 'Champs obligatoires manquants : employee_id, name, email.' },
+        { error: 'Champs obligatoires manquants : employee_id, name, firstName, email.' },
         { status: 400 }
       );
     }
@@ -62,6 +62,7 @@ export async function POST(req) {
 
       // Update values using translated columns
       balanceRow.set(LeaveBalancesColumns.employee_name, name);
+      balanceRow.set(LeaveBalancesColumns.employee_first_name, firstName);
       balanceRow.set(LeaveBalancesColumns.employee_email, email.toLowerCase());
       balanceRow.set(LeaveBalancesColumns.role, role || 'employee');
       balanceRow.set(LeaveBalancesColumns.manager_name, manager_name || 'Aucun');
@@ -79,6 +80,7 @@ export async function POST(req) {
         data: {
           employee_id,
           employee_name: name,
+          employee_first_name: firstName,
           employee_email: email.toLowerCase(),
           role: role || 'employee',
           manager_name: manager_name || 'Aucun',

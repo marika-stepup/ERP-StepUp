@@ -40,33 +40,60 @@ export async function POST(req) {
         return { error: 'Demande introuvable.', status: 404 };
       }
 
-      // Check ownership
-      if (targetRow.get(LeaveRequestsColumns.employee_id) !== employee.id) {
+      // Check ownership & admin permission
+      const isOwner = targetRow.get(LeaveRequestsColumns.employee_id) === employee.id;
+      const isAdmin = employee.role === 'hr';
+
+      if (!isOwner && !isAdmin) {
         return { error: 'Non autorisé à modifier cette demande.', status: 403 };
       }
 
-      // Check status
-      if (targetRow.get(LeaveRequestsColumns.status) !== 'En attente') {
+      // Check status permission
+      const requestStatus = targetRow.get(LeaveRequestsColumns.status);
+      if (requestStatus !== 'En attente' && !isAdmin) {
         return { error: 'Seules les demandes en attente peuvent être modifiées.', status: 400 };
       }
 
-      // 2. Check balance
+      // 2. Get balance & adjust if request was approved
+      const employeeId = targetRow.get(LeaveRequestsColumns.employee_id);
       const balancesSheet = await getSheet(SheetTabs.balances);
       const balanceRows = await balancesSheet.getRows();
       const employeeBalanceRow = balanceRows.find(
-        (row) => row.get(LeaveBalancesColumns.employee_id) === employee.id
+        (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
       );
 
       if (!employeeBalanceRow) {
-        return { error: 'Aucun solde trouvé pour cet employé.', status: 404 };
+        return { error: 'Aucun solde de congés trouvé pour cet employé.', status: 404 };
       }
 
+      const oldLeaveType = targetRow.get(LeaveRequestsColumns.leave_type) || '';
+      const oldBusinessDays = parseSheetFloat(targetRow.get(LeaveRequestsColumns.business_days));
+
+      if (requestStatus === 'Approuvé') {
+        // Revert old CP or Permission
+        const oldIsPermission = oldLeaveType.toLowerCase().includes('perm');
+        const oldInitialCol = oldIsPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
+        const oldTakenCol = oldIsPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
+        const oldRemainingCol = oldIsPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
+
+        const oldInitialVal = parseSheetFloat(employeeBalanceRow.get(oldInitialCol));
+        const oldTakenVal = parseSheetFloat(employeeBalanceRow.get(oldTakenCol));
+
+        const revertedTaken = oldTakenVal - oldBusinessDays;
+        const revertedRemaining = oldInitialVal - revertedTaken;
+
+        employeeBalanceRow.set(oldTakenCol, formatSheetFloat(revertedTaken));
+        employeeBalanceRow.set(oldRemainingCol, formatSheetFloat(revertedRemaining));
+      }
+
+      // Evaluate balance for the new request
       const isPermission = leave_type.toLowerCase().includes('perm');
-      const balanceField = isPermission 
-        ? LeaveBalancesColumns.remaining_perm 
-        : LeaveBalancesColumns.remaining_balance;
-      
-      const remainingBalance = parseSheetFloat(employeeBalanceRow.get(balanceField));
+      const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
+      const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
+      const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
+
+      const initialBalanceValue = parseSheetFloat(employeeBalanceRow.get(initialCol));
+      const remainingBalance = parseSheetFloat(employeeBalanceRow.get(remainingCol));
 
       if (remainingBalance < businessDays) {
         return {
@@ -75,9 +102,22 @@ export async function POST(req) {
         };
       }
 
+      if (requestStatus === 'Approuvé') {
+        // Deduct new CP or Permission
+        const currentTakenValue = parseSheetFloat(employeeBalanceRow.get(takenCol));
+        const newTaken = currentTakenValue + businessDays;
+        const newRemaining = initialBalanceValue - newTaken;
+
+        employeeBalanceRow.set(takenCol, formatSheetFloat(newTaken));
+        employeeBalanceRow.set(remainingCol, formatSheetFloat(newRemaining));
+      }
+
+      // Save balance updates
+      await employeeBalanceRow.save();
+
       // 3. Check overlap with other requests of the same employee
       const otherRequests = requestRows.filter(
-        (row) => row.get(LeaveRequestsColumns.employee_id) === employee.id &&
+        (row) => row.get(LeaveRequestsColumns.employee_id) === employeeId &&
                  row.get(LeaveRequestsColumns.request_id) !== request_id &&
                  row.get(LeaveRequestsColumns.status) !== 'Refusé'
       );

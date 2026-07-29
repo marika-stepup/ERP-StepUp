@@ -1127,8 +1127,7 @@ body.dark .gantt-cell.holiday {
 
 /* End balance column */
 .gantt-col-balance {
-  min-width: 60px;
-  max-width: 60px;
+  min-width: 110px;
   text-align: center !important;
   font-weight: 600;
   background: var(--panel-white);

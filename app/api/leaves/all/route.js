@@ -45,8 +45,7 @@ export async function GET(req) {
           hr_comment: row.get(LeaveRequestsColumns.hr_comment),
           service: serviceMap[empId] || 'Non spécifié'
         };
-      })
-      .filter((req) => req.status === 'En attente' || req.status === 'Approuvé');
+      });
 
     return NextResponse.json({
       success: true,

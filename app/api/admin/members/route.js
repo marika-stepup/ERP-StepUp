@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex, autoCreditContractAnniversaries, autoCreditMonthlyLeaves } from '../../../../lib/googleSheets';
 import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, parseDateFromFrench } from '../../../../lib/sheetsColumns';
+import { splitFullName } from '../../../../lib/utils';
 
 export async function GET(req) {
   // 1. Authenticate user (all authenticated roles can fetch member balances for the global dashboard)
@@ -28,29 +29,41 @@ export async function GET(req) {
     });
 
     // 3. Map sheet rows to JSON response
-    const members = employeeRows.map((row) => ({
-      employee_id: row.get(LeaveBalancesColumns.employee_id),
-      employee_name: row.get(LeaveBalancesColumns.employee_name),
-      employee_email: row.get(LeaveBalancesColumns.employee_email),
-      role: row.get(LeaveBalancesColumns.role) || (
-        row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('hr@') ? 'hr' :
-        row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('manager@') ? 'manager' :
-        row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('director@') ? 'director' :
-        row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('directeur@') ? 'director' : 'employee'
-      ),
-      initial_balance: parseSheetFloat(row.get(LeaveBalancesColumns.initial_balance)),
-      taken_days: parseSheetFloat(row.get(LeaveBalancesColumns.taken_days)),
-      remaining_balance: parseSheetFloat(row.get(LeaveBalancesColumns.remaining_balance)),
-      // Permissions support
-      initial_perm: parseSheetFloat(row.get(LeaveBalancesColumns.initial_perm)),
-      taken_perm: parseSheetFloat(row.get(LeaveBalancesColumns.taken_perm)),
-      remaining_perm: parseSheetFloat(row.get(LeaveBalancesColumns.remaining_perm)),
-      // Hierarchy manager
-      manager_name: row.get(LeaveBalancesColumns.manager_name) || 'Aucun',
-      service: row.get(LeaveBalancesColumns.service) || 'Non spécifié',
-      // Hire date
-      hire_date: parseDateFromFrench(row.get(LeaveBalancesColumns.hire_date)) || ''
-    }));
+    const members = employeeRows.map((row) => {
+      let name = row.get(LeaveBalancesColumns.employee_name) || '';
+      let firstName = row.get(LeaveBalancesColumns.employee_first_name) || '';
+
+      if (!firstName && name) {
+        const split = splitFullName(name);
+        firstName = split.firstName;
+        name = split.lastName || name;
+      }
+
+      return {
+        employee_id: row.get(LeaveBalancesColumns.employee_id),
+        employee_name: name,
+        employee_first_name: firstName,
+        employee_email: row.get(LeaveBalancesColumns.employee_email),
+        role: row.get(LeaveBalancesColumns.role) || (
+          row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('hr@') ? 'hr' :
+          row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('manager@') ? 'manager' :
+          row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('director@') ? 'director' :
+          row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('directeur@') ? 'director' : 'employee'
+        ),
+        initial_balance: parseSheetFloat(row.get(LeaveBalancesColumns.initial_balance)),
+        taken_days: parseSheetFloat(row.get(LeaveBalancesColumns.taken_days)),
+        remaining_balance: parseSheetFloat(row.get(LeaveBalancesColumns.remaining_balance)),
+        // Permissions support
+        initial_perm: parseSheetFloat(row.get(LeaveBalancesColumns.initial_perm)),
+        taken_perm: parseSheetFloat(row.get(LeaveBalancesColumns.taken_perm)),
+        remaining_perm: parseSheetFloat(row.get(LeaveBalancesColumns.remaining_perm)),
+        // Hierarchy manager
+        manager_name: row.get(LeaveBalancesColumns.manager_name) || 'Aucun',
+        service: row.get(LeaveBalancesColumns.service) || 'Non spécifié',
+        // Hire date
+        hire_date: parseDateFromFrench(row.get(LeaveBalancesColumns.hire_date)) || ''
+      };
+    });
 
     return NextResponse.json({
       success: true,

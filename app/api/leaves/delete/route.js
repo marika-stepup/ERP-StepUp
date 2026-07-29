@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveRequestsColumns, SheetTabs } from '../../../../lib/sheetsColumns';
+import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs, parseSheetFloat, formatSheetFloat } from '../../../../lib/sheetsColumns';
 
 export async function POST(req) {
   const auth = await verifyRole(req, ['employee', 'hr']);
@@ -27,14 +27,50 @@ export async function POST(req) {
         return { error: 'Demande introuvable.', status: 404 };
       }
 
-      // Check ownership
-      if (targetRow.get(LeaveRequestsColumns.employee_id) !== employee.id) {
+      // Check ownership & admin permission
+      const isOwner = targetRow.get(LeaveRequestsColumns.employee_id) === employee.id;
+      const isAdmin = employee.role === 'hr';
+
+      if (!isOwner && !isAdmin) {
         return { error: 'Non autorisé à supprimer cette demande.', status: 403 };
       }
 
-      // Check status
-      if (targetRow.get(LeaveRequestsColumns.status) !== 'En attente') {
+      // Check status permission
+      const requestStatus = targetRow.get(LeaveRequestsColumns.status);
+      if (requestStatus !== 'En attente' && !isAdmin) {
         return { error: 'Seules les demandes en attente peuvent être supprimées.', status: 400 };
+      }
+
+      // If the request was approved and is deleted by admin, restore employee balance
+      if (requestStatus === 'Approuvé') {
+        const employeeId = targetRow.get(LeaveRequestsColumns.employee_id);
+        const businessDays = parseSheetFloat(targetRow.get(LeaveRequestsColumns.business_days));
+        const leaveType = targetRow.get(LeaveRequestsColumns.leave_type) || '';
+
+        const balancesSheet = await getSheet(SheetTabs.balances);
+        const balanceRows = await balancesSheet.getRows();
+        const balanceRow = balanceRows.find(
+          (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
+        );
+
+        if (!balanceRow) {
+          return { error: `Aucun solde de congés trouvé pour l'employé lors de la suppression.`, status: 404 };
+        }
+
+        const isPermission = leaveType.toLowerCase().includes('perm');
+        const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
+        const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
+        const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
+
+        const initialBalanceValue = parseSheetFloat(balanceRow.get(initialCol));
+        const currentTakenValue = parseSheetFloat(balanceRow.get(takenCol));
+
+        const newTaken = currentTakenValue - businessDays;
+        const newRemaining = initialBalanceValue - newTaken;
+
+        balanceRow.set(takenCol, formatSheetFloat(newTaken));
+        balanceRow.set(remainingCol, formatSheetFloat(newRemaining));
+        await balanceRow.save();
       }
 
       // Delete row

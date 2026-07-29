@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
 import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
 import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, formatSheetFloat } from '../../../../lib/sheetsColumns';
+import { splitFullName } from '../../../../lib/utils';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr', 'manager' or 'director'
@@ -55,6 +56,15 @@ export async function POST(req) {
         };
       }
 
+      let name = balanceRow.get(LeaveBalancesColumns.employee_name) || '';
+      let firstName = balanceRow.get(LeaveBalancesColumns.employee_first_name) || '';
+
+      if (!firstName && name) {
+        const split = splitFullName(name);
+        firstName = split.firstName;
+        name = split.lastName || name;
+      }
+
       if (normalizedType === 'cp') {
         const currentTaken = parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_days));
         const newRemaining = numericValue - currentTaken;
@@ -67,7 +77,8 @@ export async function POST(req) {
           success: true,
           data: {
             employee_id: balanceRow.get(LeaveBalancesColumns.employee_id),
-            employee_name: balanceRow.get(LeaveBalancesColumns.employee_name),
+            employee_name: name,
+            employee_first_name: firstName,
             type: 'cp',
             initial_balance: numericValue,
             remaining_balance: newRemaining
@@ -85,7 +96,8 @@ export async function POST(req) {
           success: true,
           data: {
             employee_id: balanceRow.get(LeaveBalancesColumns.employee_id),
-            employee_name: balanceRow.get(LeaveBalancesColumns.employee_name),
+            employee_name: name,
+            employee_first_name: firstName,
             type: 'perm',
             initial_perm: numericValue,
             remaining_perm: newRemaining

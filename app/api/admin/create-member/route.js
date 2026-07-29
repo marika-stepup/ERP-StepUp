@@ -12,12 +12,12 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { email, name, role, manager_name, initial_balance, initial_perm, password, service, hire_date } = body;
+    const { email, name, firstName, role, manager_name, initial_balance, initial_perm, password, service, hire_date } = body;
 
     // Validation
-    if (!email || !name || !password) {
+    if (!email || !name || !firstName || !password) {
       return NextResponse.json(
-        { error: 'Champs obligatoires manquants : email, name, password.' },
+        { error: 'Champs obligatoires manquants : email, name, firstName, password.' },
         { status: 400 }
       );
     }
@@ -36,7 +36,7 @@ export async function POST(req) {
       password,
       options: {
         data: {
-          full_name: name,
+          full_name: `${firstName} ${name}`,
           role: role || 'employee'
         }
       }
@@ -81,6 +81,7 @@ export async function POST(req) {
       await balancesSheet.addRow({
         [LeaveBalancesColumns.employee_id]: employeeId,
         [LeaveBalancesColumns.employee_name]: name,
+        [LeaveBalancesColumns.employee_first_name]: firstName,
         [LeaveBalancesColumns.employee_email]: email.toLowerCase(),
         [LeaveBalancesColumns.role]: role || 'employee',
         [LeaveBalancesColumns.initial_balance]: formatSheetFloat(initialCP),
@@ -100,6 +101,7 @@ export async function POST(req) {
         data: {
           employee_id: employeeId,
           employee_name: name,
+          employee_first_name: firstName,
           employee_email: email,
           role: role || 'employee',
           manager_name: manager_name || 'Aucun',

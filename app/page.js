@@ -2,60 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseClient } from '../lib/supabaseClient';
-
-// Helper to check Madagascar public holidays (fixed and variable)
-const isMadagascarHoliday = (dateStr) => {
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return false;
-  const y = date.getFullYear();
-  const m = date.getMonth(); // 0-indexed
-  const d = date.getDate();
-
-  // Fixed holidays
-  if (m === 0 && d === 1) return true; // Jour de l'an
-  if (m === 2 && d === 29) return true; // Commémoration du 29 mars 1947
-  if (m === 4 && d === 1) return true; // Fête du travail
-  if (m === 5 && d === 26) return true; // Fête nationale / Indépendance
-  if (m === 7 && d === 15) return true; // Assomption
-  if (m === 10 && d === 1) return true; // Toussaint
-  if (m === 11 && d === 25) return true; // Noël
-
-  // Variable holidays calculation (Easter, Ascension, Pentecost)
-  // Meeus/Jones/Butcher Algorithm
-  const a = y % 19;
-  const b = Math.floor(y / 100);
-  const c = y % 100;
-  const dVal = Math.floor(b / 4);
-  const eVal = b % 4;
-  const fVal = Math.floor((b + 8) / 25);
-  const gVal = Math.floor((b - fVal + 1) / 3);
-  const hVal = (19 * a + b - dVal - gVal + 15) % 30;
-  const iVal = Math.floor(c / 4);
-  const kVal = c % 4;
-  const lVal = (32 + 2 * eVal + 2 * iVal - hVal - kVal) % 7;
-  const mVal = Math.floor((a + 11 * hVal + 22 * lVal) / 451);
-  const easterMonth = Math.floor((hVal + lVal - 7 * mVal + 114) / 31);
-  const easterDay = ((hVal + lVal - 7 * mVal + 114) % 31) + 1;
-
-  const easterSunday = new Date(y, easterMonth - 1, easterDay);
-
-  // Easter Monday (Easter + 1 day)
-  const easterMonday = new Date(easterSunday);
-  easterMonday.setDate(easterSunday.getDate() + 1);
-  if (m === easterMonday.getMonth() && d === easterMonday.getDate()) return true;
-
-  // Ascension Thursday (Easter + 39 days)
-  const ascension = new Date(easterSunday);
-  ascension.setDate(easterSunday.getDate() + 39);
-  if (m === ascension.getMonth() && d === ascension.getDate()) return true;
-
-  // Pentecost Monday (Easter + 50 days)
-  const pentecost = new Date(easterSunday);
-  pentecost.setDate(easterSunday.getDate() + 50);
-  if (m === pentecost.getMonth() && d === pentecost.getDate()) return true;
-
-  return false;
-};
+import { splitFullName, isMadagascarHoliday } from '../lib/utils';
 
 const formatDateStr = (str) => {
   if (!str) return '-';
@@ -100,7 +47,8 @@ export default function Page() {
 
   // Form States (Add/Edit Member)
   const [editingMember, setEditingMember] = useState(null); // When set, we are in Edit Modal
-  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberLastName, setNewMemberLastName] = useState('');
+  const [newMemberFirstName, setNewMemberFirstName] = useState('');
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberPassword, setNewMemberPassword] = useState('');
   const [showNewMemberPassword, setShowNewMemberPassword] = useState(false);
@@ -211,7 +159,7 @@ export default function Page() {
   const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
   const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`;
 
-  const monthRequests = allRequests.filter(req => req.start_date <= monthEnd && req.end_date >= monthStart);
+  const monthRequests = allRequests.filter(req => req.start_date <= monthEnd && req.end_date >= monthStart && req.status !== 'Refusé');
 
   // Generate days in month array for Gantt chart
   const daysInMonthArray = [];
@@ -235,7 +183,7 @@ export default function Page() {
   const dayServiceConflicts = {};
   daysInMonthArray.forEach(day => {
     const dayReqs = allRequests.filter(req =>
-      day.dateString >= req.start_date && day.dateString <= req.end_date
+      day.dateString >= req.start_date && day.dateString <= req.end_date && req.status !== 'Refusé'
     );
     const svcGroups = {};
     dayReqs.forEach(req => {
@@ -354,6 +302,96 @@ export default function Page() {
     } else {
       document.body.classList.remove('dark');
     }
+  };
+
+  const getProjectedBalance = (m, targetDate) => {
+    const defaultRes = {
+      cp: m.remaining_balance,
+      perm: m.remaining_perm,
+      cpBreakdown: '',
+      permBreakdown: ''
+    };
+
+    if (!m.hire_date) return defaultRes;
+
+    const parts = m.hire_date.split('-');
+    if (parts.length !== 3) return defaultRes;
+    const hireYear = parseInt(parts[0], 10);
+    const hireMonth = parseInt(parts[1], 10) - 1; // 0-indexed month
+    const hireDay = parseInt(parts[2], 10);
+
+    const today = new Date();
+    const year = targetDate.getFullYear();
+    const month = targetDate.getMonth();
+    const targetEnd = new Date(year, month + 1, 0); // last day of target month
+
+    let cpMonthly = 0;
+    let cpAnniversary = 0;
+
+    // 1. Monthly Accrual: +2.5j per month (on the 1st of each month)
+    const todayMonthIndex = today.getFullYear() * 12 + today.getMonth();
+    const targetMonthIndex = targetEnd.getFullYear() * 12 + targetEnd.getMonth();
+    const monthsDiff = targetMonthIndex - todayMonthIndex;
+    cpMonthly = monthsDiff * 2.5;
+
+    // 2. Anniversary Accrual: +30j per contract anniversary
+    if (targetEnd > today) {
+      // Future: add anniversaries that occur after today and before or equal to targetEnd
+      for (let y = today.getFullYear(); y <= targetEnd.getFullYear(); y++) {
+        const ann = new Date(y, hireMonth, hireDay);
+        if (ann > today && ann <= targetEnd) {
+          cpAnniversary += 30;
+        }
+      }
+    } else if (targetEnd < today) {
+      // Past: subtract anniversaries that occur after targetEnd and before or equal to today
+      for (let y = targetEnd.getFullYear(); y <= today.getFullYear(); y++) {
+        const ann = new Date(y, hireMonth, hireDay);
+        if (ann > targetEnd && ann <= today) {
+          cpAnniversary -= 30;
+        }
+      }
+    }
+
+    // 3. Approved Leaves Adjustment
+    let leaveAdjustment = 0;
+    let permAdjustment = 0;
+
+    const memberApprovedLeaves = allRequests.filter(req => 
+      req.employee_id === m.employee_id && 
+      req.status === 'Approuvé'
+    );
+
+    memberApprovedLeaves.forEach(req => {
+      const isPermission = req.leave_type.toLowerCase().includes('perm');
+      const reqStart = new Date(req.start_date);
+      if (reqStart > targetEnd) {
+        if (!isPermission) {
+          leaveAdjustment += req.business_days;
+        } else {
+          permAdjustment += req.business_days;
+        }
+      }
+    });
+
+    const projectedCP = m.remaining_balance + cpMonthly + cpAnniversary + leaveAdjustment;
+    const projectedPerm = m.remaining_perm + permAdjustment;
+
+    // Build human readable breakdown texts
+    const cpParts = [];
+    if (cpMonthly !== 0) cpParts.push(`${cpMonthly > 0 ? '+' : ''}${cpMonthly}j acquis`);
+    if (cpAnniversary !== 0) cpParts.push(`${cpAnniversary > 0 ? '+' : ''}${cpAnniversary}j anniv.`);
+    if (leaveAdjustment !== 0) cpParts.push(`+${leaveAdjustment}j congés fut.`);
+
+    const permParts = [];
+    if (permAdjustment !== 0) permParts.push(`+${permAdjustment}j congés fut.`);
+
+    return {
+      cp: parseFloat(Math.max(0, projectedCP).toFixed(1)),
+      perm: parseFloat(Math.max(0, projectedPerm).toFixed(1)),
+      cpBreakdown: cpParts.length > 0 ? cpParts.join(', ') : '',
+      permBreakdown: permParts.length > 0 ? permParts.join(', ') : ''
+    };
   };
 
   const userRole = user?.app_metadata?.role || user?.user_metadata?.role || 'employee';
@@ -475,7 +513,8 @@ export default function Page() {
         },
         body: JSON.stringify({
           email: newMemberEmail,
-          name: newMemberName,
+          name: newMemberLastName,
+          firstName: newMemberFirstName,
           role: newMemberRole,
           manager_name: newMemberManager,
           initial_balance: parseFloat(newMemberCP || 0),
@@ -491,7 +530,8 @@ export default function Page() {
         setMemberError(data.error || 'Erreur lors de la création du membre.');
       } else {
         setMemberSuccess(true);
-        setNewMemberName('');
+        setNewMemberLastName('');
+        setNewMemberFirstName('');
         setNewMemberEmail('');
         setNewMemberPassword('');
         setShowNewMemberPassword(false);
@@ -512,7 +552,8 @@ export default function Page() {
   // 5. Start Edit Mode for a Member (Opens Modal)
   const startEditMember = (m) => {
     setEditingMember(m);
-    setNewMemberName(m.employee_name);
+    setNewMemberLastName(m.employee_name || '');
+    setNewMemberFirstName(m.employee_first_name || '');
     setNewMemberEmail(m.employee_email);
     setNewMemberRole(m.role || 'employee');
     setNewMemberManager(m.manager_name || 'Aucun');
@@ -529,7 +570,8 @@ export default function Page() {
   // 6. Cancel Edit Mode
   const cancelEditMember = () => {
     setEditingMember(null);
-    setNewMemberName('');
+    setNewMemberLastName('');
+    setNewMemberFirstName('');
     setNewMemberEmail('');
     setNewMemberRole('employee');
     setNewMemberManager('Aucun');
@@ -634,7 +676,8 @@ export default function Page() {
         },
         body: JSON.stringify({
           employee_id: editingMember.employee_id,
-          name: newMemberName,
+          name: newMemberLastName,
+          firstName: newMemberFirstName,
           email: newMemberEmail,
           role: newMemberRole,
           manager_name: newMemberManager,
@@ -717,7 +760,7 @@ export default function Page() {
       if (!res.ok) {
         setHrError(data.error || 'Erreur lors de l\'ajustement du solde.');
       } else {
-        setHrSuccess(`Solde mis à jour pour ${data.balance?.employee_name}.`);
+        setHrSuccess(`Solde mis à jour pour ${data.balance?.employee_first_name}.`);
         fetchDashboardData();
       }
     } catch (err) {
@@ -825,7 +868,7 @@ export default function Page() {
         )}
 
         <div className="session-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: (userRole === 'hr' || userRole === 'manager' || userRole === 'director') && pendingRequests.length > 0 ? '0' : 'auto' }}>
-          <span><strong>{balance.employee_name || user?.email}</strong></span>
+          <span><strong>{balance.employee_first_name || (user?.user_metadata?.full_name ? splitFullName(user.user_metadata.full_name).firstName : '') || user?.email}</strong></span>
           <span className={`badge-role ${userRole === 'hr' ? 'hr' : userRole === 'manager' ? 'manager' : userRole === 'director' ? 'director' : 'employee'}`} style={{ marginLeft: '0.25rem' }}>
             {userRole === 'hr' ? 'Administrateur' : userRole === 'manager' ? 'Manager' : userRole === 'director' ? 'Directeur' : 'Collaborateur'}
           </span>
@@ -940,7 +983,6 @@ export default function Page() {
                     <label>Type de congé</label>
                     <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
                       <option value="CP">Congé Payé</option>
-                      <option value="RTT">RTT</option>
                       <option value="Maladie">Congé Maladie</option>
                       <option value="Permission">Permission Spéciale</option>
                     </select>
@@ -1303,14 +1345,14 @@ export default function Page() {
                           }
 
                           return filteredMembers.map(m => {
-                            const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id);
+                            const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id && req.status !== 'Refusé');
+                            const projected = getProjectedBalance(m, currentDate);
 
                             return (
                               <tr key={m.employee_id}>
                                 <td className="gantt-col-name">
                                   <div className="gantt-collaborator-name-wrapper">
-                                    <span>{m.employee_name}</span>
-                                    <span className="gantt-collaborator-email">{m.employee_email}</span>
+                                    <span>{m.employee_first_name}</span>
                                   </div>
                                 </td>
                                 <td className="gantt-col-service">
@@ -1354,18 +1396,23 @@ export default function Page() {
                                   }
 
                                   if (isSaturdayCP && saturdayReq) {
-                                    activeReq = saturdayReq;
+                                    if (isHoliday) {
+                                      isSaturdayCP = false;
+                                      saturdayReq = null;
+                                    } else {
+                                      activeReq = saturdayReq;
+                                    }
                                   }
 
                                   let cellClass = 'gantt-cell';
                                   let cellText = '';
                                   let cellTitle = '';
 
-                                  if (isWeekend && !isSaturdayCP) {
-                                    cellClass += ' weekend';
-                                  } else if (isHoliday) {
+                                  if (isHoliday) {
                                     cellClass += ' holiday';
                                     cellTitle = 'Jour Férié';
+                                  } else if (isWeekend && !isSaturdayCP) {
+                                    cellClass += ' weekend';
                                   } else if (activeReq) {
                                     if (activeReq.status === 'Approuvé') {
                                       cellClass += ' status-approved';
@@ -1382,7 +1429,7 @@ export default function Page() {
                                       cellTitle = `⚠️ Attention : Superposition dans le service ${svc} !\n`;
                                     }
 
-                                    cellTitle += `${m.employee_name} - ${activeReq.leave_type} (${activeReq.status})`;
+                                    cellTitle += `${m.employee_first_name} - ${activeReq.leave_type} (${activeReq.status})`;
                                   }
 
                                   return (
@@ -1395,11 +1442,35 @@ export default function Page() {
                                     </td>
                                   );
                                 })}
-                                <td className="gantt-col-balance" style={{ textAlign: 'center' }}>
-                                  <strong style={{ color: 'var(--brand-orange)' }}>{m.remaining_balance}j</strong>
+                                <td className="gantt-col-balance" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', verticalAlign: 'middle' }}>
+                                  <div style={{ fontWeight: '700', color: 'var(--brand-orange)', fontSize: '0.9rem', lineHeight: '1.2' }}>
+                                    {projected.cp}j
+                                  </div>
+                                  {(projected.cp !== m.remaining_balance) && (
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: '1.2', marginTop: '0.1rem' }}>
+                                      actuel: {m.remaining_balance}j
+                                    </div>
+                                  )}
+                                  {projected.cpBreakdown && (
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: '1.2', fontStyle: 'italic' }}>
+                                      {projected.cpBreakdown}
+                                    </div>
+                                  )}
                                 </td>
-                                <td className="gantt-col-balance" style={{ textAlign: 'center' }}>
-                                  <strong>{m.remaining_perm}j</strong>
+                                <td className="gantt-col-balance" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', verticalAlign: 'middle' }}>
+                                  <div style={{ fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.2' }}>
+                                    {projected.perm}j
+                                  </div>
+                                  {(projected.perm !== m.remaining_perm) && (
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: '1.2', marginTop: '0.1rem' }}>
+                                      actuel: {m.remaining_perm}j
+                                    </div>
+                                  )}
+                                  {projected.permBreakdown && (
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: '1.2', fontStyle: 'italic' }}>
+                                      {projected.permBreakdown}
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -1425,18 +1496,25 @@ export default function Page() {
                         ⚠️ Alertes Superpositions de Service ({currentDate.toLocaleDateString('fr-FR', { month: 'long' })})
                       </h3>
                       <div className="gantt-alerts-list">
-                        {filteredOverlaps.map((overlap, idx) => (
-                          <div key={idx} className="gantt-alert-item">
-                            <div>
-                              <span className="gantt-alert-badge">{overlap.service}</span>{' '}
-                              <strong>{overlap.r1.employee_name}</strong> et{' '}
-                              <strong>{overlap.r2.employee_name}</strong> ont des congés superposés.
+                        {filteredOverlaps.map((overlap, idx) => {
+                          const m1 = allMembers.find(m => m.employee_id === overlap.r1.employee_id);
+                          const m2 = allMembers.find(m => m.employee_id === overlap.r2.employee_id);
+                          const firstName1 = m1?.employee_first_name || overlap.r1.employee_name;
+                          const firstName2 = m2?.employee_first_name || overlap.r2.employee_name;
+
+                          return (
+                            <div key={idx} className="gantt-alert-item">
+                              <div>
+                                <span className="gantt-alert-badge">{overlap.service}</span>{' '}
+                                <strong>{firstName1}</strong> et{' '}
+                                <strong>{firstName2}</strong> ont des congés superposés.
+                              </div>
+                              <div>
+                                Période commune : du <strong>{new Date(overlap.start).toLocaleDateString('fr-FR')}</strong> au <strong>{new Date(overlap.end).toLocaleDateString('fr-FR')}</strong>
+                              </div>
                             </div>
-                            <div>
-                              Période commune : du <strong>{new Date(overlap.start).toLocaleDateString('fr-FR')}</strong> au <strong>{new Date(overlap.end).toLocaleDateString('fr-FR')}</strong>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -1470,13 +1548,13 @@ export default function Page() {
                   {pendingRequests.map((req) => {
                     const employeeMember = allMembers.find(m => m.employee_id === req.employee_id);
                     const currentUserMember = allMembers.find(m => m.employee_email?.toLowerCase() === user?.email?.toLowerCase());
-                    const isN1 = employeeMember && currentUserMember && employeeMember.manager_name !== 'Aucun' && employeeMember.manager_name === currentUserMember.employee_name;
+                    const isN1 = employeeMember && currentUserMember && employeeMember.manager_name !== 'Aucun' && employeeMember.manager_name === currentUserMember.employee_first_name;
 
                     return (
                       <div key={req.request_id} className="validation-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                           <div>
-                            <strong style={{ fontSize: '1.1rem' }}>{req.employee_name}</strong>
+                            <strong style={{ fontSize: '1.1rem' }}>{employeeMember?.employee_first_name || req.employee_name}</strong>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                               Type: <strong>{req.leave_type}</strong> | Jours demandés: <strong>{req.business_days} j</strong>
                             </div>
@@ -1539,16 +1617,29 @@ export default function Page() {
                   {memberSuccess && <div className="success-message">Données enregistrées avec succès.</div>}
 
                   <form onSubmit={handleCreateMember} style={{ padding: 0, border: 'none', background: 'none' }}>
-                    <div className="form-group">
-                      <label>Nom Complet</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Rakotoarisoa Dany"
-                        value={newMemberName}
-                        onChange={(e) => setNewMemberName(e.target.value)}
-                        required
-                        disabled={memberLoading}
-                      />
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Nom</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: RAKOTOARISOA"
+                          value={newMemberLastName}
+                          onChange={(e) => setNewMemberLastName(e.target.value)}
+                          required
+                          disabled={memberLoading}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Prénom</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Dany"
+                          value={newMemberFirstName}
+                          onChange={(e) => setNewMemberFirstName(e.target.value)}
+                          required
+                          disabled={memberLoading}
+                        />
+                      </div>
                     </div>
 
                     <div className="form-group">
@@ -1630,7 +1721,7 @@ export default function Page() {
                       <select value={newMemberManager} onChange={(e) => setNewMemberManager(e.target.value)}>
                         <option value="Aucun">Aucun (Directeur / RH)</option>
                         {allMembers.map(m => (
-                          <option key={m.employee_id} value={m.employee_name}>{m.employee_name}</option>
+                          <option key={m.employee_id} value={m.employee_first_name}>{m.employee_first_name}</option>
                         ))}
                       </select>
                     </div>
@@ -1772,8 +1863,7 @@ export default function Page() {
                                 </div>
                               </td>
                               <td>
-                                <strong>{m.employee_name}</strong>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.employee_email}</div>
+                                <strong>{m.employee_first_name}</strong>
                               </td>
                               <td>
                                 <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
@@ -1817,6 +1907,106 @@ export default function Page() {
               </div>
             </div>
 
+            {/* Historique et gestion de tous les congés */}
+            <div className="panel" style={{ marginTop: '1.5rem' }}>
+              <h2 className="panel-title">Gestion globale des demandes de congé</h2>
+              <p className="panel-subtitle">Modifier, supprimer ou consulter toutes les demandes (validées, en attente ou refusées).</p>
+              
+              <div className="table-container">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
+                      <th>Collaborateur</th>
+                      <th>Type</th>
+                      <th>Dates</th>
+                      <th>Durée</th>
+                      <th>Statut</th>
+                      <th>Commentaire RH</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allRequests.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                          Aucune demande de congé enregistrée.
+                        </td>
+                      </tr>
+                    ) : (
+                      allRequests.map((req) => (
+                        <tr key={req.request_id}>
+                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                              <button
+                                className="btn-icon-edit"
+                                onClick={() => startEditLeave(req)}
+                                title="Modifier la demande"
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                  padding: '0.35rem',
+                                  borderRadius: '6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.83 20.082a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                </svg>
+                              </button>
+                              <button
+                                className="btn-icon-delete"
+                                onClick={() => handleDeleteLeave(req.request_id)}
+                                title="Supprimer la demande"
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--error-color)',
+                                  cursor: 'pointer',
+                                  padding: '0.35rem',
+                                  borderRadius: '6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                          <td>
+                            <strong>{allMembers.find(m => m.employee_id === req.employee_id)?.employee_first_name || req.employee_name}</strong>
+                          </td>
+                          <td>
+                            <strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong>
+                          </td>
+                          <td>
+                            Du {req.start_date} au {req.end_date}
+                          </td>
+                          <td><strong>{req.business_days} j</strong></td>
+                          <td>
+                            <span className={`status-badge ${req.status === 'En attente' ? 'status-pending' :
+                              req.status === 'Approuvé' ? 'status-approved' : 'status-rejected'
+                              }`}>
+                              {req.status}
+                            </span>
+                          </td>
+                          <td>
+                            {req.hr_comment || '-'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         )}
       </div>
@@ -1829,22 +2019,35 @@ export default function Page() {
           <div className="modal-content">
             <h2 className="modal-title">📝 Modifier le Membre</h2>
             <p className="modal-message" style={{ marginBottom: '1.25rem' }}>
-              Mettez à jour les informations et soldes initiaux pour <strong>{editingMember.employee_name}</strong>.
+              Mettez à jour les informations et soldes initiaux pour <strong>{editingMember.employee_first_name}</strong>.
             </p>
 
             {memberError && <div className="error-message">{memberError}</div>}
 
             <form onSubmit={handleUpdateMember} style={{ padding: 0, border: 'none', background: 'none', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label>Nom Complet</label>
-                <input
-                  type="text"
-                  placeholder="Jean Dupont"
-                  value={newMemberName}
-                  onChange={(e) => setNewMemberName(e.target.value)}
-                  required
-                  disabled={memberLoading}
-                />
+               <div className="form-row">
+                <div className="form-group">
+                  <label>Nom</label>
+                  <input
+                    type="text"
+                    placeholder="Nom"
+                    value={newMemberLastName}
+                    onChange={(e) => setNewMemberLastName(e.target.value)}
+                    required
+                    disabled={memberLoading}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Prénom</label>
+                  <input
+                    type="text"
+                    placeholder="Prénom"
+                    value={newMemberFirstName}
+                    onChange={(e) => setNewMemberFirstName(e.target.value)}
+                    required
+                    disabled={memberLoading}
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -1892,7 +2095,7 @@ export default function Page() {
                 <select value={newMemberManager} onChange={(e) => setNewMemberManager(e.target.value)} disabled={memberLoading}>
                   <option value="Aucun">Aucun (Directeur / RH)</option>
                   {allMembers.filter(m => m.employee_id !== editingMember?.employee_id).map(m => (
-                    <option key={m.employee_id} value={m.employee_name}>{m.employee_name}</option>
+                    <option key={m.employee_id} value={m.employee_first_name}>{m.employee_first_name}</option>
                   ))}
                 </select>
               </div>
@@ -1987,7 +2190,6 @@ export default function Page() {
                   required
                 >
                   <option value="Congés Payés">Congés Payés</option>
-                  <option value="Congés RTT">Congés RTT</option>
                   <option value="Permission Exceptionnelle">Permission Exceptionnelle</option>
                 </select>
               </div>
