@@ -1233,26 +1233,28 @@ export default function Page() {
         {activeTab === 'globalDashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {/* KPIs grids */}
-            <div className="kpi-grid">
-              <div className="kpi-card">
-                <span className="kpi-val">{allMembers.length || 2}</span>
-                <span className="kpi-lbl">Total Collaborateurs</span>
+            {(userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
+              <div className="kpi-grid">
+                <div className="kpi-card">
+                  <span className="kpi-val">{allMembers.length || 2}</span>
+                  <span className="kpi-lbl">Total Collaborateurs</span>
+                </div>
+                <div className="kpi-card">
+                  <span className="kpi-val">
+                    {allMembers.reduce((sum, m) => sum + parseFloat(m.remaining_balance || 0), 0).toFixed(1)}j
+                  </span>
+                  <span className="kpi-lbl">Soldes CP Cumulés</span>
+                </div>
+                <div className="kpi-card">
+                  <span className="kpi-val">0</span>
+                  <span className="kpi-lbl">Salariés Absents ce jour</span>
+                </div>
+                <div className="kpi-card">
+                  <span className="kpi-val">{pendingRequests.length}</span>
+                  <span className="kpi-lbl">Demandes en attente</span>
+                </div>
               </div>
-              <div className="kpi-card">
-                <span className="kpi-val">
-                  {allMembers.reduce((sum, m) => sum + parseFloat(m.remaining_balance || 0), 0).toFixed(1)}j
-                </span>
-                <span className="kpi-lbl">Soldes CP Cumulés</span>
-              </div>
-              <div className="kpi-card">
-                <span className="kpi-val">0</span>
-                <span className="kpi-lbl">Salariés Absents ce jour</span>
-              </div>
-              <div className="kpi-card">
-                <span className="kpi-val">{pendingRequests.length}</span>
-                <span className="kpi-lbl">Demandes en attente</span>
-              </div>
-            </div>
+            )}
 
 
 
