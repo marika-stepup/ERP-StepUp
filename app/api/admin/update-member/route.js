@@ -71,7 +71,13 @@ export async function POST(req) {
       balanceRow.set(LeaveBalancesColumns.remaining_balance, formatSheetFloat(newRemainingCP));
       balanceRow.set(LeaveBalancesColumns.initial_perm, formatSheetFloat(initialPermissions));
       balanceRow.set(LeaveBalancesColumns.remaining_perm, formatSheetFloat(newRemainingPerm));
-      balanceRow.set(LeaveBalancesColumns.hire_date, hire_date ? formatDateToFrench(hire_date) : '');
+      const oldHireDate = balanceRow.get(LeaveBalancesColumns.hire_date) || '';
+      const newHireDateFormatted = hire_date ? formatDateToFrench(hire_date) : '';
+      if (oldHireDate !== newHireDateFormatted) {
+        balanceRow.set(LeaveBalancesColumns.last_anniversary_credited, '');
+      }
+
+      balanceRow.set(LeaveBalancesColumns.hire_date, newHireDateFormatted);
 
       await balanceRow.save();
 

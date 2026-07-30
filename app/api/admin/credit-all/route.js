@@ -21,10 +21,10 @@ export async function POST(req) {
       // Loop and update each row
       for (const row of rows) {
         const currentInitial = parseSheetFloat(row.get(LeaveBalancesColumns.initial_balance));
-        const currentTaken = parseSheetFloat(row.get(LeaveBalancesColumns.taken_days));
+        const currentRemaining = parseSheetFloat(row.get(LeaveBalancesColumns.remaining_balance));
         
         const newInitial = currentInitial + 2.5;
-        const newRemaining = newInitial - currentTaken;
+        const newRemaining = currentRemaining + 2.5;
 
         row.set(LeaveBalancesColumns.initial_balance, formatSheetFloat(newInitial));
         row.set(LeaveBalancesColumns.remaining_balance, formatSheetFloat(newRemaining));

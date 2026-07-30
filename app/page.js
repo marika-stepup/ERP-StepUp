@@ -328,74 +328,63 @@ export default function Page() {
     let cpMonthly = 0;
     let cpAnniversary = 0;
 
-    // 1. Monthly Accrual: +2.5j per month (on the 1st of each month)
-    const todayMonthIndex = today.getFullYear() * 12 + today.getMonth();
-    const targetMonthIndex = targetEnd.getFullYear() * 12 + targetEnd.getMonth();
+    const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+    const targetEndUTC = new Date(Date.UTC(targetEnd.getFullYear(), targetEnd.getMonth(), targetEnd.getDate()));
+
+    // 1. Monthly Accrual: +2.5j per month (difference in months index)
+    const todayMonthIndex = todayUTC.getUTCFullYear() * 12 + todayUTC.getUTCMonth();
+    const targetMonthIndex = targetEndUTC.getUTCFullYear() * 12 + targetEndUTC.getUTCMonth();
     const monthsDiff = targetMonthIndex - todayMonthIndex;
     cpMonthly = monthsDiff * 2.5;
 
     // 2. Anniversary Accrual: +30j per contract anniversary
-    if (targetEnd > today) {
+    if (targetEndUTC > todayUTC) {
       // Future: add anniversaries that occur after today and before or equal to targetEnd
-      for (let y = today.getFullYear(); y <= targetEnd.getFullYear(); y++) {
-        const ann = new Date(y, hireMonth, hireDay);
-        if (ann > today && ann <= targetEnd) {
+      for (let y = todayUTC.getUTCFullYear(); y <= targetEndUTC.getUTCFullYear(); y++) {
+        const ann = new Date(Date.UTC(y, hireMonth, hireDay));
+        if (ann > todayUTC && ann <= targetEndUTC) {
           cpAnniversary += 30;
         }
       }
-    } else if (targetEnd < today) {
+    } else if (targetEndUTC < todayUTC) {
       // Past: subtract anniversaries that occur after targetEnd and before or equal to today
-      for (let y = targetEnd.getFullYear(); y <= today.getFullYear(); y++) {
-        const ann = new Date(y, hireMonth, hireDay);
-        if (ann > targetEnd && ann <= today) {
+      for (let y = targetEndUTC.getUTCFullYear(); y <= todayUTC.getUTCFullYear(); y++) {
+        const ann = new Date(Date.UTC(y, hireMonth, hireDay));
+        if (ann > targetEndUTC && ann <= todayUTC) {
           cpAnniversary -= 30;
         }
       }
     }
 
-    // 3. Approved Leaves Adjustment
-    let leaveAdjustment = 0;
-    let permAdjustment = 0;
-
-    const memberApprovedLeaves = allRequests.filter(req => 
-      req.employee_id === m.employee_id && 
-      req.status === 'Approuvé'
-    );
-
-    memberApprovedLeaves.forEach(req => {
-      const isNoDeduct = req.leave_type.toLowerCase().includes('sans solde') || 
-                         req.leave_type.toLowerCase().includes('rattraper') || 
-                         req.leave_type.toLowerCase().includes('maladie');
-      if (isNoDeduct) return;
-
-      const isPermission = req.leave_type.toLowerCase().includes('perm');
-      const reqStart = new Date(req.start_date);
-      if (reqStart > targetEnd) {
-        if (!isPermission) {
-          leaveAdjustment += req.business_days;
-        } else {
-          permAdjustment += req.business_days;
-        }
-      }
-    });
-
-    const projectedCP = m.remaining_balance + cpMonthly + cpAnniversary + leaveAdjustment;
-    const projectedPerm = m.remaining_perm + permAdjustment;
+    const projectedCP = m.remaining_balance + cpMonthly + cpAnniversary;
+    const projectedPerm = m.remaining_perm;
 
     // Build human readable breakdown texts
-    const cpParts = [];
-    if (cpMonthly !== 0) cpParts.push(`${cpMonthly > 0 ? '+' : ''}${cpMonthly}j acquis`);
-    if (cpAnniversary !== 0) cpParts.push(`${cpAnniversary > 0 ? '+' : ''}${cpAnniversary}j anniv.`);
-    if (leaveAdjustment !== 0) cpParts.push(`+${leaveAdjustment}j congés fut.`);
+    let cpMonthlyForBreakdown = 0;
+    if (monthsDiff > 0) {
+      cpMonthlyForBreakdown = 2.5;
+    } else if (monthsDiff < 0) {
+      cpMonthlyForBreakdown = -2.5;
+    }
 
-    const permParts = [];
-    if (permAdjustment !== 0) permParts.push(`+${permAdjustment}j congés fut.`);
+    let cpAnniversaryForBreakdown = 0;
+    if (targetDate.getMonth() === hireMonth && targetDate.getFullYear() > hireYear) {
+      if (monthsDiff > 0) {
+        cpAnniversaryForBreakdown = 30;
+      } else if (monthsDiff < 0) {
+        cpAnniversaryForBreakdown = -30;
+      }
+    }
+
+    const cpParts = [];
+    if (cpMonthlyForBreakdown !== 0) cpParts.push(`${cpMonthlyForBreakdown > 0 ? '+' : ''}${cpMonthlyForBreakdown}j acquis`);
+    if (cpAnniversaryForBreakdown !== 0) cpParts.push(`${cpAnniversaryForBreakdown > 0 ? '+' : ''}${cpAnniversaryForBreakdown}j anniv.`);
 
     return {
       cp: parseFloat(Math.max(0, projectedCP).toFixed(1)),
       perm: parseFloat(Math.max(0, projectedPerm).toFixed(1)),
       cpBreakdown: cpParts.length > 0 ? cpParts.join(', ') : '',
-      permBreakdown: permParts.length > 0 ? permParts.join(', ') : ''
+      permBreakdown: ''
     };
   };
 

@@ -78,6 +78,9 @@ export async function POST(req) {
         };
       }
 
+      const today = new Date();
+      const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
       await balancesSheet.addRow({
         [LeaveBalancesColumns.employee_id]: employeeId,
         [LeaveBalancesColumns.employee_name]: name,
@@ -93,7 +96,8 @@ export async function POST(req) {
         [LeaveBalancesColumns.manager_name]: manager_name || 'Aucun',
         [LeaveBalancesColumns.service]: service || 'Non spécifié',
         [LeaveBalancesColumns.hire_date]: hire_date ? formatDateToFrench(hire_date) : '',
-        [LeaveBalancesColumns.last_anniversary_credited]: hire_date ? formatDateToFrench(hire_date) : ''
+        [LeaveBalancesColumns.last_anniversary_credited]: '',
+        [LeaveBalancesColumns.last_monthly_credit]: currentMonthStr
       });
 
       return {
