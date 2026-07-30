@@ -77,7 +77,7 @@ export async function POST(req) {
       }
 
       // Check manager hierarchy constraint: current user must be the N+1 manager of the requester
-      const managerName = balanceRow.get(LeaveBalancesColumns.manager_name);
+      const managerName = balanceRow.get(LeaveBalancesColumns.manager_name)?.trim() || '';
       const currentUserEmail = auth.user.email;
       const currentUserRow = balanceRows.find(
         (row) => row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === currentUserEmail?.toLowerCase()
@@ -90,9 +90,18 @@ export async function POST(req) {
         };
       }
 
-      const currentUserName = currentUserRow.get(LeaveBalancesColumns.employee_name);
+      const currentFirstName = currentUserRow.get(LeaveBalancesColumns.employee_first_name)?.trim() || '';
+      const currentLastName = currentUserRow.get(LeaveBalancesColumns.employee_name)?.trim() || '';
+      const currentFullName1 = `${currentFirstName} ${currentLastName}`;
+      const currentFullName2 = `${currentLastName} ${currentFirstName}`;
 
-      if (!managerName || managerName === 'Aucun' || managerName !== currentUserName) {
+      const matchesManager = 
+        managerName.toLowerCase() === currentFirstName.toLowerCase() ||
+        managerName.toLowerCase() === currentLastName.toLowerCase() ||
+        managerName.toLowerCase() === currentFullName1.toLowerCase() ||
+        managerName.toLowerCase() === currentFullName2.toLowerCase();
+
+      if (!managerName || managerName === 'Aucun' || !matchesManager) {
         return {
           error: `Accès refusé. Seul le N+1 (Manager) de l'employé est autorisé à approuver ou refuser cette demande.`,
           status: 403
