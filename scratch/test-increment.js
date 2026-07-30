@@ -1,7 +1,7 @@
-import { parseSheetFloat } from '../lib/sheetsColumns.js';
+import { calculateBusinessDays } from '../lib/utils.js';
 
 // Mock getProjectedBalance using the new logic we implemented in app/page.js
-const getProjectedBalanceMock = (m, today, targetDate) => {
+const getProjectedBalanceMock = (m, today, targetDate, allRequests) => {
   const defaultRes = {
     cp: m.remaining_balance,
     perm: m.remaining_perm,
@@ -50,112 +50,134 @@ const getProjectedBalanceMock = (m, today, targetDate) => {
     }
   }
 
-  const projectedCP = m.remaining_balance + cpMonthly + cpAnniversary;
+  let overlapCP = 0;
+  let overlapPerm = 0;
 
-  // Build human readable breakdown texts
-  let cpMonthlyForBreakdown = 0;
-  if (monthsDiff > 0) {
-    cpMonthlyForBreakdown = 2.5;
-  } else if (monthsDiff < 0) {
-    cpMonthlyForBreakdown = -2.5;
-  }
+  const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id && req.status !== 'Refusé');
 
-  let cpAnniversaryForBreakdown = 0;
-  if (targetDate.getMonth() === hireMonth && targetDate.getFullYear() > hireYear) {
-    if (monthsDiff > 0) {
-      cpAnniversaryForBreakdown = 30;
-    } else if (monthsDiff < 0) {
-      cpAnniversaryForBreakdown = -30;
+  employeeReqs.forEach(req => {
+    const isNoDeduct = req.leave_type.toLowerCase().includes('sans solde') || 
+                       req.leave_type.toLowerCase().includes('rattraper') || 
+                       req.leave_type.toLowerCase().includes('maladie');
+    if (isNoDeduct) return;
+
+    const isPermission = req.leave_type.toLowerCase().includes('perm');
+
+    // Calculate total business days of the request using current calculation rules
+    let totalDays = 0;
+    try {
+      totalDays = calculateBusinessDays(req.start_date, req.end_date);
+    } catch (e) {}
+
+    if (totalDays > 0) {
+      const reqBusinessDays = parseFloat(req.business_days || 0);
+
+      if (req.status === 'Approuvé') {
+        // Calculate portion after targetEnd
+        const targetEndStr = `${targetEnd.getFullYear()}-${String(targetEnd.getMonth() + 1).padStart(2, '0')}-${String(targetEnd.getDate()).padStart(2, '0')}`;
+        if (req.end_date > targetEndStr) {
+          // Find start of the portion after targetEnd
+          const nextDay = new Date(targetEnd);
+          nextDay.setDate(targetEnd.getDate() + 1);
+          const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
+          
+          const overlapStart = req.start_date > nextDayStr ? req.start_date : nextDayStr;
+          let afterDays = 0;
+          try {
+            afterDays = calculateBusinessDays(overlapStart, req.end_date);
+          } catch (e) {}
+          
+          const fraction = afterDays / totalDays;
+          if (!isPermission) {
+            overlapCP -= reqBusinessDays * fraction; // Subtracting negative overlap means adding back!
+          } else {
+            overlapPerm -= reqBusinessDays * fraction;
+          }
+        }
+      } else if (req.status === 'En attente') {
+        // Calculate portion before or on targetEnd
+        const targetEndStr = `${targetEnd.getFullYear()}-${String(targetEnd.getMonth() + 1).padStart(2, '0')}-${String(targetEnd.getDate()).padStart(2, '0')}`;
+        if (req.start_date <= targetEndStr) {
+          const overlapEnd = req.end_date < targetEndStr ? req.end_date : targetEndStr;
+          let beforeDays = 0;
+          try {
+            beforeDays = calculateBusinessDays(req.start_date, overlapEnd);
+          } catch (e) {}
+          
+          const fraction = beforeDays / totalDays;
+          if (isPermission) {
+            overlapPerm += reqBusinessDays * fraction;
+          } else {
+            overlapCP += reqBusinessDays * fraction;
+          }
+        }
+      }
     }
-  }
+  });
 
-  const cpParts = [];
-  if (cpMonthlyForBreakdown !== 0) cpParts.push(`${cpMonthlyForBreakdown > 0 ? '+' : ''}${cpMonthlyForBreakdown}j acquis`);
-  if (cpAnniversaryForBreakdown !== 0) cpParts.push(`${cpAnniversaryForBreakdown > 0 ? '+' : ''}${cpAnniversaryForBreakdown}j anniv.`);
+  const projectedCP = m.remaining_balance + cpMonthly + cpAnniversary - overlapCP;
+  const projectedPerm = m.remaining_perm - overlapPerm;
 
   return {
     cp: parseFloat(Math.max(0, projectedCP).toFixed(1)),
-    cpBreakdown: cpParts.join(', ')
+    perm: parseFloat(Math.max(0, projectedPerm).toFixed(1))
   };
 };
 
 // Test Suite
-console.log('--- Testing Balance Projection Logic ---');
+console.log('--- Running Projected Balance Unit Tests ---');
 
-const m = {
-  remaining_balance: 24, // Dany's actual remaining balance in the database (since July is credited)
+const dany = {
+  employee_id: 'dany-1',
+  remaining_balance: 26,
   remaining_perm: 5,
-  hire_date: '2019-11-25' // Dany's hire date
+  hire_date: '2019-11-25'
+};
+
+const mamintsoavina = {
+  employee_id: 'mamintsoavina-1',
+  remaining_balance: 4,
+  remaining_perm: 5,
+  hire_date: '2023-10-15'
 };
 
 const today = new Date('2026-07-30'); // July 30, 2026
 
-// Test 1: Project to February 2027
-const targetFeb2027 = new Date('2027-02-15');
-const resFeb2027 = getProjectedBalanceMock(m, today, targetFeb2027);
-console.log('Projecting to Feb 2027:', resFeb2027);
-// Expected:
-// Months completed: Aug, Sept, Oct, Nov, Dec, Jan, Feb = 7 months -> 7 * 2.5 = 17.5j
-// Anniversary: Nov 25, 2026 is between July 30, 2026 and Feb 28, 2027 -> 1 anniversary -> +30j
-// Total CP = 24 (remaining) + 17.5 (monthly) + 30 (anniversary) = 71.5j
-if (resFeb2027.cp === 71.5 && resFeb2027.cpBreakdown === '+2.5j acquis') {
-  console.log('✅ Test 1 Passed (Feb 2027 projection: 71.5j, breakdown: "+2.5j acquis")');
-} else {
-  console.error(`❌ Test 1 Failed: expected 71.5 and "+2.5j acquis", got ${resFeb2027.cp} and "${resFeb2027.cpBreakdown}"`);
-  process.exit(1);
-}
+// Mock Database Requests
+const requests = [
+  {
+    employee_id: 'dany-1',
+    start_date: '2026-08-06',
+    end_date: '2026-08-08',
+    business_days: 3,
+    status: 'En attente',
+    leave_type: 'CP'
+  },
+  {
+    employee_id: 'mamintsoavina-1',
+    start_date: '2026-12-24',
+    end_date: '2027-01-04',
+    business_days: 10, // Database still has old 10 days stored
+    status: 'Approuvé',
+    leave_type: 'CP'
+  }
+];
 
-// Test 2: Project to current month July 2026 (target date July 15, 2026)
-const targetJuly2026 = new Date('2026-07-15');
-const resJuly2026 = getProjectedBalanceMock(m, today, targetJuly2026);
-console.log('Projecting to July 2026:', resJuly2026);
-// Months difference = 0
-// Expected: 0j acquis, 0j anniv. Total = 24j
-if (resJuly2026.cp === 24 && resJuly2026.cpBreakdown === '') {
-  console.log('✅ Test 2 Passed (July 2026 projection: 24j, breakdown: "")');
-} else {
-  console.error(`❌ Test 2 Failed: expected 24 and "", got ${resJuly2026.cp} and "${resJuly2026.cpBreakdown}"`);
-  process.exit(1);
-}
+// Test Dany's projections
+console.log('\n--- Dany Projections ---');
+const danyAug = getProjectedBalanceMock(dany, today, new Date('2026-08-15'), requests);
+console.log('Dany August 2026:', danyAug); // Expected: 26 + 2.5 - 3 = 25.5
 
-// Test 3: Project to August 2026
-const targetAugust2026 = new Date('2026-08-15');
-const resAugust2026 = getProjectedBalanceMock(m, today, targetAugust2026);
-console.log('Projecting to August 2026:', resAugust2026);
-// Months difference = 1 -> 1 * 2.5 = 2.5j
-// Expected: +2.5j acquis, 0j anniv. Total = 24 + 2.5 = 26.5j
-if (resAugust2026.cp === 26.5 && resAugust2026.cpBreakdown === '+2.5j acquis') {
-  console.log('✅ Test 3 Passed (August 2026 projection: 26.5j, breakdown: "+2.5j acquis")');
-} else {
-  console.error(`❌ Test 3 Failed: expected 26.5 and "+2.5j acquis", got ${resAugust2026.cp} and "${resAugust2026.cpBreakdown}"`);
-  process.exit(1);
-}
+const danySept = getProjectedBalanceMock(dany, today, new Date('2026-09-15'), requests);
+console.log('Dany September 2026:', danySept); // Expected: 26 + 5 - 3 = 28
 
-// Test 4: Project to past month June 2026
-const targetJune2026 = new Date('2026-06-15');
-const resJune2026 = getProjectedBalanceMock(m, today, targetJune2026);
-console.log('Projecting to June 2026:', resJune2026);
-// Months difference = -1 -> -2.5j
-// Expected: -2.5j acquis, 0j anniv. Total = 24 - 2.5 = 21.5j
-if (resJune2026.cp === 21.5 && resJune2026.cpBreakdown === '-2.5j acquis') {
-  console.log('✅ Test 4 Passed (June 2026 projection: 21.5j, breakdown: "-2.5j acquis")');
-} else {
-  console.error(`❌ Test 4 Failed: expected 21.5 and "-2.5j acquis", got ${resJune2026.cp} and "${resJune2026.cpBreakdown}"`);
-  process.exit(1);
-}
+// Test Mamintsoavina's projections
+console.log('\n--- Mamintsoavina Projections ---');
+const mamAug = getProjectedBalanceMock(mamintsoavina, today, new Date('2026-08-15'), requests);
+console.log('Mamintsoavina August 2026:', mamAug); // Expected: 4 + 2.5 + 10 = 16.5
 
-// Test 5: Project to anniversary month November 2026
-const targetNov2026 = new Date('2026-11-15');
-const resNov2026 = getProjectedBalanceMock(m, today, targetNov2026);
-console.log('Projecting to November 2026:', resNov2026);
-// Months difference = 4 -> 4 * 2.5 = 10j
-// Anniversary Nov 25 is in this month -> +30j
-// Expected: +2.5j acquis, +30j anniv. Total = 24 + 10 + 30 = 64j
-if (resNov2026.cp === 64 && resNov2026.cpBreakdown === '+2.5j acquis, +30j anniv.') {
-  console.log('✅ Test 5 Passed (November 2026 projection: 64j, breakdown: "+2.5j acquis, +30j anniv.")');
-} else {
-  console.error(`❌ Test 5 Failed: expected 64 and "+2.5j acquis, +30j anniv.", got ${resNov2026.cp} and "${resNov2026.cpBreakdown}"`);
-  process.exit(1);
-}
+const mamDec = getProjectedBalanceMock(mamintsoavina, today, new Date('2026-12-15'), requests);
+console.log('Mamintsoavina December 2026:', mamDec); // Expected: 4 + 12.5 + 10 * (1/6) = 18.17
 
-console.log('🎉 ALL TESTS PASSED SUCCESSFULLY! 🎉');
+const mamJan = getProjectedBalanceMock(mamintsoavina, today, new Date('2027-01-15'), requests);
+console.log('Mamintsoavina January 2027:', mamJan); // Expected: 4 + 15 + 0 = 19.0

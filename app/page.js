@@ -359,10 +359,6 @@ export default function Page() {
     let overlapCP = 0;
     let overlapPerm = 0;
 
-    const targetStart = new Date(year, month, 1);
-    const targetStartStr = `${targetStart.getFullYear()}-${String(targetStart.getMonth() + 1).padStart(2, '0')}-01`;
-    const targetEndStr = `${targetEnd.getFullYear()}-${String(targetEnd.getMonth() + 1).padStart(2, '0')}-${String(targetEnd.getDate()).padStart(2, '0')}`;
-
     const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id && req.status !== 'Refusé');
 
     employeeReqs.forEach(req => {
@@ -373,25 +369,54 @@ export default function Page() {
 
       const isPermission = req.leave_type.toLowerCase().includes('perm');
 
-      // Calculate intersection of [req.start_date, req.end_date] with [targetStartStr, targetEndStr]
-      const overlapStart = req.start_date > targetStartStr ? req.start_date : targetStartStr;
-      const overlapEnd = req.end_date < targetEndStr ? req.end_date : targetEndStr;
+      // Calculate total business days of the request using current calculation rules
+      let totalDays = 0;
+      try {
+        totalDays = calculateBusinessDays(req.start_date, req.end_date);
+      } catch (e) {}
 
-      if (overlapStart <= overlapEnd) {
-        try {
-          const overlapBusinessDays = calculateBusinessDays(overlapStart, overlapEnd);
-          if (overlapBusinessDays > 0) {
-            // Deduct from projection if pending, or if approved and target month is in the future
-            if (req.status === 'En attente' || (req.status === 'Approuvé' && targetMonthIndex > todayMonthIndex)) {
-              if (isPermission) {
-                overlapPerm += overlapBusinessDays;
-              } else {
-                overlapCP += overlapBusinessDays;
-              }
+      if (totalDays > 0) {
+        const reqBusinessDays = parseFloat(req.business_days || 0);
+
+        if (req.status === 'Approuvé') {
+          // Calculate portion after targetEnd
+          const targetEndStr = `${targetEnd.getFullYear()}-${String(targetEnd.getMonth() + 1).padStart(2, '0')}-${String(targetEnd.getDate()).padStart(2, '0')}`;
+          if (req.end_date > targetEndStr) {
+            // Find start of the portion after targetEnd
+            const nextDay = new Date(targetEnd);
+            nextDay.setDate(targetEnd.getDate() + 1);
+            const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
+            
+            const overlapStart = req.start_date > nextDayStr ? req.start_date : nextDayStr;
+            let afterDays = 0;
+            try {
+              afterDays = calculateBusinessDays(overlapStart, req.end_date);
+            } catch (e) {}
+            
+            const fraction = afterDays / totalDays;
+            if (!isPermission) {
+              overlapCP -= reqBusinessDays * fraction; // Subtracting negative overlap means adding back!
+            } else {
+              overlapPerm -= reqBusinessDays * fraction;
             }
           }
-        } catch (e) {
-          // ignore invalid date errors
+        } else if (req.status === 'En attente') {
+          // Calculate portion before or on targetEnd
+          const targetEndStr = `${targetEnd.getFullYear()}-${String(targetEnd.getMonth() + 1).padStart(2, '0')}-${String(targetEnd.getDate()).padStart(2, '0')}`;
+          if (req.start_date <= targetEndStr) {
+            const overlapEnd = req.end_date < targetEndStr ? req.end_date : targetEndStr;
+            let beforeDays = 0;
+            try {
+              beforeDays = calculateBusinessDays(req.start_date, overlapEnd);
+            } catch (e) {}
+            
+            const fraction = beforeDays / totalDays;
+            if (isPermission) {
+              overlapPerm += reqBusinessDays * fraction;
+            } else {
+              overlapCP += reqBusinessDays * fraction;
+            }
+          }
         }
       }
     });
