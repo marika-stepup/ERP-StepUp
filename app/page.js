@@ -362,9 +362,9 @@ export default function Page() {
     const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id && req.status !== 'Refusé');
 
     employeeReqs.forEach(req => {
-      const isNoDeduct = req.leave_type.toLowerCase().includes('sans solde') || 
-                         req.leave_type.toLowerCase().includes('rattraper') || 
-                         req.leave_type.toLowerCase().includes('maladie');
+      const isNoDeduct = req.leave_type.toLowerCase().includes('sans solde') ||
+        req.leave_type.toLowerCase().includes('rattraper') ||
+        req.leave_type.toLowerCase().includes('maladie');
       if (isNoDeduct) return;
 
       const isPermission = req.leave_type.toLowerCase().includes('perm');
@@ -373,7 +373,7 @@ export default function Page() {
       let totalDays = 0;
       try {
         totalDays = calculateBusinessDays(req.start_date, req.end_date);
-      } catch (e) {}
+      } catch (e) { }
 
       if (totalDays > 0) {
         const reqBusinessDays = parseFloat(req.business_days || 0);
@@ -386,13 +386,13 @@ export default function Page() {
             const nextDay = new Date(targetEnd);
             nextDay.setDate(targetEnd.getDate() + 1);
             const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
-            
+
             const overlapStart = req.start_date > nextDayStr ? req.start_date : nextDayStr;
             let afterDays = 0;
             try {
               afterDays = calculateBusinessDays(overlapStart, req.end_date);
-            } catch (e) {}
-            
+            } catch (e) { }
+
             const fraction = afterDays / totalDays;
             if (!isPermission) {
               overlapCP -= reqBusinessDays * fraction; // Subtracting negative overlap means adding back!
@@ -408,8 +408,8 @@ export default function Page() {
             let beforeDays = 0;
             try {
               beforeDays = calculateBusinessDays(req.start_date, overlapEnd);
-            } catch (e) {}
-            
+            } catch (e) { }
+
             const fraction = beforeDays / totalDays;
             if (isPermission) {
               overlapPerm += reqBusinessDays * fraction;
@@ -521,6 +521,11 @@ export default function Page() {
     e.preventDefault();
     setSubmitError(null);
     setSubmitSuccess(false);
+    if (!reason || !reason.trim()) {
+      setSubmitError('Le motif / justification est obligatoire.');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -1051,7 +1056,7 @@ export default function Page() {
 
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Date Début</label>
+                      <label>Date de début</label>
                       <input
                         type="date"
                         value={startDate}
@@ -1060,7 +1065,7 @@ export default function Page() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Heure Début</label>
+                      <label>Heure de début</label>
                       <input
                         type="time"
                         value={startTime}
@@ -1071,7 +1076,7 @@ export default function Page() {
 
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Date Fin</label>
+                      <label>Date de fin</label>
                       <input
                         type="date"
                         value={endDate}
@@ -1080,7 +1085,7 @@ export default function Page() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Heure Fin</label>
+                      <label>Heure de fin</label>
                       <input
                         type="time"
                         value={endTime}
@@ -1090,22 +1095,12 @@ export default function Page() {
                   </div>
 
                   <div className="form-group">
-                    <label>Nombre de jours déduits (facultatif)</label>
-                    <input
-                      type="number"
-                      placeholder="Ex: 1 ou 2.5"
-                      step="0.5"
-                      value={daysRequested}
-                      onChange={(e) => setDaysRequested(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Motif / Justification</label>
+                    <label>Motif</label>
                     <textarea
                       placeholder="Raison..."
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
+                      required
                     />
                   </div>
 
@@ -1195,8 +1190,8 @@ export default function Page() {
                               <strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong>
                             </td>
                             <td>
-                              Du {req.start_date}<br />
-                              Au {req.end_date}
+                              Du {formatDateStr(req.start_date)}<br />
+                              Au {formatDateStr(req.end_date)}
                             </td>
                             <td><strong>{req.business_days} j</strong></td>
                             <td>
@@ -1621,7 +1616,7 @@ export default function Page() {
                           <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Période de congé :</div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                              Du {req.start_date} au {req.end_date}
+                              Du {formatDateStr(req.start_date)} au {formatDateStr(req.end_date)}
                             </div>
                           </div>
                         </div>
@@ -1945,7 +1940,7 @@ export default function Page() {
                 <div className="panel">
                   <h2 className="panel-title">Gestion globale des demandes de congé</h2>
                   <p className="panel-subtitle">Modifier, supprimer ou consulter toutes les demandes (validées, en attente ou refusées).</p>
-                  
+
                   <div className="table-container">
                     <table className="admin-table">
                       <thead>
@@ -2020,7 +2015,7 @@ export default function Page() {
                                 <strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong>
                               </td>
                               <td>
-                                Du {req.start_date} au {req.end_date}
+                                Du {formatDateStr(req.start_date)} au {formatDateStr(req.end_date)}
                               </td>
                               <td><strong>{req.business_days} j</strong></td>
                               <td>
@@ -2060,7 +2055,7 @@ export default function Page() {
             {memberError && <div className="error-message">{memberError}</div>}
 
             <form onSubmit={handleUpdateMember} style={{ padding: 0, border: 'none', background: 'none', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-               <div className="form-row">
+              <div className="form-row">
                 <div className="form-group">
                   <label>Nom</label>
                   <input
