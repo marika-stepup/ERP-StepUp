@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseClient } from '../lib/supabaseClient';
-import { splitFullName, isMadagascarHoliday } from '../lib/utils';
+import { splitFullName, isMadagascarHoliday, calculateBusinessDays } from '../lib/utils';
 
 const formatDateStr = (str) => {
   if (!str) return '-';
@@ -356,8 +356,48 @@ export default function Page() {
       }
     }
 
-    const projectedCP = m.remaining_balance + cpMonthly + cpAnniversary;
-    const projectedPerm = m.remaining_perm;
+    let overlapCP = 0;
+    let overlapPerm = 0;
+
+    const targetStart = new Date(year, month, 1);
+    const targetStartStr = `${targetStart.getFullYear()}-${String(targetStart.getMonth() + 1).padStart(2, '0')}-01`;
+    const targetEndStr = `${targetEnd.getFullYear()}-${String(targetEnd.getMonth() + 1).padStart(2, '0')}-${String(targetEnd.getDate()).padStart(2, '0')}`;
+
+    const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id && req.status !== 'Refusé');
+
+    employeeReqs.forEach(req => {
+      const isNoDeduct = req.leave_type.toLowerCase().includes('sans solde') || 
+                         req.leave_type.toLowerCase().includes('rattraper') || 
+                         req.leave_type.toLowerCase().includes('maladie');
+      if (isNoDeduct) return;
+
+      const isPermission = req.leave_type.toLowerCase().includes('perm');
+
+      // Calculate intersection of [req.start_date, req.end_date] with [targetStartStr, targetEndStr]
+      const overlapStart = req.start_date > targetStartStr ? req.start_date : targetStartStr;
+      const overlapEnd = req.end_date < targetEndStr ? req.end_date : targetEndStr;
+
+      if (overlapStart <= overlapEnd) {
+        try {
+          const overlapBusinessDays = calculateBusinessDays(overlapStart, overlapEnd);
+          if (overlapBusinessDays > 0) {
+            // Deduct from projection if pending, or if approved and target month is in the future
+            if (req.status === 'En attente' || (req.status === 'Approuvé' && targetMonthIndex > todayMonthIndex)) {
+              if (isPermission) {
+                overlapPerm += overlapBusinessDays;
+              } else {
+                overlapCP += overlapBusinessDays;
+              }
+            }
+          }
+        } catch (e) {
+          // ignore invalid date errors
+        }
+      }
+    });
+
+    const projectedCP = m.remaining_balance + cpMonthly + cpAnniversary - overlapCP;
+    const projectedPerm = m.remaining_perm - overlapPerm;
 
     // Build human readable breakdown texts
     let cpMonthlyForBreakdown = 0;
@@ -1363,30 +1403,29 @@ export default function Page() {
                                     day.dateString >= req.start_date && day.dateString <= req.end_date
                                   );
 
-                                  // Special rule: Saturday formatted as a leave day if a CP request covers it or ended on the preceding Friday
+                                  // Special rule: Saturday formatted as a leave day if the preceding Friday was a CP day and not a holiday
                                   let isSaturdayCP = false;
                                   let saturdayReq = null;
 
                                   if (day.dayNameAbbr === 'sam') {
-                                    if (activeReq && (activeReq.leave_type === 'CP' || activeReq.leave_type === 'Congés Payés')) {
-                                      isSaturdayCP = true;
-                                      saturdayReq = activeReq;
-                                    } else {
-                                      const parts = day.dateString.split('-');
-                                      const y = parseInt(parts[0], 10);
-                                      const mVal = parseInt(parts[1], 10) - 1;
-                                      const dVal = parseInt(parts[2], 10);
-                                      const currD = new Date(y, mVal, dVal);
-                                      currD.setDate(currD.getDate() - 1);
-                                      const prevDateString = `${currD.getFullYear()}-${String(currD.getMonth() + 1).padStart(2, '0')}-${String(currD.getDate()).padStart(2, '0')}`;
+                                    const parts = day.dateString.split('-');
+                                    const y = parseInt(parts[0], 10);
+                                    const mVal = parseInt(parts[1], 10) - 1;
+                                    const dVal = parseInt(parts[2], 10);
+                                    const currD = new Date(y, mVal, dVal);
+                                    currD.setDate(currD.getDate() - 1);
+                                    const prevDateString = `${currD.getFullYear()}-${String(currD.getMonth() + 1).padStart(2, '0')}-${String(currD.getDate()).padStart(2, '0')}`;
 
-                                      const endedOnFriday = employeeReqs.find(req =>
-                                        req.end_date === prevDateString &&
+                                    const isFridayHoliday = isMadagascarHoliday(prevDateString);
+                                    if (!isFridayHoliday) {
+                                      const fridayReq = employeeReqs.find(req =>
+                                        prevDateString >= req.start_date &&
+                                        prevDateString <= req.end_date &&
                                         (req.leave_type === 'CP' || req.leave_type === 'Congés Payés')
                                       );
-                                      if (endedOnFriday) {
+                                      if (fridayReq) {
                                         isSaturdayCP = true;
-                                        saturdayReq = endedOnFriday;
+                                        saturdayReq = fridayReq;
                                       }
                                     }
                                   }
@@ -1398,6 +1437,8 @@ export default function Page() {
                                     } else {
                                       activeReq = saturdayReq;
                                     }
+                                  } else if (day.dayNameAbbr === 'sam' && !isSaturdayCP) {
+                                    activeReq = null;
                                   }
 
                                   let cellClass = 'gantt-cell';
@@ -1442,11 +1483,7 @@ export default function Page() {
                                   <div style={{ fontWeight: '700', color: 'var(--brand-orange)', fontSize: '0.9rem', lineHeight: '1.2' }}>
                                     {projected.cp}j
                                   </div>
-                                  {(projected.cp !== m.remaining_balance) && (
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: '1.2', marginTop: '0.1rem' }}>
-                                      actuel: {m.remaining_balance}j
-                                    </div>
-                                  )}
+
                                   {projected.cpBreakdown && (
                                     <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: '1.2', fontStyle: 'italic' }}>
                                       {projected.cpBreakdown}
@@ -1457,11 +1494,7 @@ export default function Page() {
                                   <div style={{ fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.2' }}>
                                     {projected.perm}j
                                   </div>
-                                  {(projected.perm !== m.remaining_perm) && (
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: '1.2', marginTop: '0.1rem' }}>
-                                      actuel: {m.remaining_perm}j
-                                    </div>
-                                  )}
+
                                   {projected.permBreakdown && (
                                     <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: '1.2', fontStyle: 'italic' }}>
                                       {projected.permBreakdown}
