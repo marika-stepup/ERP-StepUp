@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex, autoCreditContractAnniversaries, autoCreditMonthlyLeaves } from '../../../../lib/googleSheets';
+import { getSheet, runWithMutex, autoCreditContractAnniversaries } from '../../../../lib/googleSheets';
 import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, parseDateFromFrench } from '../../../../lib/sheetsColumns';
 import { splitFullName } from '../../../../lib/utils';
 
@@ -12,10 +12,9 @@ export async function GET(req) {
   }
 
   try {
-    // Run automatic anniversary & monthly crediting with mutex to avoid race conditions
+    // Run automatic anniversary crediting with mutex to avoid race conditions
     await runWithMutex(async () => {
       await autoCreditContractAnniversaries();
-      await autoCreditMonthlyLeaves();
     });
 
     // 2. Fetch the Leave_Balances sheet

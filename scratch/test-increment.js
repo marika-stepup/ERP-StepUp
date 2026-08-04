@@ -27,11 +27,10 @@ const getProjectedBalanceMock = (m, today, targetDate, allRequests) => {
   const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
   const targetEndUTC = new Date(Date.UTC(targetEnd.getFullYear(), targetEnd.getMonth(), targetEnd.getDate()));
 
-  // 1. Monthly Accrual: +2.5j per month (difference in months index)
+  // 1. Monthly Accrual: Removed
   const todayMonthIndex = todayUTC.getUTCFullYear() * 12 + todayUTC.getUTCMonth();
   const targetMonthIndex = targetEndUTC.getUTCFullYear() * 12 + targetEndUTC.getUTCMonth();
   const monthsDiff = targetMonthIndex - todayMonthIndex;
-  cpMonthly = monthsDiff * 2.5;
 
   // 2. Anniversary Accrual: +30j per contract anniversary
   if (targetEndUTC > todayUTC) {
@@ -166,18 +165,18 @@ const requests = [
 // Test Dany's projections
 console.log('\n--- Dany Projections ---');
 const danyAug = getProjectedBalanceMock(dany, today, new Date('2026-08-15'), requests);
-console.log('Dany August 2026:', danyAug); // Expected: 26 + 2.5 - 3 = 25.5
+console.log('Dany August 2026:', danyAug); // Expected: 26 + 0 - 3 = 23
 
 const danySept = getProjectedBalanceMock(dany, today, new Date('2026-09-15'), requests);
-console.log('Dany September 2026:', danySept); // Expected: 26 + 5 - 3 = 28
+console.log('Dany September 2026:', danySept); // Expected: 26 + 0 - 3 = 23
 
 // Test Mamintsoavina's projections
 console.log('\n--- Mamintsoavina Projections ---');
 const mamAug = getProjectedBalanceMock(mamintsoavina, today, new Date('2026-08-15'), requests);
-console.log('Mamintsoavina August 2026:', mamAug); // Expected: 4 + 2.5 + 10 = 16.5
+console.log('Mamintsoavina August 2026:', mamAug); // Expected: 4 + 0 + 10 = 14
 
 const mamDec = getProjectedBalanceMock(mamintsoavina, today, new Date('2026-12-15'), requests);
-console.log('Mamintsoavina December 2026:', mamDec); // Expected: 4 + 12.5 + 10 * (1/6) = 18.17
+console.log('Mamintsoavina December 2026:', mamDec); // Expected: 4 + 30 + 10 * (1/6) = 35.67 (35.7)
 
 const mamJan = getProjectedBalanceMock(mamintsoavina, today, new Date('2027-01-15'), requests);
-console.log('Mamintsoavina January 2027:', mamJan); // Expected: 4 + 15 + 0 = 19.0
+console.log('Mamintsoavina January 2027:', mamJan); // Expected: 4 + 30 + 0 = 34

@@ -331,11 +331,10 @@ export default function Page() {
     const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
     const targetEndUTC = new Date(Date.UTC(targetEnd.getFullYear(), targetEnd.getMonth(), targetEnd.getDate()));
 
-    // 1. Monthly Accrual: +2.5j per month (difference in months index)
+    // 1. Monthly Accrual: Removed
     const todayMonthIndex = todayUTC.getUTCFullYear() * 12 + todayUTC.getUTCMonth();
     const targetMonthIndex = targetEndUTC.getUTCFullYear() * 12 + targetEndUTC.getUTCMonth();
     const monthsDiff = targetMonthIndex - todayMonthIndex;
-    cpMonthly = monthsDiff * 2.5;
 
     // 2. Anniversary Accrual: +30j per contract anniversary
     if (targetEndUTC > todayUTC) {
@@ -425,13 +424,6 @@ export default function Page() {
     const projectedPerm = m.remaining_perm - overlapPerm;
 
     // Build human readable breakdown texts
-    let cpMonthlyForBreakdown = 0;
-    if (monthsDiff > 0) {
-      cpMonthlyForBreakdown = 2.5;
-    } else if (monthsDiff < 0) {
-      cpMonthlyForBreakdown = -2.5;
-    }
-
     let cpAnniversaryForBreakdown = 0;
     if (targetDate.getMonth() === hireMonth && targetDate.getFullYear() > hireYear) {
       if (monthsDiff > 0) {
@@ -442,7 +434,6 @@ export default function Page() {
     }
 
     const cpParts = [];
-    if (cpMonthlyForBreakdown !== 0) cpParts.push(`${cpMonthlyForBreakdown > 0 ? '+' : ''}${cpMonthlyForBreakdown}j acquis`);
     if (cpAnniversaryForBreakdown !== 0) cpParts.push(`${cpAnniversaryForBreakdown > 0 ? '+' : ''}${cpAnniversaryForBreakdown}j anniv.`);
 
     return {
