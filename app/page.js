@@ -243,7 +243,8 @@ export default function Page() {
     'SEO',
     'SEA & Data analyst',
     'Marketing de croissance',
-    'Community management'
+    'Community management',
+    'Commercial'
   ];
 
   const uniqueServices = ['Tous', ...new Set([
@@ -533,7 +534,8 @@ export default function Page() {
         'SEO',
         'SEA & Data analyst',
         'Marketing de croissance',
-        'Community management'
+        'Community management',
+        'Commercial'
       ];
       
       const defaultSorted = [...allMembers].sort((a, b) => {
@@ -1433,7 +1435,8 @@ export default function Page() {
                             'SEO',
                             'SEA & Data analyst',
                             'Marketing de croissance',
-                            'Community management'
+                            'Community management',
+                            'Commercial'
                           ];
 
                           const sortedMembers = [...allMembers].sort((a, b) => {
@@ -1826,6 +1829,7 @@ export default function Page() {
                         <option value="SEA & Data analyst">SEA & Data analyst</option>
                         <option value="Marketing de croissance">Marketing de croissance</option>
                         <option value="Community management">Community management</option>
+                        <option value="Commercial">Commercial</option>
                       </select>
                     </div>
 
@@ -2263,6 +2267,7 @@ export default function Page() {
                   <option value="SEA & Data analyst">SEA & Data analyst</option>
                   <option value="Marketing de croissance">Marketing de croissance</option>
                   <option value="Community management">Community management</option>
+                  <option value="Commercial">Commercial</option>
                 </select>
               </div>
 
