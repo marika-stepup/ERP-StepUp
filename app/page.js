@@ -507,6 +507,79 @@ export default function Page() {
     }
   }, [user, token, userRole]);
 
+  // 2e. Initialize and synchronize drag-and-drop member ordering from localStorage
+  const [memberOrder, setMemberOrder] = useState([]);
+  const [draggedMemberId, setDraggedMemberId] = useState(null);
+  const [dragOverMemberId, setDragOverMemberId] = useState(null);
+
+  useEffect(() => {
+    if (allMembers.length > 0) {
+      const stored = localStorage.getItem('memberOrder');
+      let order = [];
+      if (stored) {
+        try {
+          order = JSON.parse(stored);
+        } catch (e) {
+          console.error('Error parsing memberOrder:', e);
+        }
+      }
+
+      const servicesOrder = [
+        'Direction',
+        'Admin',
+        'Team leader',
+        'Web',
+        'Graphiste',
+        'SEO',
+        'SEA & Data analyst',
+        'Marketing de croissance',
+        'Community management'
+      ];
+      
+      const defaultSorted = [...allMembers].sort((a, b) => {
+        const serviceA = a.service === 'Directeur' ? 'Direction' : a.service;
+        const serviceB = b.service === 'Directeur' ? 'Direction' : b.service;
+        const indexA = servicesOrder.indexOf(serviceA);
+        const indexB = servicesOrder.indexOf(serviceB);
+
+        if (indexA !== -1 && indexB !== -1) {
+          return indexA - indexB;
+        }
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '');
+      });
+
+      const allActiveIds = new Set(allMembers.map(m => m.employee_id));
+      let cleanedOrder = order.filter(id => allActiveIds.has(id));
+
+      const orderedIds = new Set(cleanedOrder);
+      const missingIds = defaultSorted
+        .map(m => m.employee_id)
+        .filter(id => !orderedIds.has(id));
+
+      const finalOrder = [...cleanedOrder, ...missingIds];
+
+      setMemberOrder(finalOrder);
+      localStorage.setItem('memberOrder', JSON.stringify(finalOrder));
+    }
+  }, [allMembers]);
+
+  const handleReorderMembers = (draggedId, targetId) => {
+    setMemberOrder(prevOrder => {
+      const newOrder = [...prevOrder];
+      const fromIdx = newOrder.indexOf(draggedId);
+      const toIdx = newOrder.indexOf(targetId);
+      
+      if (fromIdx !== -1 && toIdx !== -1) {
+        newOrder.splice(fromIdx, 1);
+        newOrder.splice(toIdx, 0, draggedId);
+        localStorage.setItem('memberOrder', JSON.stringify(newOrder));
+      }
+      return newOrder;
+    });
+  };
+
   // 3. Submit Leave Request
   const handleSubmitLeave = async (e) => {
     e.preventDefault();
@@ -1364,17 +1437,11 @@ export default function Page() {
                           ];
 
                           const sortedMembers = [...allMembers].sort((a, b) => {
-                            const serviceA = a.service === 'Directeur' ? 'Direction' : a.service;
-                            const serviceB = b.service === 'Directeur' ? 'Direction' : b.service;
-                            const indexA = servicesOrder.indexOf(serviceA);
-                            const indexB = servicesOrder.indexOf(serviceB);
-
-                            if (indexA !== -1 && indexB !== -1) {
-                              return indexA - indexB;
-                            }
-                            if (indexA !== -1) return -1;
-                            if (indexB !== -1) return 1;
-                            return a.employee_name.localeCompare(b.employee_name);
+                            const indexA = memberOrder.indexOf(a.employee_id);
+                            const indexB = memberOrder.indexOf(b.employee_id);
+                            const finalA = indexA !== -1 ? indexA : 9999;
+                            const finalB = indexB !== -1 ? indexB : 9999;
+                            return finalA - finalB;
                           });
 
                           const filteredMembers = sortedMembers.filter(m => {
@@ -1398,10 +1465,56 @@ export default function Page() {
                             const projected = getProjectedBalance(m, currentDate);
 
                             return (
-                              <tr key={m.employee_id}>
+                              <tr
+                                key={m.employee_id}
+                                draggable={true}
+                                onDragStart={(e) => {
+                                  setDraggedMemberId(m.employee_id);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  e.dataTransfer.setData('text/plain', m.employee_id);
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedMemberId(null);
+                                  setDragOverMemberId(null);
+                                }}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  if (draggedMemberId && draggedMemberId !== m.employee_id) {
+                                    setDragOverMemberId(m.employee_id);
+                                  }
+                                }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  const draggedId = e.dataTransfer.getData('text/plain') || draggedMemberId;
+                                  const targetId = m.employee_id;
+                                  if (draggedId && targetId && draggedId !== targetId) {
+                                    handleReorderMembers(draggedId, targetId);
+                                  }
+                                  setDraggedMemberId(null);
+                                  setDragOverMemberId(null);
+                                }}
+                                className={`draggable-row ${draggedMemberId === m.employee_id ? 'dragging' : ''} ${dragOverMemberId === m.employee_id ? 'drag-over' : ''}`}
+                              >
                                 <td className="gantt-col-name">
-                                  <div className="gantt-collaborator-name-wrapper">
-                                    <span>{m.employee_first_name}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}>
+                                    <button
+                                      type="button"
+                                      className="drag-handle-btn"
+                                      title="Faire glisser pour réordonner"
+                                      style={{ flexShrink: 0 }}
+                                    >
+                                      <svg width="10" height="15" viewBox="0 0 10 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                        <circle cx="2" cy="2.5" r="0.75" fill="currentColor" stroke="none" />
+                                        <circle cx="2" cy="7.5" r="0.75" fill="currentColor" stroke="none" />
+                                        <circle cx="2" cy="12.5" r="0.75" fill="currentColor" stroke="none" />
+                                        <circle cx="8" cy="2.5" r="0.75" fill="currentColor" stroke="none" />
+                                        <circle cx="8" cy="7.5" r="0.75" fill="currentColor" stroke="none" />
+                                        <circle cx="8" cy="12.5" r="0.75" fill="currentColor" stroke="none" />
+                                      </svg>
+                                    </button>
+                                    <div className="gantt-collaborator-name-wrapper" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      <span>{m.employee_first_name}</span>
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="gantt-col-service">
@@ -1840,7 +1953,14 @@ export default function Page() {
                       </thead>
                       <tbody>
                         {(() => {
-                          const filtered = allMembers.filter(m => {
+                          const sorted = [...allMembers].sort((a, b) => {
+                            const indexA = memberOrder.indexOf(a.employee_id);
+                            const indexB = memberOrder.indexOf(b.employee_id);
+                            const finalA = indexA !== -1 ? indexA : 9999;
+                            const finalB = indexB !== -1 ? indexB : 9999;
+                            return finalA - finalB;
+                          });
+                          const filtered = sorted.filter(m => {
                             if (adminServiceFilter === 'Tous') return true;
                             const svc = (m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié';
                             return svc === adminServiceFilter;
@@ -1857,9 +1977,52 @@ export default function Page() {
                           }
 
                           return filtered.map((m) => (
-                            <tr key={m.employee_id}>
+                            <tr
+                              key={m.employee_id}
+                              draggable={true}
+                              onDragStart={(e) => {
+                                setDraggedMemberId(m.employee_id);
+                                e.dataTransfer.effectAllowed = 'move';
+                                e.dataTransfer.setData('text/plain', m.employee_id);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedMemberId(null);
+                                setDragOverMemberId(null);
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                if (draggedMemberId && draggedMemberId !== m.employee_id) {
+                                  setDragOverMemberId(m.employee_id);
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const draggedId = e.dataTransfer.getData('text/plain') || draggedMemberId;
+                                const targetId = m.employee_id;
+                                if (draggedId && targetId && draggedId !== targetId) {
+                                  handleReorderMembers(draggedId, targetId);
+                                }
+                                setDraggedMemberId(null);
+                                setDragOverMemberId(null);
+                              }}
+                              className={`draggable-row ${draggedMemberId === m.employee_id ? 'dragging' : ''} ${dragOverMemberId === m.employee_id ? 'drag-over' : ''}`}
+                            >
                               <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
+                                  <button
+                                    type="button"
+                                    className="drag-handle-btn"
+                                    title="Faire glisser pour réordonner"
+                                  >
+                                    <svg width="10" height="15" viewBox="0 0 10 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                      <circle cx="2" cy="2.5" r="0.75" fill="currentColor" stroke="none" />
+                                      <circle cx="2" cy="7.5" r="0.75" fill="currentColor" stroke="none" />
+                                      <circle cx="2" cy="12.5" r="0.75" fill="currentColor" stroke="none" />
+                                      <circle cx="8" cy="2.5" r="0.75" fill="currentColor" stroke="none" />
+                                      <circle cx="8" cy="7.5" r="0.75" fill="currentColor" stroke="none" />
+                                      <circle cx="8" cy="12.5" r="0.75" fill="currentColor" stroke="none" />
+                                    </svg>
+                                  </button>
                                   <button
                                     className="btn-icon-edit"
                                     onClick={() => startEditMember(m)}
