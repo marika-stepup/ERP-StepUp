@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabaseClient } from '../lib/supabaseClient';
 import { splitFullName, isMadagascarHoliday, calculateBusinessDays } from '../lib/utils';
+import { SyncQueueManager } from '../lib/syncQueue';
 
 const formatDateStr = (str) => {
   if (!str) return '-';
@@ -15,6 +16,77 @@ export default function Page() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState('');
+
+  const tokenRef = useRef(token);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  const syncQueueRef = useRef(null);
+
+  useEffect(() => {
+    syncQueueRef.current = new SyncQueueManager({
+      getToken: () => tokenRef.current,
+      debounceMs: 3000,
+      maxBatchSize: 10,
+      onSyncStart: () => {
+        console.log('[Sync] Synchronisation en cours...');
+      },
+      onSyncSuccess: (result) => {
+        console.log('[Sync] Synchronisation réussie !', result);
+      },
+      onSyncError: (error) => {
+        console.error('[Sync] Erreur de synchronisation :', error);
+      },
+      onRollback: (failedMutations) => {
+        console.warn('[Sync] Échec de synchronisation (Rollback) :', failedMutations);
+        setAllMembers(prevMembers => {
+          const updated = [...prevMembers];
+          for (const m of failedMutations) {
+            const index = updated.findIndex(u => u.employee_id === m.employeeId);
+            if (index !== -1) {
+              const fieldKey = m.field === 'cp' ? 'initial_balance' : 'initial_perm';
+              const remainingKey = m.field === 'cp' ? 'remaining_balance' : 'remaining_perm';
+              const takenKey = m.field === 'cp' ? 'taken_days' : 'taken_perm';
+              const takenVal = parseFloat(updated[index][takenKey] || 0);
+              const oldInitialVal = parseFloat(m.oldValue || 0);
+              
+              updated[index] = {
+                ...updated[index],
+                [fieldKey]: oldInitialVal,
+                [remainingKey]: oldInitialVal - takenVal
+              };
+            }
+          }
+          return updated;
+        });
+
+        // Rollback current user's balance
+        for (const m of failedMutations) {
+          if (m.employeeId === userRef.current?.id) {
+            setBalance(prevBalance => {
+              const fieldKey = m.field === 'cp' ? 'initial_balance' : 'initial_perm';
+              const remainingKey = m.field === 'cp' ? 'remaining_balance' : 'remaining_perm';
+              const takenKey = m.field === 'cp' ? 'taken_days' : 'taken_perm';
+              const takenVal = parseFloat(prevBalance[takenKey] || 0);
+              const oldInitialVal = parseFloat(m.oldValue || 0);
+              
+              return {
+                ...prevBalance,
+                [fieldKey]: oldInitialVal,
+                [remainingKey]: oldInitialVal - takenVal
+              };
+            });
+          }
+        }
+      }
+    });
+  }, []);
 
   // Navigation
   const [activeTab, setActiveTab] = useState('mySpace'); // 'mySpace', 'globalDashboard', 'adminRH'
@@ -867,36 +939,63 @@ export default function Page() {
   };
 
   // 9. Adjust Balance Quick Input (HR Admin Table)
-  const handleAdjustBalance = async (employeeId, type, value) => {
-    setAdjustingId(employeeId);
+  const handleAdjustBalance = (employeeId, type, value) => {
     setHrError(null);
     setHrSuccess(null);
 
-    try {
-      const res = await fetch('/api/admin/adjust-balance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          employee_id: employeeId,
-          type,
-          value: parseFloat(value || 0)
-        })
-      });
+    const numericValue = parseFloat(value || 0);
+    if (isNaN(numericValue) || numericValue < 0) {
+      setHrError('La valeur doit être un nombre positif valide.');
+      return;
+    }
 
-      const data = await res.json();
-      if (!res.ok) {
-        setHrError(data.error || 'Erreur lors de l\'ajustement du solde.');
-      } else {
-        setHrSuccess(`Solde mis à jour pour ${data.balance?.employee_first_name}.`);
-        fetchDashboardData();
-      }
-    } catch (err) {
-      setHrError('Une erreur réseau est survenue.');
-    } finally {
-      setAdjustingId(null);
+    // 1. Trouver le membre actuel pour récupérer l'ancienne valeur (pour le rollback)
+    const member = allMembers.find(m => m.employee_id === employeeId);
+    const fieldKey = type.toLowerCase() === 'cp' ? 'initial_balance' : 'initial_perm';
+    const remainingKey = type.toLowerCase() === 'cp' ? 'remaining_balance' : 'remaining_perm';
+    const takenKey = type.toLowerCase() === 'cp' ? 'taken_days' : 'taken_perm';
+    
+    const oldValue = parseFloat(member ? member[fieldKey] : 0);
+
+    // 2. Mettre à jour l'état local React de manière optimiste
+    setAllMembers(prevMembers => {
+      return prevMembers.map(m => {
+        if (m.employee_id === employeeId) {
+          const takenVal = parseFloat(m[takenKey] || 0);
+          return {
+            ...m,
+            [fieldKey]: numericValue,
+            [remainingKey]: numericValue - takenVal
+          };
+        }
+        return m;
+      });
+    });
+
+    // 3. Mettre à jour le propre solde de l'utilisateur si c'est lui
+    if (employeeId === userRef.current?.id) {
+      setBalance(prevBalance => {
+        const takenVal = parseFloat(prevBalance[takenKey] || 0);
+        return {
+          ...prevBalance,
+          [fieldKey]: numericValue,
+          [remainingKey]: numericValue - takenVal
+        };
+      });
+    }
+
+    // 4. Enregistrer dans la file de synchronisation
+    if (syncQueueRef.current) {
+      syncQueueRef.current.enqueue({
+        type: 'adjust-balance',
+        employeeId,
+        field: type.toLowerCase(),
+        value: numericValue,
+        oldValue: oldValue
+      });
+      setHrSuccess('Modifications enregistrées localement (synchronisation en cours...)');
+    } else {
+      setHrError('Le gestionnaire de synchronisation n\'est pas disponible.');
     }
   };
 
