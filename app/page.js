@@ -4,12 +4,39 @@ import { useEffect, useState, useRef } from 'react';
 import { supabaseClient } from '../lib/supabaseClient';
 import { splitFullName, isMadagascarHoliday, calculateBusinessDays } from '../lib/utils';
 import { SyncQueueManager } from '../lib/syncQueue';
+import { 
+  Clock, 
+  Download, 
+  Sun, 
+  Moon, 
+  LogOut, 
+  ClipboardList, 
+  PlusCircle, 
+  History, 
+  AlertTriangle, 
+  Search, 
+  UserPlus, 
+  XCircle, 
+  Timer, 
+  LogIn, 
+  Edit, 
+  ShieldAlert, 
+  Smartphone,
+  ChevronDown
+} from 'lucide-react';
 
 const formatDateStr = (str) => {
   if (!str) return '-';
   const parts = str.split('-');
   if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
   return str;
+};
+
+const getTodayDateString = () => {
+  const d = new Date();
+  const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+  const local = new Date(utc + (3600000 * 3)); // Madagascar UTC+3
+  return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, '0')}-${String(local.getDate()).padStart(2, '0')}`;
 };
 
 export default function Page() {
@@ -28,6 +55,7 @@ export default function Page() {
   }, [user]);
 
   const syncQueueRef = useRef(null);
+  const lastLoadedDateRef = useRef(null);
 
   useEffect(() => {
     syncQueueRef.current = new SyncQueueManager({
@@ -55,7 +83,7 @@ export default function Page() {
               const takenKey = m.field === 'cp' ? 'taken_days' : 'taken_perm';
               const takenVal = parseFloat(updated[index][takenKey] || 0);
               const oldInitialVal = parseFloat(m.oldValue || 0);
-              
+
               updated[index] = {
                 ...updated[index],
                 [fieldKey]: oldInitialVal,
@@ -75,7 +103,7 @@ export default function Page() {
               const takenKey = m.field === 'cp' ? 'taken_days' : 'taken_perm';
               const takenVal = parseFloat(prevBalance[takenKey] || 0);
               const oldInitialVal = parseFloat(m.oldValue || 0);
-              
+
               return {
                 ...prevBalance,
                 [fieldKey]: oldInitialVal,
@@ -95,6 +123,12 @@ export default function Page() {
 
   // Dark/Light Mode state
   const [darkMode, setDarkMode] = useState(false);
+
+  // Menu burger & PWA installation states
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [showiOSInstallModal, setShowiOSInstallModal] = useState(false);
 
   // Business Data States
   const [balance, setBalance] = useState({
@@ -130,6 +164,39 @@ export default function Page() {
   const [newMemberCP, setNewMemberCP] = useState('25');
   const [newMemberPerm, setNewMemberPerm] = useState('5');
   const [newMemberHireDate, setNewMemberHireDate] = useState('');
+
+  // Schedule States
+  const [newMemberDefaultArrival, setNewMemberDefaultArrival] = useState('08:00');
+  const [newMemberDefaultDeparture, setNewMemberDefaultDeparture] = useState('17:00');
+  const [newMemberCustomSchedule, setNewMemberCustomSchedule] = useState(false);
+  const [newMemberMonArrival, setNewMemberMonArrival] = useState('08:00');
+  const [newMemberMonDeparture, setNewMemberMonDeparture] = useState('17:00');
+  const [newMemberTueArrival, setNewMemberTueArrival] = useState('08:00');
+  const [newMemberTueDeparture, setNewMemberTueDeparture] = useState('17:00');
+  const [newMemberWedArrival, setNewMemberWedArrival] = useState('08:00');
+  const [newMemberWedDeparture, setNewMemberWedDeparture] = useState('17:00');
+  const [newMemberThuArrival, setNewMemberThuArrival] = useState('08:00');
+  const [newMemberThuDeparture, setNewMemberThuDeparture] = useState('17:00');
+  const [newMemberFriArrival, setNewMemberFriArrival] = useState('08:00');
+  const [newMemberFriDeparture, setNewMemberFriDeparture] = useState('17:00');
+  const [newMemberSatArrival, setNewMemberSatArrival] = useState('08:00');
+  const [newMemberSatDeparture, setNewMemberSatDeparture] = useState('12:00');
+
+  // Pointage States
+  const [pointageDate, setPointageDate] = useState(getTodayDateString());
+  const [pointageSearchQuery, setPointageSearchQuery] = useState('');
+  const [pointageServiceFilter, setPointageServiceFilter] = useState('Tous');
+  const [pointageEmployees, setPointageEmployees] = useState([]);
+  const [pointageStats, setPointageStats] = useState(null);
+  const [pointageLoading, setPointageLoading] = useState(false);
+  const [clockingEmployeeId, setClockingEmployeeId] = useState(null);
+
+  // Pagination / Limit States
+  const [globalDashboardLimit, setGlobalDashboardLimit] = useState(10);
+  const [adminRHLimit, setAdminRHLimit] = useState(10);
+  const [pointageExpectedLimit, setPointageExpectedLimit] = useState(10);
+  const [pointagePresentLimit, setPointagePresentLimit] = useState(10);
+
   const [memberError, setMemberError] = useState(null);
   const [memberSuccess, setMemberSuccess] = useState(false);
   const [memberLoading, setMemberLoading] = useState(false);
@@ -142,10 +209,6 @@ export default function Page() {
   const [editLeaveLoading, setEditLeaveLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const getTodayDateString = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(getTodayDateString());
 
   // Adjustments & HR Actions
@@ -316,7 +379,8 @@ export default function Page() {
     'SEA & Data analyst',
     'Marketing de croissance',
     'Community management',
-    'Commercial'
+    'Commercial',
+    'Pointeur'
   ];
 
   const uniqueServices = ['Tous', ...new Set([
@@ -364,6 +428,51 @@ export default function Page() {
       subscription?.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (balance && balance.service === 'Pointeur') {
+      setActiveTab('pointage');
+    }
+  }, [balance]);
+
+  useEffect(() => {
+    const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true);
+    // Always show the button for testing unless already running standalone
+    setIsInstallable(!isStandalone);
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(window.navigator.userAgent) && !window.MSStream;
+    if (isIOS) {
+      setShowiOSInstallModal(true);
+      setMenuOpen(false);
+      return;
+    }
+
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstallable(false);
+        setDeferredPrompt(null);
+      }
+    } else {
+      // General instructions alert/modal for non-iOS browsers when deferredPrompt is not yet ready
+      alert("Pour installer l'application sur Android ou Ordinateur :\n\n1. Cliquez sur les 3 points verticaux de votre navigateur (Chrome/Edge).\n2. Sélectionnez l'option 'Ajouter à l'écran d'accueil' ou 'Installer l'application'.");
+    }
+    setMenuOpen(false);
+  };
 
   // Toggle Dark Mode function
   const toggleDarkMode = () => {
@@ -524,39 +633,44 @@ export default function Page() {
     if (!token) return;
     try {
       // 2a. Fetch personal balance
+      let currentService = '';
       const balanceRes = await fetch('/api/leaves/balance', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (balanceRes.ok) {
         const balanceData = await balanceRes.json();
         setBalance(balanceData);
+        currentService = balanceData.service;
       }
 
-      // 2b. Fetch personal requests
-      const myRequestsRes = await fetch('/api/leaves/my-requests', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (myRequestsRes.ok) {
-        const myRequestsData = await myRequestsRes.json();
-        setMyRequests(myRequestsData.requests || []);
-      }
+      // Skip heavy lists loading for the timekeeper (Pointeur) role
+      if (currentService !== 'Pointeur') {
+        // 2b. Fetch personal requests
+        const myRequestsRes = await fetch('/api/leaves/my-requests', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (myRequestsRes.ok) {
+          const myRequestsData = await myRequestsRes.json();
+          setMyRequests(myRequestsData.requests || []);
+        }
 
-      // 2c. Fetch global members list (accessible to all roles for the global dashboard)
-      const membersRes = await fetch('/api/admin/members', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (membersRes.ok) {
-        const membersData = await membersRes.json();
-        setAllMembers(membersData.members || []);
-      }
+        // 2c. Fetch global members list (accessible to all roles for the global dashboard)
+        const membersRes = await fetch('/api/admin/members', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (membersRes.ok) {
+          const membersData = await membersRes.json();
+          setAllMembers(membersData.members || []);
+        }
 
-      // Fetch all leave requests for the calendar (accessible to all roles)
-      const allRequestsRes = await fetch('/api/leaves/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (allRequestsRes.ok) {
-        const allRequestsData = await allRequestsRes.json();
-        setAllRequests(allRequestsData.requests || []);
+        // Fetch all leave requests for the calendar (accessible to all roles)
+        const allRequestsRes = await fetch('/api/leaves/all', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (allRequestsRes.ok) {
+          const allRequestsData = await allRequestsRes.json();
+          setAllRequests(allRequestsData.requests || []);
+        }
       }
 
       // 2d. Fetch pending requests if authorized (HR, Manager, Director)
@@ -607,9 +721,10 @@ export default function Page() {
         'SEA & Data analyst',
         'Marketing de croissance',
         'Community management',
-        'Commercial'
+        'Commercial',
+        'Pointeur'
       ];
-      
+
       const defaultSorted = [...allMembers].sort((a, b) => {
         const serviceA = a.service === 'Directeur' ? 'Direction' : a.service;
         const serviceB = b.service === 'Directeur' ? 'Direction' : b.service;
@@ -644,7 +759,7 @@ export default function Page() {
       const newOrder = [...prevOrder];
       const fromIdx = newOrder.indexOf(draggedId);
       const toIdx = newOrder.indexOf(targetId);
-      
+
       if (fromIdx !== -1 && toIdx !== -1) {
         newOrder.splice(fromIdx, 1);
         newOrder.splice(toIdx, 0, draggedId);
@@ -699,6 +814,21 @@ export default function Page() {
     }
   };
 
+  const getWorkSchedulePayload = () => {
+    const schedule = {
+      default: { arrival: newMemberDefaultArrival, departure: newMemberDefaultDeparture }
+    };
+    if (newMemberCustomSchedule) {
+      schedule.Mon = { arrival: newMemberMonArrival, departure: newMemberMonDeparture };
+      schedule.Tue = { arrival: newMemberTueArrival, departure: newMemberTueDeparture };
+      schedule.Wed = { arrival: newMemberWedArrival, departure: newMemberWedDeparture };
+      schedule.Thu = { arrival: newMemberThuArrival, departure: newMemberThuDeparture };
+      schedule.Fri = { arrival: newMemberFriArrival, departure: newMemberFriDeparture };
+      schedule.Sat = { arrival: newMemberSatArrival, departure: newMemberSatDeparture };
+    }
+    return schedule;
+  };
+
   // 4. Create new member (HR Admin)
   const handleCreateMember = async (e) => {
     e.preventDefault();
@@ -723,7 +853,8 @@ export default function Page() {
           initial_perm: parseFloat(newMemberPerm || 0),
           password: newMemberPassword,
           service: newMemberService,
-          hire_date: newMemberHireDate
+          hire_date: newMemberHireDate,
+          work_schedule: getWorkSchedulePayload()
         })
       });
 
@@ -742,6 +873,24 @@ export default function Page() {
         setNewMemberHireDate('');
         setNewMemberManager('Aucun');
         setNewMemberService('Direction');
+
+        // Reset schedules
+        setNewMemberDefaultArrival('08:00');
+        setNewMemberDefaultDeparture('17:00');
+        setNewMemberCustomSchedule(false);
+        setNewMemberMonArrival('08:00');
+        setNewMemberMonDeparture('17:00');
+        setNewMemberTueArrival('08:00');
+        setNewMemberTueDeparture('17:00');
+        setNewMemberWedArrival('08:00');
+        setNewMemberWedDeparture('17:00');
+        setNewMemberThuArrival('08:00');
+        setNewMemberThuDeparture('17:00');
+        setNewMemberFriArrival('08:00');
+        setNewMemberFriDeparture('17:00');
+        setNewMemberSatArrival('08:00');
+        setNewMemberSatDeparture('12:00');
+
         fetchDashboardData();
       }
     } catch (err) {
@@ -764,6 +913,29 @@ export default function Page() {
     setNewMemberService(m.service || 'Non spécifié');
     setNewMemberHireDate(m.hire_date || '');
 
+    // Parse work schedule
+    const schedule = m.work_schedule || {};
+    const defaultSchedule = schedule.default || { arrival: '08:00', departure: '17:00' };
+
+    setNewMemberDefaultArrival(defaultSchedule.arrival || '08:00');
+    setNewMemberDefaultDeparture(defaultSchedule.departure || '17:00');
+
+    const isCustom = !!(schedule.Mon || schedule.Tue || schedule.Wed || schedule.Thu || schedule.Fri || schedule.Sat);
+    setNewMemberCustomSchedule(isCustom);
+
+    setNewMemberMonArrival((schedule.Mon && schedule.Mon.arrival) || '08:00');
+    setNewMemberMonDeparture((schedule.Mon && schedule.Mon.departure) || '17:00');
+    setNewMemberTueArrival((schedule.Tue && schedule.Tue.arrival) || '08:00');
+    setNewMemberTueDeparture((schedule.Tue && schedule.Tue.departure) || '17:00');
+    setNewMemberWedArrival((schedule.Wed && schedule.Wed.arrival) || '08:00');
+    setNewMemberWedDeparture((schedule.Wed && schedule.Wed.departure) || '17:00');
+    setNewMemberThuArrival((schedule.Thu && schedule.Thu.arrival) || '08:00');
+    setNewMemberThuDeparture((schedule.Thu && schedule.Thu.departure) || '17:00');
+    setNewMemberFriArrival((schedule.Fri && schedule.Fri.arrival) || '08:00');
+    setNewMemberFriDeparture((schedule.Fri && schedule.Fri.departure) || '17:00');
+    setNewMemberSatArrival((schedule.Sat && schedule.Sat.arrival) || '08:00');
+    setNewMemberSatDeparture((schedule.Sat && schedule.Sat.departure) || '12:00');
+
     // Clear alerts
     setMemberError(null);
     setMemberSuccess(false);
@@ -781,6 +953,23 @@ export default function Page() {
     setNewMemberPerm('5');
     setNewMemberService('Direction');
     setNewMemberHireDate('');
+
+    // Reset schedules
+    setNewMemberDefaultArrival('08:00');
+    setNewMemberDefaultDeparture('17:00');
+    setNewMemberCustomSchedule(false);
+    setNewMemberMonArrival('08:00');
+    setNewMemberMonDeparture('17:00');
+    setNewMemberTueArrival('08:00');
+    setNewMemberTueDeparture('17:00');
+    setNewMemberWedArrival('08:00');
+    setNewMemberWedDeparture('17:00');
+    setNewMemberThuArrival('08:00');
+    setNewMemberThuDeparture('17:00');
+    setNewMemberFriArrival('08:00');
+    setNewMemberFriDeparture('17:00');
+    setNewMemberSatArrival('08:00');
+    setNewMemberSatDeparture('12:00');
   };
 
   // 6.5 Leave Edit/Delete Actions
@@ -886,7 +1075,8 @@ export default function Page() {
           initial_balance: parseFloat(newMemberCP || 0),
           initial_perm: parseFloat(newMemberPerm || 0),
           service: newMemberService,
-          hire_date: newMemberHireDate
+          hire_date: newMemberHireDate,
+          work_schedule: getWorkSchedulePayload()
         })
       });
 
@@ -902,6 +1092,178 @@ export default function Page() {
       setMemberError('Une erreur réseau est survenue.');
     } finally {
       setMemberLoading(false);
+    }
+  };
+
+  // 7.5 Time logs & Pointage Handlers
+  const fetchPointageData = async (forceSpinner = false) => {
+    if (!token) return;
+    
+    const hasData = pointageEmployees && pointageEmployees.length > 0;
+    const dateChanged = lastLoadedDateRef.current !== pointageDate;
+    
+    // Only display spinner if we don't have local data yet or if date changed
+    if (forceSpinner || !hasData || dateChanged) {
+      setPointageLoading(true);
+    }
+
+    try {
+      const logsRes = await fetch(`/api/time-logs?date=${pointageDate}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (logsRes.ok) {
+        const logsData = await logsRes.json();
+        setPointageEmployees(logsData.employees || []);
+        lastLoadedDateRef.current = pointageDate;
+      }
+
+      if (balance?.service !== 'Pointeur') {
+        const statsRes = await fetch('/api/time-logs/stats', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setPointageStats(statsData);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching pointage data:', err);
+    } finally {
+      setPointageLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user && token && activeTab === 'pointage') {
+      fetchPointageData();
+    }
+  }, [user, token, activeTab, pointageDate]);
+
+  const handleClockIn = async (employeeId) => {
+    if (!token) return;
+
+    const empIndex = pointageEmployees.findIndex(emp => emp.employee_id === employeeId);
+    if (empIndex === -1) return;
+
+    const emp = pointageEmployees[empIndex];
+
+    // Compute current local time in Madagascar (UTC+3)
+    const d = new Date();
+    const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+    const localTime = new Date(utc + (3600000 * 3));
+    const nowTimeStr = `${String(localTime.getHours()).padStart(2, '0')}:${String(localTime.getMinutes()).padStart(2, '0')}`;
+
+    // Determine scheduled clock-in for status logic
+    const dateObj = new Date(pointageDate);
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayOfWeek = days[dateObj.getDay()];
+
+    const schedule = emp.work_schedule || {};
+    const defaultSchedule = schedule.default || { arrival: '08:00', departure: '17:00' };
+    const daySchedule = schedule[dayOfWeek] || defaultSchedule;
+    const scheduledClockIn = daySchedule.arrival || '08:00';
+
+    const [inH, inM] = nowTimeStr.split(':').map(Number);
+    const [schedH, schedM] = scheduledClockIn.split(':').map(Number);
+
+    let status = 'Présent';
+    if ((inH * 60 + inM) > (schedH * 60 + schedM)) {
+      status = 'En retard';
+    }
+
+    // Keep original copy for potential rollback
+    const originalEmployees = [...pointageEmployees];
+
+    // 1. Optimistic Update: Add clock-in data locally immediately
+    const updatedEmployees = [...pointageEmployees];
+    updatedEmployees[empIndex] = {
+      ...emp,
+      time_log: {
+        ...(emp.time_log || {}),
+        clock_in: nowTimeStr,
+        status: status
+      }
+    };
+    setPointageEmployees(updatedEmployees);
+
+    // 2. Perform API request in background
+    try {
+      const res = await fetch('/api/time-logs/clock-in', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          employee_id: employeeId,
+          date: pointageDate,
+          clock_in_time: nowTimeStr
+        })
+      });
+
+      if (!res.ok) {
+        // Rollback state on error
+        setPointageEmployees(originalEmployees);
+        const errData = await res.json();
+        alert(errData.error || 'Erreur lors du pointage.');
+      }
+    } catch (err) {
+      console.error('Clock-in failed:', err);
+      setPointageEmployees(originalEmployees);
+    }
+  };
+
+  const handleClockOut = async (employeeId) => {
+    if (!token) return;
+
+    const empIndex = pointageEmployees.findIndex(emp => emp.employee_id === employeeId);
+    if (empIndex === -1) return;
+
+    const emp = pointageEmployees[empIndex];
+
+    // Compute current local time in Madagascar (UTC+3)
+    const d = new Date();
+    const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+    const localTime = new Date(utc + (3600000 * 3));
+    const nowTimeStr = `${String(localTime.getHours()).padStart(2, '0')}:${String(localTime.getMinutes()).padStart(2, '0')}`;
+
+    const originalEmployees = [...pointageEmployees];
+
+    // 1. Optimistic Update: Add clock-out locally immediately
+    const updatedEmployees = [...pointageEmployees];
+    updatedEmployees[empIndex] = {
+      ...emp,
+      time_log: {
+        ...(emp.time_log || {}),
+        clock_out: nowTimeStr
+      }
+    };
+    setPointageEmployees(updatedEmployees);
+
+    // 2. Perform API request in background
+    try {
+      const res = await fetch('/api/time-logs/clock-out', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          employee_id: employeeId,
+          date: pointageDate,
+          clock_out_time: nowTimeStr
+        })
+      });
+
+      if (!res.ok) {
+        // Rollback state on error
+        setPointageEmployees(originalEmployees);
+        const errData = await res.json();
+        alert(errData.error || 'Erreur lors du pointage.');
+      }
+    } catch (err) {
+      console.error('Clock-out failed:', err);
+      setPointageEmployees(originalEmployees);
     }
   };
 
@@ -954,7 +1316,7 @@ export default function Page() {
     const fieldKey = type.toLowerCase() === 'cp' ? 'initial_balance' : 'initial_perm';
     const remainingKey = type.toLowerCase() === 'cp' ? 'remaining_balance' : 'remaining_perm';
     const takenKey = type.toLowerCase() === 'cp' ? 'taken_days' : 'taken_perm';
-    
+
     const oldValue = parseFloat(member ? member[fieldKey] : 0);
 
     // 2. Mettre à jour l'état local React de manière optimiste
@@ -1059,6 +1421,8 @@ export default function Page() {
     );
   }
 
+  const profileLoaded = !!balance.employee_id;
+
   return (
     <div style={{ width: '100%' }}>
       {/* --- TOP HEADER NAVIGATION BAR --- */}
@@ -1091,7 +1455,7 @@ export default function Page() {
             className="kpi-badge-hover"
             title="Gérer les demandes de congé en attente"
           >
-            <span className="kpi-pulse-icon">⏳</span>
+            <Clock size={14} className="kpi-pulse-icon" style={{ marginRight: '0.25rem' }} />
             <span>{pendingRequests.length} en attente</span>
           </div>
         )}
@@ -1102,89 +1466,205 @@ export default function Page() {
             {userRole === 'hr' ? 'Administrateur' : userRole === 'manager' ? 'Manager' : userRole === 'director' ? 'Directeur' : 'Collaborateur'}
           </span>
 
-          {/* Dark Mode Switcher Icon */}
-          <button
-            onClick={toggleDarkMode}
-            className="logout-btn-header"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '0.45rem',
-              marginLeft: '0.75rem',
-              borderRadius: '50%',
-              width: '32px',
-              height: '32px'
-            }}
-            title={darkMode ? "Mode Clair" : "Mode Sombre"}
-          >
-            {darkMode ? (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '16px', height: '16px' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21M4.93 4.93l1.414 1.414M16.24 16.24l1.414 1.414M3 12h2.25m13.5 0H21M5.757 18.243l-1.414-1.414M19.636 5.636l-1.414 1.414m-5.456 6.364a9 9 0 11-12.728 0 9 9 0 0112.728 0z" />
+          {/* Burger Menu Button & Dropdown */}
+          <div style={{ position: 'relative', marginLeft: '0.75rem' }}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="logout-btn-header burger-btn"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0.45rem',
+                borderRadius: '8px',
+                border: '1px solid var(--border-light)',
+                background: 'var(--panel-white)',
+                cursor: 'pointer',
+                width: '38px',
+                height: '38px',
+                color: 'var(--text-primary)',
+                boxShadow: 'none',
+                marginTop: 0
+              }}
+              title="Menu Options"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '20px', height: '20px' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
               </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '16px', height: '16px' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-              </svg>
-            )}
-          </button>
+            </button>
 
-          {/* Logout Icon Button */}
-          <button
-            onClick={handleLogout}
-            className="logout-btn-header"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '0.45rem',
-              borderRadius: '50%',
-              width: '32px',
-              height: '32px'
-            }}
-            title="Se déconnecter"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '16px', height: '16px' }}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-            </svg>
-          </button>
+            {menuOpen && (
+              <>
+                <div 
+                  onClick={() => setMenuOpen(false)} 
+                  style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 90 }}
+                />
+                <div 
+                  className="burger-dropdown"
+                  style={{
+                    position: 'absolute',
+                    top: '46px',
+                    right: 0,
+                    backgroundColor: 'var(--panel-white)',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                    padding: '0.5rem',
+                    minWidth: '220px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.25rem',
+                    zIndex: 100,
+                    animation: 'fadeIn 0.15s ease-out'
+                  }}
+                >
+                  {isInstallable && (
+                    <button
+                      onClick={handleInstallClick}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-primary)',
+                        padding: '0.6rem 1rem',
+                        width: '100%',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        borderRadius: '8px',
+                        boxShadow: 'none',
+                        marginTop: 0
+                      }}
+                      className="menu-item-hover"
+                    >
+                      <Download size={16} style={{ color: 'var(--brand-orange)' }} /> Installer l'application
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      toggleDarkMode();
+                      setMenuOpen(false);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      padding: '0.6rem 1rem',
+                      width: '100%',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      boxShadow: 'none',
+                      marginTop: 0
+                    }}
+                    className="menu-item-hover"
+                  >
+                    {darkMode ? (
+                      <>
+                        <Sun size={16} style={{ color: 'var(--brand-orange)' }} /> Mode Clair
+                      </>
+                    ) : (
+                      <>
+                        <Moon size={16} style={{ color: 'var(--brand-orange)' }} /> Mode Sombre
+                      </>
+                    )}
+                  </button>
+
+                  <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: '0.25rem 0' }} />
+
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--error-color)',
+                      padding: '0.6rem 1rem',
+                      width: '100%',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      boxShadow: 'none',
+                      marginTop: 0
+                    }}
+                    className="menu-item-hover-danger"
+                  >
+                    <LogOut size={16} /> Se déconnecter
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
       <div className="app-container">
         {/* --- TABS SELECTOR --- */}
         <div className="nav-tabs">
-          <button
-            className={`tab-button ${activeTab === 'mySpace' ? 'active' : ''}`}
-            onClick={() => setActiveTab('mySpace')}
-          >
-            Mon espace
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'globalDashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('globalDashboard')}
-          >
-            Tableau de bord global
-          </button>
-          {(userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
-            <button
-              className={`tab-button ${activeTab === 'adminRH' ? 'active' : ''}`}
-              onClick={() => setActiveTab('adminRH')}
-            >
-              Administration RH
-            </button>
+          {profileLoaded ? (
+            <>
+              {balance?.service !== 'Pointeur' && (
+                <>
+                  <button
+                    className={`tab-button ${activeTab === 'mySpace' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('mySpace')}
+                  >
+                    Mon espace
+                  </button>
+                  <button
+                    className={`tab-button ${activeTab === 'globalDashboard' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('globalDashboard')}
+                  >
+                    Tableau de bord global
+                  </button>
+                </>
+              )}
+              {(userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Pointeur') && (
+                <>
+                  {balance?.service !== 'Pointeur' && (
+                    <button
+                      className={`tab-button ${activeTab === 'adminRH' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('adminRH')}
+                    >
+                      Administration RH
+                    </button>
+                  )}
+                  <button
+                    className={`tab-button ${activeTab === 'pointage' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('pointage')}
+                  >
+                    Pointage
+                  </button>
+                </>
+              )}
+            </>
+          ) : (
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', padding: '0.5rem' }}>Chargement du profil...</span>
           )}
         </div>
 
         {/* ==================================================== */}
         {/* 1. TAB CONTENT: MON ESPACE                          */}
         {/* ==================================================== */}
-        {activeTab === 'mySpace' && (
+        {profileLoaded && activeTab === 'mySpace' && balance?.service !== 'Pointeur' && (
           <div className="split-layout">
             {/* Sidebar with Balance & Request Form */}
             <div className="sidebar">
               <div className="panel">
-                <h2 className="panel-title">📋 Mes soldes restants</h2>
+                <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ClipboardList size={18} style={{ color: 'var(--brand-orange)' }} /> Mes soldes restants</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div className="balance-card-mini cp">
                     <span className="balance-card-title">Congés payés</span>
@@ -1202,10 +1682,7 @@ export default function Page() {
               </div>
 
               <div className="panel">
-                <h2 className="panel-title">➕ Déposer une demande</h2>
-
-                {submitError && <div className="error-message">{submitError}</div>}
-                {submitSuccess && <div className="success-message">Votre demande a été soumise.</div>}
+                <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><PlusCircle size={18} style={{ color: 'var(--brand-orange)' }} /> Déposer une demande</h2>
 
                 <form onSubmit={handleSubmitLeave} style={{ padding: 0, border: 'none', background: 'none' }}>
                   <div className="form-group">
@@ -1269,6 +1746,9 @@ export default function Page() {
                     />
                   </div>
 
+                  {submitError && <div className="error-message" style={{ marginTop: '1rem', marginBottom: '1rem' }}>{submitError}</div>}
+                  {submitSuccess && <div className="success-message" style={{ marginTop: '1rem', marginBottom: '1rem' }}>Votre demande a été soumise.</div>}
+
                   <button type="submit" className="btn-accent" disabled={submitting}>
                     {submitting ? 'Envoi...' : 'Soumettre la demande'}
                   </button>
@@ -1279,7 +1759,7 @@ export default function Page() {
             {/* Main Content with request history */}
             <div className="main-content">
               <div className="panel">
-                <h2 className="panel-title">🕒 Suivi de mes demandes</h2>
+                <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><History size={18} style={{ color: 'var(--brand-orange)' }} /> Suivi de mes demandes</h2>
 
                 {myRequests.length === 0 ? (
                   <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
@@ -1390,7 +1870,7 @@ export default function Page() {
         {/* ==================================================== */}
         {/* 2. TAB CONTENT: GLOBAL DASHBOARD                     */}
         {/* ==================================================== */}
-        {activeTab === 'globalDashboard' && (
+        {profileLoaded && activeTab === 'globalDashboard' && balance?.service !== 'Pointeur' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {/* KPIs grids */}
             {(userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
@@ -1562,7 +2042,7 @@ export default function Page() {
                             );
                           }
 
-                          return filteredMembers.map(m => {
+                          return filteredMembers.slice(0, globalDashboardLimit).map(m => {
                             const employeeReqs = allRequests.filter(req => req.employee_id === m.employee_id && req.status !== 'Refusé');
                             const projected = getProjectedBalance(m, currentDate);
 
@@ -1691,7 +2171,7 @@ export default function Page() {
                                     const svc = m.service || 'Non spécifié';
                                     if (dayServiceConflicts[`${day.dateString}-${svc}`]) {
                                       cellClass += ' overlap';
-                                      cellTitle = `⚠️ Attention : Superposition dans le service ${svc} !\n`;
+                                      cellTitle = `[Attention] Superposition dans le service ${svc} !\n`;
                                     }
 
                                     cellTitle += `${m.employee_first_name} - ${activeReq.leave_type} (${activeReq.status})`;
@@ -1737,6 +2217,39 @@ export default function Page() {
                     </tbody>
                   </table>
                 </div>
+                {(() => {
+                  const filteredMembers = allMembers.filter(m => {
+                    if (ganttServiceFilter === 'Tous') return true;
+                    const svc = (m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié';
+                    return svc === ganttServiceFilter;
+                  });
+                  if (filteredMembers.length > globalDashboardLimit) {
+                    return (
+                      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+                        <button
+                          type="button"
+                          className="btn-accent"
+                          onClick={() => setGlobalDashboardLimit(prev => prev + 10)}
+                          style={{
+                            background: 'none',
+                            border: '1px solid var(--brand-orange)',
+                            color: 'var(--brand-orange)',
+                            padding: '0.5rem 1.5rem',
+                            borderRadius: '20px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <Search size={16} /> Voir plus de collaborateurs ({filteredMembers.length - globalDashboardLimit} restants)
+                        </button>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Overlaps alert cards */}
                 {(() => {
@@ -1749,8 +2262,8 @@ export default function Page() {
 
                   return (
                     <div className="gantt-alerts-card">
-                      <h3 className="gantt-alerts-title">
-                        ⚠️ Alertes Superpositions de Service ({currentDate.toLocaleDateString('fr-FR', { month: 'long' })})
+                      <h3 className="gantt-alerts-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <AlertTriangle size={18} style={{ color: 'var(--warning-color)' }} /> Alertes Superpositions de Service ({currentDate.toLocaleDateString('fr-FR', { month: 'long' })})
                       </h3>
                       <div className="gantt-alerts-list">
                         {filteredOverlaps.map((overlap, idx) => {
@@ -1784,17 +2297,16 @@ export default function Page() {
         {/* ==================================================== */}
         {/* 3. TAB CONTENT: ADMINISTRATION RH                    */}
         {/* ==================================================== */}
-        {activeTab === 'adminRH' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
+        {profileLoaded && activeTab === 'adminRH' && balance?.service !== 'Pointeur' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-            {/* Header Actions Alerts */}
-            {hrError && <div className="error-message">{hrError}</div>}
-            {hrSuccess && <div className="success-message">{hrSuccess}</div>}
 
             {/* Validation Panel */}
             <div className="panel" style={{ borderTop: '4px solid var(--brand-orange)' }}>
               <h2 className="panel-title">Suivi et validation finale RH</h2>
               <p className="panel-subtitle">Valider ou refuser les demandes de congé de l'entreprise.</p>
+
+              {hrError && <div className="error-message" style={{ marginBottom: '1rem' }}>{hrError}</div>}
+              {hrSuccess && <div className="success-message" style={{ marginBottom: '1rem' }}>{hrSuccess}</div>}
 
               {pendingRequests.length === 0 ? (
                 <p style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>
@@ -1868,10 +2380,7 @@ export default function Page() {
               {/* Add user form */}
               <div className="sidebar" style={{ width: '350px' }}>
                 <div className="panel">
-                  <h2 className="panel-title">👤 Ajouter un membre</h2>
-
-                  {memberError && <div className="error-message">{memberError}</div>}
-                  {memberSuccess && <div className="success-message">Données enregistrées avec succès.</div>}
+                  <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><UserPlus size={18} style={{ color: 'var(--brand-orange)' }} /> Ajouter un membre</h2>
 
                   <form onSubmit={handleCreateMember} style={{ padding: 0, border: 'none', background: 'none' }}>
                     <div className="form-row">
@@ -1929,6 +2438,7 @@ export default function Page() {
                         <option value="Marketing de croissance">Marketing de croissance</option>
                         <option value="Community management">Community management</option>
                         <option value="Commercial">Commercial</option>
+                        <option value="Pointeur">Pointeur</option>
                       </select>
                     </div>
 
@@ -1995,6 +2505,89 @@ export default function Page() {
                       />
                     </div>
 
+                    <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
+                      <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Clock size={16} /> Horaires de travail</h3>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Heure d'arrivée standard</label>
+                          <input
+                            type="time"
+                            value={newMemberDefaultArrival}
+                            onChange={(e) => setNewMemberDefaultArrival(e.target.value)}
+                            disabled={memberLoading}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Heure de départ standard</label>
+                          <input
+                            type="time"
+                            value={newMemberDefaultDeparture}
+                            onChange={(e) => setNewMemberDefaultDeparture(e.target.value)}
+                            disabled={memberLoading}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <input
+                          type="checkbox"
+                          id="newMemberCustomSchedule"
+                          checked={newMemberCustomSchedule}
+                          onChange={(e) => setNewMemberCustomSchedule(e.target.checked)}
+                          style={{ width: 'auto', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="newMemberCustomSchedule" style={{ marginBottom: 0, cursor: 'pointer', fontWeight: 400 }}>Horaires variables par jour</label>
+                      </div>
+
+                      {newMemberCustomSchedule && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(0,0,0,0.02)', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => {
+                            const dayNamesFr = { Mon: 'Lundi', Tue: 'Mardi', Wed: 'Mercredi', Thu: 'Jeudi', Fri: 'Vendredi', Sat: 'Samedi' };
+                            const arrivalVal = day === 'Mon' ? newMemberMonArrival : day === 'Tue' ? newMemberTueArrival : day === 'Wed' ? newMemberWedArrival : day === 'Thu' ? newMemberThuArrival : day === 'Fri' ? newMemberFriArrival : newMemberSatArrival;
+                            const departureVal = day === 'Mon' ? newMemberMonDeparture : day === 'Tue' ? newMemberTueDeparture : day === 'Wed' ? newMemberWedDeparture : day === 'Thu' ? newMemberThuDeparture : day === 'Fri' ? newMemberFriDeparture : newMemberSatDeparture;
+
+                            const setArrival = (val) => {
+                              if (day === 'Mon') setNewMemberMonArrival(val);
+                              else if (day === 'Tue') setNewMemberTueArrival(val);
+                              else if (day === 'Wed') setNewMemberWedArrival(val);
+                              else if (day === 'Thu') setNewMemberThuArrival(val);
+                              else if (day === 'Fri') setNewMemberFriArrival(val);
+                              else setNewMemberSatArrival(val);
+                            };
+
+                            const setDeparture = (val) => {
+                              if (day === 'Mon') setNewMemberMonDeparture(val);
+                              else if (day === 'Tue') setNewMemberTueDeparture(val);
+                              else if (day === 'Wed') setNewMemberWedDeparture(val);
+                              else if (day === 'Thu') setNewMemberThuDeparture(val);
+                              else if (day === 'Fri') setNewMemberFriDeparture(val);
+                              else setNewMemberSatDeparture(val);
+                            };
+
+                            return (
+                              <div key={day} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                                <span style={{ fontWeight: 500, minWidth: '70px', fontSize: '0.85rem' }}>{dayNamesFr[day]}</span>
+                                <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
+                                  <input
+                                    type="time"
+                                    value={arrivalVal}
+                                    onChange={(e) => setArrival(e.target.value)}
+                                    style={{ padding: '0.25rem', fontSize: '0.85rem', width: '100%' }}
+                                  />
+                                  <input
+                                    type="time"
+                                    value={departureVal}
+                                    onChange={(e) => setDeparture(e.target.value)}
+                                    style={{ padding: '0.25rem', fontSize: '0.85rem', width: '100%' }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
                     <div className="form-row">
                       <div className="form-group">
                         <label>Solde Initial CP</label>
@@ -2016,9 +2609,14 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <button type="submit" className="btn-accent" disabled={memberLoading}>
-                      {memberLoading ? 'Enregistrement...' : 'Enregistrer'}
-                    </button>
+                    {memberError && <div className="error-message" style={{ marginTop: '1rem', marginBottom: '1rem' }}>{memberError}</div>}
+                    {memberSuccess && <div className="success-message" style={{ marginTop: '1rem', marginBottom: '1rem' }}>Données enregistrées avec succès.</div>}
+
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem', width: '100%' }}>
+                      <button type="submit" className="btn-accent" disabled={memberLoading} style={{ minWidth: '150px' }}>
+                        {memberLoading ? 'Enregistrement...' : 'Enregistrer'}
+                      </button>
+                    </div>
                   </form>
                 </div>
               </div>
@@ -2041,6 +2639,9 @@ export default function Page() {
                       </select>
                     </div>
                   </div>
+
+                  {hrError && <div className="error-message" style={{ marginBottom: '1rem' }}>{hrError}</div>}
+                  {hrSuccess && <div className="success-message" style={{ marginBottom: '1rem' }}>{hrSuccess}</div>}
 
                   <div className="table-container">
                     <table className="admin-table">
@@ -2079,7 +2680,7 @@ export default function Page() {
                             );
                           }
 
-                          return filtered.map((m) => (
+                          return filtered.slice(0, adminRHLimit).map((m) => (
                             <tr
                               key={m.employee_id}
                               draggable={true}
@@ -2191,12 +2792,48 @@ export default function Page() {
                       </tbody>
                     </table>
                   </div>
+                  {(() => {
+                    const filtered = allMembers.filter(m => {
+                      if (adminServiceFilter === 'Tous') return true;
+                      const svc = (m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié';
+                      return svc === adminServiceFilter;
+                    });
+                    if (filtered.length > adminRHLimit) {
+                      return (
+                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+                          <button
+                            type="button"
+                            className="btn-accent"
+                            onClick={() => setAdminRHLimit(prev => prev + 10)}
+                            style={{
+                              background: 'none',
+                              border: '1px solid var(--brand-orange)',
+                              color: 'var(--brand-orange)',
+                              padding: '0.5rem 1.5rem',
+                              borderRadius: '20px',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem'
+                            }}
+                          >
+                            <Search size={14} /> Voir plus de collaborateurs ({filtered.length - adminRHLimit} restants)
+                          </button>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* Historique et gestion de tous les congés */}
                 <div className="panel">
                   <h2 className="panel-title">Gestion globale des demandes de congé</h2>
                   <p className="panel-subtitle">Modifier, supprimer ou consulter toutes les demandes (validées, en attente ou refusées).</p>
+
+                  {hrError && <div className="error-message" style={{ marginBottom: '1rem' }}>{hrError}</div>}
+                  {hrSuccess && <div className="success-message" style={{ marginBottom: '1rem' }}>{hrSuccess}</div>}
 
                   <div className="table-container">
                     <table className="admin-table">
@@ -2296,6 +2933,440 @@ export default function Page() {
             </div>
           </div>
         )}
+        {/* ==================================================== */}
+        {/* 3.5. TAB CONTENT: POINTAGE                           */}
+        {/* ==================================================== */}
+        {profileLoaded && activeTab === 'pointage' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Pointeur') && (
+          <div className="pointage-layout" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+            {/* Top Toolbar: Date & Filters */}
+            <div className="panel" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div className="form-group" style={{ marginBottom: 0, minWidth: '180px' }}>
+                  <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date de pointage</label>
+                  <input
+                    type="date"
+                    value={pointageDate}
+                    onChange={(e) => setPointageDate(e.target.value)}
+                    style={{ margin: 0, padding: '0.5rem' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0, minWidth: '180px' }}>
+                  <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Filtrer par service</label>
+                  <select
+                    value={pointageServiceFilter}
+                    onChange={(e) => setPointageServiceFilter(e.target.value)}
+                    style={{ margin: 0, padding: '0.5rem' }}
+                  >
+                    <option value="Tous">Tous les services</option>
+                    <option value="Direction">Direction</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Team leader">Team leader</option>
+                    <option value="Web">Web</option>
+                    <option value="Graphiste">Graphiste</option>
+                    <option value="SEO">SEO</option>
+                    <option value="SEA & Data analyst">SEA & Data analyst</option>
+                    <option value="Marketing de croissance">Marketing de croissance</option>
+                    <option value="Community management">Community management</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Pointeur">Pointeur</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0, minWidth: '260px', position: 'relative' }}>
+                <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Rechercher un collaborateur</label>
+                <input
+                  type="text"
+                  placeholder="Rechercher..."
+                  value={pointageSearchQuery}
+                  onChange={(e) => setPointageSearchQuery(e.target.value)}
+                  style={{ margin: 0, padding: '0.5rem' }}
+                />
+              </div>
+            </div>
+
+            {/* Attendance Analytics & KPIs Dashboard */}
+            {pointageStats && balance?.service !== 'Pointeur' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+
+                {/* Expected card */}
+                <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Présence Aujourd'hui</span>
+                    <UserPlus size={18} style={{ color: 'var(--brand-orange)' }} />
+                  </div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                    {pointageStats.today.present} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>/ {pointageStats.today.total} actifs</span>
+                  </div>
+                  <div style={{ width: '100%', height: '6px', background: 'var(--border-light)', borderRadius: '3px', marginTop: '0.25rem', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${pointageStats.today.total > 0 ? (pointageStats.today.present / pointageStats.today.total) * 100 : 0}%`,
+                      height: '100%',
+                      background: 'var(--brand-orange)',
+                      borderRadius: '3px',
+                      transition: 'width 0.4s ease'
+                    }}></div>
+                  </div>
+                </div>
+
+                {/* Late Arrivals card */}
+                <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Arrivées en retard</span>
+                    <AlertTriangle size={18} style={{ color: 'var(--warning-color)' }} />
+                  </div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f97316' }}>
+                    {pointageStats.today.late} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>ce jour</span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Taux d'assiduité : <strong style={{ color: 'var(--success-color)' }}>{pointageStats.today.punctuality_rate}%</strong>
+                  </div>
+                </div>
+
+                {/* Absents card */}
+                <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Non pointés</span>
+                    <XCircle size={18} style={{ color: 'var(--error-color)' }} />
+                  </div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
+                    {pointageStats.today.absent} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>collaborateurs</span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Départs pointés : <strong>{pointageStats.today.clocked_out}</strong>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* The 2 Columns Board */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+
+              {/* Column 1: A l'étape d'arrivée (Non présents) */}
+              <div className="panel" style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '2px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+                  <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    Non arrivés
+                  </h2>
+                  <span className="badge-role employee" style={{ padding: '0.2rem 0.5rem', borderRadius: '12px', fontSize: '0.75rem' }}>
+                    {pointageEmployees.filter(emp => {
+                      // Match filter
+                      const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                      const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
+                      const notClockedIn = !emp.time_log || !emp.time_log.clock_in;
+                      return matchesSearch && matchesService && notClockedIn;
+                    }).length}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '300px' }}>
+                  {pointageLoading ? (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>Chargement en cours...</div>
+                  ) : (() => {
+                    const filtered = pointageEmployees.filter(emp => {
+                      const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                      const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
+                      const notClockedIn = !emp.time_log || !emp.time_log.clock_in;
+                      return matchesSearch && matchesService && notClockedIn;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '4rem 1rem', background: 'var(--panel-white)', borderRadius: '8px', border: '1px dashed var(--border-light)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                          Aucun collaborateur attendu dans cette liste.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {filtered.slice(0, pointageExpectedLimit).map(emp => {
+                          // Get schedule of day dynamically
+                          const dateObj = new Date(pointageDate);
+                          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                          const dayOfWeek = days[dateObj.getDay()];
+                          const schedule = emp.work_schedule || {};
+                          const daySchedule = schedule[dayOfWeek] || schedule.default || { arrival: '08:00', departure: '17:00' };
+
+                          return (
+                            <div key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-white)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border-light)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{emp.employee_first_name} {emp.employee_name}</span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Service : {emp.service}</span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
+                                  <Timer size={12} /> Horaire : {daySchedule.arrival} - {daySchedule.departure}
+                                </span>
+                                {emp.time_log && emp.time_log.clock_out && (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--error-color)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    <LogOut size={12} /> Parti à {emp.time_log.clock_out.substring(0, 5)}
+                                  </span>
+                                )}
+                              </div>
+
+                              <button
+                                className="btn-accent"
+                                onClick={() => handleClockIn(emp.employee_id)}
+                                disabled={clockingEmployeeId === emp.employee_id || (emp.time_log && emp.time_log.clock_out)}
+                                style={{
+                                  padding: '0.4rem 0.8rem',
+                                  fontSize: '0.85rem',
+                                  background: '#328853',
+                                  borderColor: '#15803d',
+                                  minWidth: '90px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}
+                              >
+                                {clockingEmployeeId === emp.employee_id ? 'Envoi...' : (
+                                  <>
+                                    <LogIn size={14} /> Arrivé
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                        {filtered.length > pointageExpectedLimit && (
+                          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', width: '100%' }}>
+                            <button
+                              type="button"
+                              onClick={() => setPointageExpectedLimit(prev => prev + 10)}
+                              style={{
+                                background: 'none',
+                                border: '1px solid var(--brand-orange)',
+                                color: 'var(--brand-orange)',
+                                padding: '0.4rem 1rem',
+                                borderRadius: '20px',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                fontSize: '0.8rem'
+                              }}
+                            >
+                              <ChevronDown size={14} /> Voir plus ({filtered.length - pointageExpectedLimit} restants)
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Column 2: Présents dans les locaux */}
+              <div className="panel" style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '2px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+                  <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    Présents
+                  </h2>
+                  <span className="badge-role manager" style={{ padding: '0.2rem 0.5rem', borderRadius: '12px', fontSize: '0.75rem' }}>
+                    {pointageEmployees.filter(emp => {
+                      const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                      const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
+                      const isClockedIn = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
+                      return matchesSearch && matchesService && isClockedIn;
+                    }).length}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '300px' }}>
+                  {pointageLoading ? (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>Chargement en cours...</div>
+                  ) : (() => {
+                    const filtered = pointageEmployees.filter(emp => {
+                      const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                      const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
+                      const isClockedIn = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
+                      return matchesSearch && matchesService && isClockedIn;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '4rem 1rem', background: 'var(--panel-white)', borderRadius: '8px', border: '1px dashed var(--border-light)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                          Aucun collaborateur présent actuellement.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {filtered.slice(0, pointagePresentLimit).map(emp => (
+                          <div key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-white)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border-light)' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                              <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{emp.employee_first_name} {emp.employee_name}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Service : {emp.service}</span>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--success-color)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <LogIn size={12} /> Arrivée : {emp.time_log.clock_in.substring(0, 5)}
+                                </span>
+                                <span className={`status-badge ${emp.time_log.status === 'En retard' ? 'status-rejected' : 'status-approved'}`} style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
+                                  {emp.time_log.status}
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              className="btn-accent"
+                              onClick={() => handleClockOut(emp.employee_id)}
+                              disabled={clockingEmployeeId === emp.employee_id}
+                              style={{
+                                padding: '0.4rem 0.8rem',
+                                fontSize: '0.85rem',
+                                background: 'var(--brand-orange)',
+                                borderColor: 'var(--brand-orange-hover)',
+                                minWidth: '90px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem'
+                              }}
+                            >
+                              {clockingEmployeeId === emp.employee_id ? 'Envoi...' : (
+                                <>
+                                  <LogOut size={14} /> Sortie
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                        {filtered.length > pointagePresentLimit && (
+                          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', width: '100%' }}>
+                            <button
+                              type="button"
+                              onClick={() => setPointagePresentLimit(prev => prev + 10)}
+                              style={{
+                                background: 'none',
+                                border: '1px solid var(--brand-orange)',
+                                color: 'var(--brand-orange)',
+                                padding: '0.4rem 1rem',
+                                borderRadius: '20px',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                fontSize: '0.8rem'
+                              }}
+                            >
+                              <ChevronDown size={14} /> Voir plus ({filtered.length - pointagePresentLimit} restants)
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+            </div>
+
+            {/* SVG Attendance History & Charts */}
+            {pointageStats && pointageStats.chartData && pointageStats.chartData.length > 0 && balance?.service !== 'Pointeur' && (
+              <div className="panel" style={{ marginTop: '1rem' }}>
+                <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><History size={18} style={{ color: 'var(--brand-orange)' }} /> Assiduité de l'équipe (7 derniers jours)</h2>
+                <p className="panel-subtitle">Historique des présences quotidiennes triées par ponctualité.</p>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '1.5rem', alignItems: 'center' }}>
+
+                  {/* stacked Bar Chart SVG */}
+                  <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <svg viewBox="0 0 500 220" style={{ width: '100%', height: 'auto', background: 'none' }}>
+                      {/* Grid Lines */}
+                      <line x1="40" y1="20" x2="480" y2="20" stroke="var(--border-light)" strokeDasharray="4" />
+                      <line x1="40" y1="70" x2="480" y2="70" stroke="var(--border-light)" strokeDasharray="4" />
+                      <line x1="40" y1="120" x2="480" y2="120" stroke="var(--border-light)" strokeDasharray="4" />
+                      <line x1="40" y1="170" x2="480" y2="170" stroke="var(--border-light)" />
+
+                      {/* Y Labels */}
+                      <text x="20" y="24" fontSize="10" fill="var(--text-secondary)" textAnchor="end">100%</text>
+                      <text x="20" y="74" fontSize="10" fill="var(--text-secondary)" textAnchor="end">50%</text>
+                      <text x="20" y="124" fontSize="10" fill="var(--text-secondary)" textAnchor="end">25%</text>
+                      <text x="20" y="174" fontSize="10" fill="var(--text-secondary)" textAnchor="end">0%</text>
+
+                      {/* Bars */}
+                      {pointageStats.chartData.map((d, index) => {
+                        const x = 55 + index * 60;
+                        const total = d.present + d.absent || 1;
+
+                        const presentHeight = (d.present / total) * 150;
+                        const lateHeight = (d.late / total) * 150;
+                        const punctualHeight = Math.max(0, presentHeight - lateHeight);
+                        const absentHeight = (d.absent / total) * 150;
+
+                        const yAbsent = 170 - absentHeight;
+                        const yLate = yAbsent - lateHeight;
+                        const yPunctual = yLate - punctualHeight;
+
+                        return (
+                          <g key={d.date} style={{ cursor: 'pointer' }}>
+                            {/* Punctual segment (Green) */}
+                            {punctualHeight > 0 && (
+                              <rect x={x} y={yPunctual} width="22" height={punctualHeight} fill="#166534" rx="2" />
+                            )}
+                            {/* Late segment (Orange) */}
+                            {lateHeight > 0 && (
+                              <rect x={x} y={yLate} width="22" height={lateHeight} fill="var(--brand-orange)" rx="2" />
+                            )}
+                            {/* Absent segment (Gray) */}
+                            {absentHeight > 0 && (
+                              <rect x={x} y={yAbsent} width="22" height={absentHeight} fill="var(--border-light)" rx="2" />
+                            )}
+
+                            {/* Date Label */}
+                            <text x={x + 11} y="192" fontSize="10" fill="var(--text-secondary)" textAnchor="middle" fontWeight="500">{d.label}</text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+
+                    {/* Legend */}
+                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem', fontSize: '0.85rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#166534' }}></span>
+                        <span>Présent (À l'heure)</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--brand-orange)' }}></span>
+                        <span>En retard</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--border-light)' }}></span>
+                        <span>Absent / Non pointé</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Radial Progress Ring SVG */}
+                  <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ position: 'relative', width: '140px', height: '140px' }}>
+                      <svg width="100%" height="100%" viewBox="0 0 40 40">
+                        {/* Background circle */}
+                        <circle cx="20" cy="20" r="15.91549430918954" fill="none" stroke="var(--border-light)" strokeWidth="3" />
+                        {/* Progress ring */}
+                        <circle cx="20" cy="20" r="15.91549430918954" fill="none" stroke="var(--success-color)" strokeWidth="3.5"
+                          strokeDasharray={`${pointageStats.today.punctuality_rate} ${100 - pointageStats.today.punctuality_rate}`}
+                          strokeDashoffset="25"
+                          strokeLinecap="round"
+                          style={{ transition: 'stroke-dasharray 0.5s ease-out' }}
+                        />
+                      </svg>
+                      {/* Percent indicator */}
+                      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--brand-navy)' }}>{pointageStats.today.punctuality_rate}%</span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>À l'heure</span>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '200px', fontWeight: 500 }}>
+                      Taux de ponctualité global aujourd'hui
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
       </div>
 
       {/* ==================================================== */}
@@ -2304,7 +3375,7 @@ export default function Page() {
       {editingMember && (
         <div className="modal-backdrop">
           <div className="modal-content">
-            <h2 className="modal-title">📝 Modifier le Membre</h2>
+            <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Edit size={20} /> Modifier le Membre</h2>
             <p className="modal-message" style={{ marginBottom: '1.25rem' }}>
               Mettez à jour les informations et soldes initiaux pour <strong>{editingMember.employee_first_name}</strong>.
             </p>
@@ -2367,6 +3438,7 @@ export default function Page() {
                   <option value="Marketing de croissance">Marketing de croissance</option>
                   <option value="Community management">Community management</option>
                   <option value="Commercial">Commercial</option>
+                  <option value="Pointeur">Pointeur</option>
                 </select>
               </div>
 
@@ -2397,6 +3469,89 @@ export default function Page() {
                   required
                   disabled={memberLoading}
                 />
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Clock size={16} /> Horaires de travail</h3>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Heure d'arrivée standard</label>
+                    <input
+                      type="time"
+                      value={newMemberDefaultArrival}
+                      onChange={(e) => setNewMemberDefaultArrival(e.target.value)}
+                      disabled={memberLoading}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Heure de départ standard</label>
+                    <input
+                      type="time"
+                      value={newMemberDefaultDeparture}
+                      onChange={(e) => setNewMemberDefaultDeparture(e.target.value)}
+                      disabled={memberLoading}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="editMemberCustomSchedule"
+                    checked={newMemberCustomSchedule}
+                    onChange={(e) => setNewMemberCustomSchedule(e.target.checked)}
+                    style={{ width: 'auto', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="editMemberCustomSchedule" style={{ marginBottom: 0, cursor: 'pointer', fontWeight: 400 }}>Horaires variables par jour</label>
+                </div>
+
+                {newMemberCustomSchedule && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(0,0,0,0.02)', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => {
+                      const dayNamesFr = { Mon: 'Lundi', Tue: 'Mardi', Wed: 'Mercredi', Thu: 'Jeudi', Fri: 'Vendredi', Sat: 'Samedi' };
+                      const arrivalVal = day === 'Mon' ? newMemberMonArrival : day === 'Tue' ? newMemberTueArrival : day === 'Wed' ? newMemberWedArrival : day === 'Thu' ? newMemberThuArrival : day === 'Fri' ? newMemberFriArrival : newMemberSatArrival;
+                      const departureVal = day === 'Mon' ? newMemberMonDeparture : day === 'Tue' ? newMemberTueDeparture : day === 'Wed' ? newMemberWedDeparture : day === 'Thu' ? newMemberThuDeparture : day === 'Fri' ? newMemberFriDeparture : newMemberSatDeparture;
+
+                      const setArrival = (val) => {
+                        if (day === 'Mon') setNewMemberMonArrival(val);
+                        else if (day === 'Tue') setNewMemberTueArrival(val);
+                        else if (day === 'Wed') setNewMemberWedArrival(val);
+                        else if (day === 'Thu') setNewMemberThuArrival(val);
+                        else if (day === 'Fri') setNewMemberFriArrival(val);
+                        else setNewMemberSatArrival(val);
+                      };
+
+                      const setDeparture = (val) => {
+                        if (day === 'Mon') setNewMemberMonDeparture(val);
+                        else if (day === 'Tue') setNewMemberTueDeparture(val);
+                        else if (day === 'Wed') setNewMemberWedDeparture(val);
+                        else if (day === 'Thu') setNewMemberThuDeparture(val);
+                        else if (day === 'Fri') setNewMemberFriDeparture(val);
+                        else setNewMemberSatDeparture(val);
+                      };
+
+                      return (
+                        <div key={day} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <span style={{ fontWeight: 500, minWidth: '70px', fontSize: '0.85rem' }}>{dayNamesFr[day]}</span>
+                          <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
+                            <input
+                              type="time"
+                              value={arrivalVal}
+                              onChange={(e) => setArrival(e.target.value)}
+                              style={{ padding: '0.25rem', fontSize: '0.85rem', width: '100%' }}
+                            />
+                            <input
+                              type="time"
+                              value={departureVal}
+                              onChange={(e) => setDeparture(e.target.value)}
+                              style={{ padding: '0.25rem', fontSize: '0.85rem', width: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="form-row">
@@ -2439,12 +3594,10 @@ export default function Page() {
       {editingLeave && (
         <div className="modal-backdrop">
           <div className="modal-content">
-            <h2 className="modal-title">📝 Modifier la Demande</h2>
+            <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Edit size={20} /> Modifier la Demande</h2>
             <p className="modal-message" style={{ marginBottom: '1.25rem' }}>
               Mettez à jour les dates ou le type de congé pour cette demande.
             </p>
-
-            {editLeaveError && <div className="error-message">{editLeaveError}</div>}
 
             <form onSubmit={handleUpdateLeave} style={{ padding: 0, border: 'none', background: 'none', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group">
@@ -2487,6 +3640,8 @@ export default function Page() {
                 </select>
               </div>
 
+              {editLeaveError && <div className="error-message" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>{editLeaveError}</div>}
+
               <div className="modal-footer">
                 <button type="submit" className="btn-accent" style={{ minWidth: '110px' }} disabled={editLeaveLoading}>
                   {editLeaveLoading ? 'Envoi...' : 'Sauvegarder'}
@@ -2506,7 +3661,7 @@ export default function Page() {
       {confirmModal.isOpen && (
         <div className="modal-backdrop" style={{ zIndex: 110 }}>
           <div className="modal-content modal-content-small">
-            <h2 className="modal-title">🛡️ {confirmModal.title}</h2>
+            <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ShieldAlert size={20} /> {confirmModal.title}</h2>
             <p className="modal-message" style={{ marginBottom: '1.5rem' }}>{confirmModal.message}</p>
             <div className="modal-footer">
               <button
@@ -2524,6 +3679,60 @@ export default function Page() {
                 Annuler
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Installation Instructions Modal */}
+      {showiOSInstallModal && (
+        <div className="modal-backdrop" onClick={() => setShowiOSInstallModal(false)} style={{ zIndex: 120 }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <h2 className="panel-title" style={{ justifyContent: 'center', fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Smartphone size={20} /> Installer Step Hub sur iOS
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: '0.5rem 0 1.5rem 0' }}>
+              Suivez ces étapes simples pour ajouter l'application sur votre écran d'accueil iPhone ou iPad :
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left', margin: '1rem 0' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.15rem', background: 'var(--warning-bg)', color: 'var(--brand-orange)', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', flexShrink: 0 }}>1</span>
+                <div>
+                  <span style={{ fontWeight: '700', color: 'var(--brand-navy)', fontSize: '0.95rem' }}>Ouvrez Safari</span>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Cette fonctionnalité est supportée uniquement sur Safari.</p>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.15rem', background: 'var(--warning-bg)', color: 'var(--brand-orange)', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', flexShrink: 0 }}>2</span>
+                <div>
+                  <span style={{ fontWeight: '700', color: 'var(--brand-navy)', fontSize: '0.95rem' }}>Appuyez sur le bouton Partager</span>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    C'est l'icône de partage 
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '16px', height: '16px', display: 'inline', color: 'var(--brand-orange)' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15M9 12l3 3m0 0l3-3m-3 3V2.25" />
+                    </svg>
+                     dans la barre du navigateur.
+                  </p>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.15rem', background: 'var(--warning-bg)', color: 'var(--brand-orange)', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', flexShrink: 0 }}>3</span>
+                <div>
+                  <span style={{ fontWeight: '700', color: 'var(--brand-navy)', fontSize: '0.95rem' }}>Sélectionnez "Sur l'écran d'accueil"</span>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Faites défiler le menu vers le bas et appuyez sur l'option ➕.</p>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              className="btn-accent" 
+              onClick={() => setShowiOSInstallModal(false)}
+              style={{ width: '100%', marginTop: '1.5rem' }}
+            >
+              Compris !
+            </button>
           </div>
         </div>
       )}

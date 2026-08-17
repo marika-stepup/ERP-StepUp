@@ -60,9 +60,6 @@ export default function LoginPage() {
         <h1>Step Hub</h1>
         <p>Portail interne de l'agence. Connectez-vous pour accéder à votre espace de travail.</p>
 
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">Connexion réussie ! Redirection...</div>}
-
         <form onSubmit={handleLogin} style={{ border: 'none', background: 'none', padding: 0 }}>
           <div className="form-group" style={{ marginBottom: '1.25rem' }}>
             <label htmlFor="email" style={{ textAlign: 'left', marginBottom: '0.4rem' }}>Adresse Email</label>
@@ -110,6 +107,9 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+
+          {error && <div className="error-message" style={{ marginBottom: '1.25rem' }}>{error}</div>}
+          {success && <div className="success-message" style={{ marginBottom: '1.25rem' }}>Connexion réussie ! Redirection...</div>}
 
           <button type="submit" style={{ width: '100%' }} disabled={loading || success}>
             {loading ? 'Connexion en cours...' : 'Se connecter'}

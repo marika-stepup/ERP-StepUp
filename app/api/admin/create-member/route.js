@@ -11,7 +11,7 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { email, name, firstName, role, manager_name, initial_balance, initial_perm, password, service, hire_date } = body;
+    const { email, name, firstName, role, manager_name, initial_balance, initial_perm, password, service, hire_date, work_schedule } = body;
 
     // Validation
     if (!email || !name || !firstName || !password) {
@@ -100,7 +100,8 @@ export async function POST(req) {
         service: service || 'Non spécifié',
         hire_date: hire_date || null,
         last_anniversary_credited: null,
-        last_monthly_credit: currentMonthStr
+        last_monthly_credit: currentMonthStr,
+        work_schedule: work_schedule || null
       });
 
     if (insertErr) {

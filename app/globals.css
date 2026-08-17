@@ -1299,3 +1299,139 @@ body.dark .gantt-cell.holiday {
 .drag-handle-btn:active {
   cursor: grabbing;
 }
+
+/* ==================================================== */
+/* BURGER MENU & RESPONSIVE MOBILE STYLES               */
+/* ==================================================== */
+
+/* Burger Menu hover animations */
+.menu-item-hover {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.menu-item-hover:hover {
+  background-color: var(--background-light) !important;
+}
+
+.menu-item-hover-danger {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.menu-item-hover-danger:hover {
+  background-color: var(--error-bg) !important;
+  color: var(--error-color) !important;
+}
+
+/* fadeIn Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsiveness enhancements for smartphones */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0.5rem 1rem !important;
+  }
+  
+  .logo-text {
+    font-size: 1.15rem !important;
+  }
+  
+  .logo-img {
+    height: 38px !important;
+  }
+
+  .session-badge {
+    padding: 0.35rem 0.65rem !important;
+    font-size: 0.8rem !important;
+    gap: 0.4rem !important;
+  }
+  
+  .session-badge strong {
+    max-width: 75px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+  }
+
+  .nav-tabs {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+    gap: 0.25rem !important;
+  }
+  
+  .nav-tabs::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+
+  .tab-button {
+    padding: 0.6rem 1rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  .panel {
+    padding: 1.25rem !important;
+    border-radius: 12px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .btn-accent, button {
+    width: 100%;
+  }
+
+  /* Exclude inline table buttons and burger buttons from full width */
+  td button,
+  .action-buttons-cell button,
+  .burger-btn,
+  .burger-dropdown button,
+  .drag-handle-btn {
+    width: auto;
+  }
+}
+
+/* ==================================================== */
+/* DARK MODE OVERRIDES FOR TABLES & LOGO                 */
+/* ==================================================== */
+body.dark .table-container {
+  background-color: var(--panel-white) !important;
+  border-color: var(--border-light) !important;
+}
+
+body.dark table {
+  background-color: var(--panel-white) !important;
+}
+
+body.dark th {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: var(--text-secondary) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+
+body.dark td {
+  border-bottom: 1px solid var(--border-light) !important;
+  color: var(--text-primary) !important;
+}
+
+body.dark tr:hover td {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+body.dark .logo-img,
+body.dark .login-logo-img {
+  filter: brightness(0) invert(1) !important;
+  opacity: 0.95;
+}

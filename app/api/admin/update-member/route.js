@@ -11,7 +11,7 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { employee_id, name, firstName, email, role, manager_name, initial_balance, initial_perm, service, hire_date } = body;
+    const { employee_id, name, firstName, email, role, manager_name, initial_balance, initial_perm, service, hire_date, work_schedule } = body;
 
     // Validation
     if (!employee_id || !name || !firstName || !email) {
@@ -91,7 +91,8 @@ export async function POST(req) {
         initial_perm: initialPermissions,
         remaining_perm: newRemainingPerm,
         hire_date: hire_date || null,
-        last_anniversary_credited: lastAnniversary
+        last_anniversary_credited: lastAnniversary,
+        work_schedule: work_schedule || null
       })
       .eq('employee_id', employee_id);
 

@@ -54,7 +54,8 @@ export async function GET(req) {
       initial_perm: Number(balance.initial_perm || 0),
       taken_perm: Number(balance.taken_perm || 0),
       remaining_perm: Number(balance.remaining_perm || 0),
-      hire_date: balance.hire_date || ''
+      hire_date: balance.hire_date || '',
+      service: balance.service || 'Non spécifié'
     });
 
   } catch (error) {
