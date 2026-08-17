@@ -4,23 +4,23 @@ import { useEffect, useState, useRef } from 'react';
 import { supabaseClient } from '../lib/supabaseClient';
 import { splitFullName, isMadagascarHoliday, calculateBusinessDays } from '../lib/utils';
 import { SyncQueueManager } from '../lib/syncQueue';
-import { 
-  Clock, 
-  Download, 
-  Sun, 
-  Moon, 
-  LogOut, 
-  ClipboardList, 
-  PlusCircle, 
-  History, 
-  AlertTriangle, 
-  Search, 
-  UserPlus, 
-  XCircle, 
-  Timer, 
-  LogIn, 
-  Edit, 
-  ShieldAlert, 
+import {
+  Clock,
+  Download,
+  Sun,
+  Moon,
+  LogOut,
+  ClipboardList,
+  PlusCircle,
+  History,
+  AlertTriangle,
+  Search,
+  UserPlus,
+  XCircle,
+  Timer,
+  LogIn,
+  Edit,
+  ShieldAlert,
   Smartphone,
   ChevronDown
 } from 'lucide-react';
@@ -192,10 +192,10 @@ export default function Page() {
   const [clockingEmployeeId, setClockingEmployeeId] = useState(null);
 
   // Pagination / Limit States
-  const [globalDashboardLimit, setGlobalDashboardLimit] = useState(10);
-  const [adminRHLimit, setAdminRHLimit] = useState(10);
-  const [pointageExpectedLimit, setPointageExpectedLimit] = useState(10);
-  const [pointagePresentLimit, setPointagePresentLimit] = useState(10);
+  const [globalDashboardLimit, setGlobalDashboardLimit] = useState(5);
+  const [adminRHLimit, setAdminRHLimit] = useState(5);
+  const [pointageExpectedLimit, setPointageExpectedLimit] = useState(5);
+  const [pointagePresentLimit, setPointagePresentLimit] = useState(5);
 
   const [memberError, setMemberError] = useState(null);
   const [memberSuccess, setMemberSuccess] = useState(false);
@@ -1098,10 +1098,10 @@ export default function Page() {
   // 7.5 Time logs & Pointage Handlers
   const fetchPointageData = async (forceSpinner = false) => {
     if (!token) return;
-    
+
     const hasData = pointageEmployees && pointageEmployees.length > 0;
     const dateChanged = lastLoadedDateRef.current !== pointageDate;
-    
+
     // Only display spinner if we don't have local data yet or if date changed
     if (forceSpinner || !hasData || dateChanged) {
       setPointageLoading(true);
@@ -1495,11 +1495,11 @@ export default function Page() {
 
             {menuOpen && (
               <>
-                <div 
-                  onClick={() => setMenuOpen(false)} 
+                <div
+                  onClick={() => setMenuOpen(false)}
                   style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 90 }}
                 />
-                <div 
+                <div
                   className="burger-dropdown"
                   style={{
                     position: 'absolute',
@@ -2229,7 +2229,7 @@ export default function Page() {
                         <button
                           type="button"
                           className="btn-accent"
-                          onClick={() => setGlobalDashboardLimit(prev => prev + 10)}
+                          onClick={() => setGlobalDashboardLimit(prev => prev + 5)}
                           style={{
                             background: 'none',
                             border: '1px solid var(--brand-orange)',
@@ -2804,7 +2804,7 @@ export default function Page() {
                           <button
                             type="button"
                             className="btn-accent"
-                            onClick={() => setAdminRHLimit(prev => prev + 10)}
+                            onClick={() => setAdminRHLimit(prev => prev + 5)}
                             style={{
                               background: 'none',
                               border: '1px solid var(--brand-orange)',
@@ -2994,7 +2994,7 @@ export default function Page() {
                 {/* Expected card */}
                 <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Présence Aujourd'hui</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Présence aujourd'hui</span>
                     <UserPlus size={18} style={{ color: 'var(--brand-orange)' }} />
                   </div>
                   <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
@@ -3094,7 +3094,7 @@ export default function Page() {
                           return (
                             <div key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-white)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border-light)' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{emp.employee_first_name} {emp.employee_name}</span>
+                                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{emp.employee_first_name}</span>
                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Service : {emp.service}</span>
                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
                                   <Timer size={12} /> Horaire : {daySchedule.arrival} - {daySchedule.departure}
@@ -3134,7 +3134,7 @@ export default function Page() {
                           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', width: '100%' }}>
                             <button
                               type="button"
-                              onClick={() => setPointageExpectedLimit(prev => prev + 10)}
+                              onClick={() => setPointageExpectedLimit(prev => prev + 5)}
                               style={{
                                 background: 'none',
                                 border: '1px solid var(--brand-orange)',
@@ -3196,7 +3196,7 @@ export default function Page() {
                         {filtered.slice(0, pointagePresentLimit).map(emp => (
                           <div key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-white)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border-light)' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                              <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{emp.employee_first_name} {emp.employee_name}</span>
+                              <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{emp.employee_first_name}</span>
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Service : {emp.service}</span>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
@@ -3236,7 +3236,7 @@ export default function Page() {
                           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', width: '100%' }}>
                             <button
                               type="button"
-                              onClick={() => setPointagePresentLimit(prev => prev + 10)}
+                              onClick={() => setPointagePresentLimit(prev => prev + 5)}
                               style={{
                                 background: 'none',
                                 border: '1px solid var(--brand-orange)',
@@ -3693,7 +3693,7 @@ export default function Page() {
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: '0.5rem 0 1.5rem 0' }}>
               Suivez ces étapes simples pour ajouter l'application sur votre écran d'accueil iPhone ou iPad :
             </p>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left', margin: '1rem 0' }}>
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 <span style={{ fontSize: '1.15rem', background: 'var(--warning-bg)', color: 'var(--brand-orange)', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', flexShrink: 0 }}>1</span>
@@ -3702,21 +3702,21 @@ export default function Page() {
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Cette fonctionnalité est supportée uniquement sur Safari.</p>
                 </div>
               </div>
-              
+
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 <span style={{ fontSize: '1.15rem', background: 'var(--warning-bg)', color: 'var(--brand-orange)', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', flexShrink: 0 }}>2</span>
                 <div>
                   <span style={{ fontWeight: '700', color: 'var(--brand-navy)', fontSize: '0.95rem' }}>Appuyez sur le bouton Partager</span>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    C'est l'icône de partage 
+                    C'est l'icône de partage
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: '16px', height: '16px', display: 'inline', color: 'var(--brand-orange)' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15M9 12l3 3m0 0l3-3m-3 3V2.25" />
                     </svg>
-                     dans la barre du navigateur.
+                    dans la barre du navigateur.
                   </p>
                 </div>
               </div>
-              
+
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 <span style={{ fontSize: '1.15rem', background: 'var(--warning-bg)', color: 'var(--brand-orange)', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', flexShrink: 0 }}>3</span>
                 <div>
@@ -3726,8 +3726,8 @@ export default function Page() {
               </div>
             </div>
 
-            <button 
-              className="btn-accent" 
+            <button
+              className="btn-accent"
               onClick={() => setShowiOSInstallModal(false)}
               style={{ width: '100%', marginTop: '1.5rem' }}
             >
