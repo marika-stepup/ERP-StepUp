@@ -49,15 +49,14 @@ export async function POST(req) {
       );
     }
 
-    // 3. Register user in Supabase Auth
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    // 3. Register user in Supabase Auth using Admin API (preserves service_role headers)
+    const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
       email: normalizedEmail,
-      password,
-      options: {
-        data: {
-          full_name: `${firstName} ${name}`,
-          role: role || 'employee'
-        }
+      password: password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: `${firstName} ${name}`,
+        role: role || 'employee'
       }
     });
 
