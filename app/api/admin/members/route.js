@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex, autoCreditContractAnniversaries } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, parseDateFromFrench } from '../../../../lib/sheetsColumns';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { splitFullName } from '../../../../lib/utils';
 
 export async function GET(req) {
@@ -12,25 +10,28 @@ export async function GET(req) {
   }
 
   try {
-    // Run automatic anniversary crediting with mutex to avoid race conditions
-    await runWithMutex(async () => {
-      await autoCreditContractAnniversaries();
+    const supabase = getSupabaseAdmin();
+
+    // 2. Fetch the leave balances from Supabase
+    const { data: balances, error: dbError } = await supabase
+      .from('leave_balances')
+      .select('*')
+      .order('employee_name', { ascending: true });
+
+    if (dbError) {
+      throw dbError;
+    }
+
+    // Filter out potential config rows (usually not present in Supabase)
+    const employeeBalances = (balances || []).filter(member => {
+      const id = member.employee_id;
+      return id && !id.startsWith('SYSTEM_');
     });
 
-    // 2. Fetch the Leave_Balances sheet
-    const balancesSheet = await getSheet(SheetTabs.balances);
-    const rows = await balancesSheet.getRows();
-
-    // Filter out system configuration rows
-    const employeeRows = rows.filter(row => {
-      const empId = row.get(LeaveBalancesColumns.employee_id);
-      return empId && !empId.startsWith('SYSTEM_');
-    });
-
-    // 3. Map sheet rows to JSON response
-    const members = employeeRows.map((row) => {
-      let name = row.get(LeaveBalancesColumns.employee_name) || '';
-      let firstName = row.get(LeaveBalancesColumns.employee_first_name) || '';
+    // 3. Map to JSON response
+    const members = employeeBalances.map((row) => {
+      let name = row.employee_name || '';
+      let firstName = row.employee_first_name || '';
 
       if (!firstName && name) {
         const split = splitFullName(name);
@@ -39,28 +40,20 @@ export async function GET(req) {
       }
 
       return {
-        employee_id: row.get(LeaveBalancesColumns.employee_id),
+        employee_id: row.employee_id,
         employee_name: name,
         employee_first_name: firstName,
-        employee_email: row.get(LeaveBalancesColumns.employee_email),
-        role: row.get(LeaveBalancesColumns.role) || (
-          row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('hr@') ? 'hr' :
-          row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('manager@') ? 'manager' :
-          row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('director@') ? 'director' :
-          row.get(LeaveBalancesColumns.employee_email)?.toLowerCase().includes('directeur@') ? 'director' : 'employee'
-        ),
-        initial_balance: parseSheetFloat(row.get(LeaveBalancesColumns.initial_balance)),
-        taken_days: parseSheetFloat(row.get(LeaveBalancesColumns.taken_days)),
-        remaining_balance: parseSheetFloat(row.get(LeaveBalancesColumns.remaining_balance)),
-        // Permissions support
-        initial_perm: parseSheetFloat(row.get(LeaveBalancesColumns.initial_perm)),
-        taken_perm: parseSheetFloat(row.get(LeaveBalancesColumns.taken_perm)),
-        remaining_perm: parseSheetFloat(row.get(LeaveBalancesColumns.remaining_perm)),
-        // Hierarchy manager
-        manager_name: row.get(LeaveBalancesColumns.manager_name) || 'Aucun',
-        service: row.get(LeaveBalancesColumns.service) || 'Non spécifié',
-        // Hire date
-        hire_date: parseDateFromFrench(row.get(LeaveBalancesColumns.hire_date)) || ''
+        employee_email: row.employee_email,
+        role: row.role || 'employee',
+        initial_balance: Number(row.initial_balance || 0),
+        taken_days: Number(row.taken_days || 0),
+        remaining_balance: Number(row.remaining_balance || 0),
+        initial_perm: Number(row.initial_perm || 0),
+        taken_perm: Number(row.taken_perm || 0),
+        remaining_perm: Number(row.remaining_perm || 0),
+        manager_name: row.manager_name || 'Aucun',
+        service: row.service || 'Non spécifié',
+        hire_date: row.hire_date || ''
       };
     });
 
@@ -71,7 +64,7 @@ export async function GET(req) {
     });
 
   } catch (error) {
-    console.error('Error fetching members list:', error);
+    console.error('Error fetching members list from Supabase:', error);
     return NextResponse.json(
       { error: 'Erreur interne du serveur lors de la récupération de la liste des membres.' },
       { status: 500 }

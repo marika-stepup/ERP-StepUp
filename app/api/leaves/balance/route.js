@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex, autoCreditContractAnniversaries } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, parseDateFromFrench } from '../../../../lib/sheetsColumns';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { splitFullName } from '../../../../lib/utils';
 
 export async function GET(req) {
@@ -13,23 +11,22 @@ export async function GET(req) {
   const user = auth.user;
 
   try {
-    // Run automatic anniversary crediting with mutex to avoid race conditions
-    await runWithMutex(async () => {
-      await autoCreditContractAnniversaries();
-    });
+    const supabase = getSupabaseAdmin();
 
-    // 2. Fetch the Leave_Balances sheet
-    const balancesSheet = await getSheet(SheetTabs.balances);
-    const rows = await balancesSheet.getRows();
+    // 2. Fetch the leave balance from Supabase
+    const { data: balance, error: dbError } = await supabase
+      .from('leave_balances')
+      .select('*')
+      .eq('employee_id', user.id)
+      .maybeSingle();
 
-    // 3. Find the row for the logged-in user
-    const balanceRow = rows.find(
-      (row) => row.get(LeaveBalancesColumns.employee_id) === user.id || 
-               row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === user.email.toLowerCase()
-    );
+    if (dbError) {
+      throw dbError;
+    }
 
-    if (!balanceRow) {
-      const splitUser = splitFullName(user.user_metadata?.full_name || 'Utilisateur');
+    // 3. Fallback if not initialized in database
+    if (!balance) {
+      const splitUser = splitFullName(user.name || 'Utilisateur');
       return NextResponse.json({
         employee_id: user.id,
         employee_name: splitUser.lastName || 'Utilisateur',
@@ -42,35 +39,26 @@ export async function GET(req) {
         taken_perm: 0.0,
         remaining_perm: 5.0,
         hire_date: '',
-        warning: 'Ligne de solde initial non encore initialisée dans Google Sheets.'
+        warning: 'Ligne de solde initial non encore initialisée dans la base de données Supabase.'
       });
     }
 
-    let name = balanceRow.get(LeaveBalancesColumns.employee_name) || '';
-    let firstName = balanceRow.get(LeaveBalancesColumns.employee_first_name) || '';
-
-    if (!firstName && name) {
-      const split = splitFullName(name);
-      firstName = split.firstName;
-      name = split.lastName || name;
-    }
-
     return NextResponse.json({
-      employee_id: balanceRow.get(LeaveBalancesColumns.employee_id),
-      employee_name: name,
-      employee_first_name: firstName,
-      employee_email: balanceRow.get(LeaveBalancesColumns.employee_email),
-      initial_balance: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.initial_balance)),
-      taken_days: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_days)),
-      remaining_balance: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.remaining_balance)),
-      initial_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.initial_perm)),
-      taken_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_perm)),
-      remaining_perm: parseSheetFloat(balanceRow.get(LeaveBalancesColumns.remaining_perm)),
-      hire_date: parseDateFromFrench(balanceRow.get(LeaveBalancesColumns.hire_date)) || ''
+      employee_id: balance.employee_id,
+      employee_name: balance.employee_name,
+      employee_first_name: balance.employee_first_name,
+      employee_email: balance.employee_email,
+      initial_balance: Number(balance.initial_balance || 0),
+      taken_days: Number(balance.taken_days || 0),
+      remaining_balance: Number(balance.remaining_balance || 0),
+      initial_perm: Number(balance.initial_perm || 0),
+      taken_perm: Number(balance.taken_perm || 0),
+      remaining_perm: Number(balance.remaining_perm || 0),
+      hire_date: balance.hire_date || ''
     });
 
   } catch (error) {
-    console.error('Error fetching balance:', error);
+    console.error('Error fetching balance from Supabase:', error);
     return NextResponse.json(
       { error: 'Erreur interne du serveur lors de la récupération du solde.' },
       { status: 500 }

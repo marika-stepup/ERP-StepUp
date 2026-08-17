@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { verifyRole, getSupabaseClient } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs, formatSheetFloat, formatDateToFrench } from '../../../../lib/sheetsColumns';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
+import { syncEmployeeBalance } from '../../../../lib/sheetsSync';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr', 'manager' or 'director'
@@ -29,10 +28,30 @@ export async function POST(req) {
       );
     }
 
-    // Register user in Supabase Auth first
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 2. Check if email already exists in leave_balances
+    const { data: existingMember, error: checkErr } = await supabase
+      .from('leave_balances')
+      .select('employee_id')
+      .eq('employee_email', normalizedEmail)
+      .maybeSingle();
+
+    if (checkErr) {
+      throw checkErr;
+    }
+
+    if (existingMember) {
+      return NextResponse.json(
+        { error: `Un membre avec l'e-mail "${email}" existe déjà dans le système.` },
+        { status: 400 }
+      );
+    }
+
+    // 3. Register user in Supabase Auth
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: {
@@ -45,7 +64,7 @@ export async function POST(req) {
     if (signUpError) {
       console.error('Supabase signup error:', signUpError);
       return NextResponse.json(
-        { error: `Erreur d'enregistrement dans Supabase : ${signUpError.message}` },
+        { error: `Erreur d'enregistrement dans Supabase Auth : ${signUpError.message}` },
         { status: 400 }
       );
     }
@@ -60,70 +79,58 @@ export async function POST(req) {
 
     const initialCP = parseFloat(initial_balance || 0);
     const initialPermissions = parseFloat(initial_perm || 0);
+    const today = new Date();
+    const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-    // Use mutex to prevent duplicates during creation
-    const result = await runWithMutex(async () => {
-      const balancesSheet = await getSheet(SheetTabs.balances);
-      const rows = await balancesSheet.getRows();
-
-      // Check if email already exists
-      const exists = rows.some(
-        (row) => row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === email.toLowerCase()
-      );
-
-      if (exists) {
-        return {
-          error: `Un membre avec l'e-mail "${email}" existe déjà dans le système.`,
-          status: 400
-        };
-      }
-
-      const today = new Date();
-      const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-
-      await balancesSheet.addRow({
-        [LeaveBalancesColumns.employee_id]: employeeId,
-        [LeaveBalancesColumns.employee_name]: name,
-        [LeaveBalancesColumns.employee_first_name]: firstName,
-        [LeaveBalancesColumns.employee_email]: email.toLowerCase(),
-        [LeaveBalancesColumns.role]: role || 'employee',
-        [LeaveBalancesColumns.initial_balance]: formatSheetFloat(initialCP),
-        [LeaveBalancesColumns.taken_days]: formatSheetFloat(0),
-        [LeaveBalancesColumns.remaining_balance]: formatSheetFloat(initialCP),
-        [LeaveBalancesColumns.initial_perm]: formatSheetFloat(initialPermissions),
-        [LeaveBalancesColumns.taken_perm]: formatSheetFloat(0),
-        [LeaveBalancesColumns.remaining_perm]: formatSheetFloat(initialPermissions),
-        [LeaveBalancesColumns.manager_name]: manager_name || 'Aucun',
-        [LeaveBalancesColumns.service]: service || 'Non spécifié',
-        [LeaveBalancesColumns.hire_date]: hire_date ? formatDateToFrench(hire_date) : '',
-        [LeaveBalancesColumns.last_anniversary_credited]: '',
-        [LeaveBalancesColumns.last_monthly_credit]: currentMonthStr
+    // 4. Create row in leave_balances table in Supabase
+    const { error: insertErr } = await supabase
+      .from('leave_balances')
+      .insert({
+        employee_id: employeeId,
+        employee_name: name,
+        employee_first_name: firstName,
+        employee_email: normalizedEmail,
+        role: role || 'employee',
+        initial_balance: initialCP,
+        taken_days: 0,
+        remaining_balance: initialCP,
+        initial_perm: initialPermissions,
+        taken_perm: 0,
+        remaining_perm: initialPermissions,
+        manager_name: manager_name || 'Aucun',
+        service: service || 'Non spécifié',
+        hire_date: hire_date || null,
+        last_anniversary_credited: null,
+        last_monthly_credit: currentMonthStr
       });
 
-      return {
-        success: true,
-        data: {
-          employee_id: employeeId,
-          employee_name: name,
-          employee_first_name: firstName,
-          employee_email: email,
-          role: role || 'employee',
-          manager_name: manager_name || 'Aucun',
-          initial_balance: initialCP,
-          initial_perm: initialPermissions,
-          service: service || 'Non spécifié',
-          hire_date: hire_date || ''
-        }
-      };
-    });
+    if (insertErr) {
+      // Clean up Auth user if DB insert fails
+      await supabase.auth.admin.deleteUser(employeeId);
+      throw insertErr;
+    }
 
-    if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    // 5. Sync to Google Sheets (awaited for reliability)
+    try {
+      await syncEmployeeBalance(employeeId);
+    } catch (syncErr) {
+      console.error('[CreateMember] Sync to Google Sheets failed:', syncErr);
     }
 
     return NextResponse.json({
       message: 'Nouveau membre créé avec succès.',
-      member: result.data
+      member: {
+        employee_id: employeeId,
+        employee_name: name,
+        employee_first_name: firstName,
+        employee_email: normalizedEmail,
+        role: role || 'employee',
+        manager_name: manager_name || 'Aucun',
+        initial_balance: initialCP,
+        initial_perm: initialPermissions,
+        service: service || 'Non spécifié',
+        hire_date: hire_date || ''
+      }
     });
 
   } catch (error) {

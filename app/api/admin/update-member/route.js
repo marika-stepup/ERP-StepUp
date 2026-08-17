@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, formatSheetFloat, formatDateToFrench } from '../../../../lib/sheetsColumns';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
+import { syncEmployeeBalance } from '../../../../lib/sheetsSync';
 
 export async function POST(req) {
   // 1. Authenticate user as 'hr', 'manager' or 'director'
@@ -22,91 +21,119 @@ export async function POST(req) {
       );
     }
 
+    const supabase = getSupabaseAdmin();
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 2. Fetch current member details
+    const { data: member, error: fetchErr } = await supabase
+      .from('leave_balances')
+      .select('*')
+      .eq('employee_id', employee_id)
+      .maybeSingle();
+
+    if (fetchErr) {
+      throw fetchErr;
+    }
+
+    if (!member) {
+      return NextResponse.json(
+        { error: `Membre avec l'identifiant "${employee_id}" introuvable.` },
+        { status: 404 }
+      );
+    }
+
+    // 3. Check if email conflicts with another user
+    const { data: emailConflict, error: conflictErr } = await supabase
+      .from('leave_balances')
+      .select('employee_id')
+      .eq('employee_email', normalizedEmail)
+      .neq('employee_id', employee_id)
+      .maybeSingle();
+
+    if (conflictErr) {
+      throw conflictErr;
+    }
+
+    if (emailConflict) {
+      return NextResponse.json(
+        { error: `Un autre membre avec l'e-mail "${email}" existe déjà.` },
+        { status: 400 }
+      );
+    }
+
     const initialCP = parseFloat(initial_balance || 0);
     const initialPermissions = parseFloat(initial_perm || 0);
 
-    // Use mutex to prevent race conditions during updates
-    const result = await runWithMutex(async () => {
-      const balancesSheet = await getSheet(SheetTabs.balances);
-      const rows = await balancesSheet.getRows();
+    const currentTakenCP = Number(member.taken_days || 0);
+    const currentTakenPerm = Number(member.taken_perm || 0);
 
-      const balanceRow = rows.find(
-        (row) => row.get(LeaveBalancesColumns.employee_id) === employee_id
-      );
+    const newRemainingCP = initialCP - currentTakenCP;
+    const newRemainingPerm = initialPermissions - currentTakenPerm;
 
-      if (!balanceRow) {
-        return {
-          error: `Membre avec l'identifiant "${employee_id}" introuvable.`,
-          status: 404
-        };
+    // 4. Check if hire date changes to reset anniversary credited date
+    let lastAnniversary = member.last_anniversary_credited;
+    if (member.hire_date !== (hire_date || null)) {
+      lastAnniversary = null;
+    }
+
+    // 5. Update member values in Supabase
+    const { error: updateErr } = await supabase
+      .from('leave_balances')
+      .update({
+        employee_name: name,
+        employee_first_name: firstName,
+        employee_email: normalizedEmail,
+        role: role || 'employee',
+        manager_name: manager_name || 'Aucun',
+        service: service || 'Non spécifié',
+        initial_balance: initialCP,
+        remaining_balance: newRemainingCP,
+        initial_perm: initialPermissions,
+        remaining_perm: newRemainingPerm,
+        hire_date: hire_date || null,
+        last_anniversary_credited: lastAnniversary
+      })
+      .eq('employee_id', employee_id);
+
+    if (updateErr) {
+      throw updateErr;
+    }
+
+    // Update role in Supabase Auth user metadata as well
+    const { error: authUpdateErr } = await supabase.auth.admin.updateUserById(employee_id, {
+      user_metadata: {
+        full_name: `${firstName} ${name}`,
+        role: role || 'employee'
       }
-
-      // Check if the updated email conflicts with another user
-      const emailConflict = rows.some(
-        (row) => row.get(LeaveBalancesColumns.employee_id) !== employee_id && 
-                 row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === email.toLowerCase()
-      );
-
-      if (emailConflict) {
-        return {
-          error: `Un autre membre avec l'e-mail "${email}" existe déjà.`,
-          status: 400
-        };
-      }
-
-      const currentTakenCP = parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_days));
-      const currentTakenPerm = parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_perm));
-
-      const newRemainingCP = initialCP - currentTakenCP;
-      const newRemainingPerm = initialPermissions - currentTakenPerm;
-
-      // Update values using translated columns
-      balanceRow.set(LeaveBalancesColumns.employee_name, name);
-      balanceRow.set(LeaveBalancesColumns.employee_first_name, firstName);
-      balanceRow.set(LeaveBalancesColumns.employee_email, email.toLowerCase());
-      balanceRow.set(LeaveBalancesColumns.role, role || 'employee');
-      balanceRow.set(LeaveBalancesColumns.manager_name, manager_name || 'Aucun');
-      balanceRow.set(LeaveBalancesColumns.service, service || 'Non spécifié');
-      balanceRow.set(LeaveBalancesColumns.initial_balance, formatSheetFloat(initialCP));
-      balanceRow.set(LeaveBalancesColumns.remaining_balance, formatSheetFloat(newRemainingCP));
-      balanceRow.set(LeaveBalancesColumns.initial_perm, formatSheetFloat(initialPermissions));
-      balanceRow.set(LeaveBalancesColumns.remaining_perm, formatSheetFloat(newRemainingPerm));
-      const oldHireDate = balanceRow.get(LeaveBalancesColumns.hire_date) || '';
-      const newHireDateFormatted = hire_date ? formatDateToFrench(hire_date) : '';
-      if (oldHireDate !== newHireDateFormatted) {
-        balanceRow.set(LeaveBalancesColumns.last_anniversary_credited, '');
-      }
-
-      balanceRow.set(LeaveBalancesColumns.hire_date, newHireDateFormatted);
-
-      await balanceRow.save();
-
-      return {
-        success: true,
-        data: {
-          employee_id,
-          employee_name: name,
-          employee_first_name: firstName,
-          employee_email: email.toLowerCase(),
-          role: role || 'employee',
-          manager_name: manager_name || 'Aucun',
-          initial_balance: initialCP,
-          remaining_balance: newRemainingCP,
-          initial_perm: initialPermissions,
-          remaining_perm: newRemainingPerm,
-          service: service || 'Non spécifié',
-          hire_date: hire_date || ''
-        }
-      };
     });
 
-    if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    if (authUpdateErr) {
+      console.warn('[UpdateMember] Failed to update Supabase Auth metadata:', authUpdateErr.message);
+    }
+
+    // 6. Sync changes to Google Sheets (awaited for reliability)
+    try {
+      await syncEmployeeBalance(employee_id);
+    } catch (syncErr) {
+      console.error('[UpdateMember] Sync to Google Sheets failed:', syncErr);
     }
 
     return NextResponse.json({
       message: 'Membre mis à jour avec succès.',
-      member: result.data
+      member: {
+        employee_id,
+        employee_name: name,
+        employee_first_name: firstName,
+        employee_email: normalizedEmail,
+        role: role || 'employee',
+        manager_name: manager_name || 'Aucun',
+        initial_balance: initialCP,
+        remaining_balance: newRemainingCP,
+        initial_perm: initialPermissions,
+        remaining_perm: newRemainingPerm,
+        service: service || 'Non spécifié',
+        hire_date: hire_date || ''
+      }
     });
 
   } catch (error) {

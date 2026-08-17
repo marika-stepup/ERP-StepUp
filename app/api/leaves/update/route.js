@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { calculateBusinessDays } from '../../../../lib/utils';
-import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs, parseSheetFloat, formatSheetFloat, formatDateToFrench, parseDateFromFrench } from '../../../../lib/sheetsColumns';
+import { syncLeaveRequest, syncEmployeeBalance } from '../../../../lib/sheetsSync';
 
 export async function POST(req) {
   const auth = await verifyRole(req, ['employee', 'hr']);
@@ -30,137 +29,188 @@ export async function POST(req) {
       return NextResponse.json({ error: 'La période ne contient aucun jour ouvré.' }, { status: 400 });
     }
 
-    const result = await runWithMutex(async () => {
-      // 1. Get request
-      const requestsSheet = await getSheet(SheetTabs.requests);
-      const requestRows = await requestsSheet.getRows();
-      const targetRow = requestRows.find(row => row.get(LeaveRequestsColumns.request_id) === request_id);
+    const supabase = getSupabaseAdmin();
 
-      if (!targetRow) {
-        return { error: 'Demande introuvable.', status: 404 };
+    // 1. Fetch request from Supabase
+    const { data: targetRequest, error: reqErr } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('request_id', request_id)
+      .maybeSingle();
+
+    if (reqErr) {
+      throw reqErr;
+    }
+
+    if (!targetRequest) {
+      return NextResponse.json({ error: 'Demande introuvable.' }, { status: 404 });
+    }
+
+    // Check ownership & admin permission
+    const isOwner = targetRequest.employee_id === employee.id;
+    const isAdmin = employee.role === 'hr';
+
+    if (!isOwner && !isAdmin) {
+      return NextResponse.json({ error: 'Non autorisé à modifier cette demande.' }, { status: 403 });
+    }
+
+    // Check status permission
+    const requestStatus = targetRequest.status;
+    if (requestStatus !== 'En attente' && !isAdmin) {
+      return NextResponse.json({ error: 'Seules les demandes en attente peuvent être modifiées.' }, { status: 400 });
+    }
+
+    const employeeId = targetRequest.employee_id;
+
+    // 2. Fetch employee balance
+    const { data: balance, error: balanceErr } = await supabase
+      .from('leave_balances')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .maybeSingle();
+
+    if (balanceErr) {
+      throw balanceErr;
+    }
+
+    if (!balance) {
+      return NextResponse.json({ error: 'Aucun solde de congés trouvé pour cet employé.' }, { status: 404 });
+    }
+
+    const oldLeaveType = targetRequest.leave_type || '';
+    const oldBusinessDays = Number(targetRequest.business_days || 0);
+
+    let tempCPInitial = Number(balance.initial_balance || 0);
+    let tempCPTaken = Number(balance.taken_days || 0);
+    let tempCPRemaining = Number(balance.remaining_balance || 0);
+    let tempPermInitial = Number(balance.initial_perm || 0);
+    let tempPermTaken = Number(balance.taken_perm || 0);
+    let tempPermRemaining = Number(balance.remaining_perm || 0);
+
+    // If request was approved, revert old days locally in memory to calculate new balances correctly
+    if (requestStatus === 'Approuvé') {
+      const oldIsNoDeduct = oldLeaveType.toLowerCase().includes('sans solde') || 
+                            oldLeaveType.toLowerCase().includes('rattraper') || 
+                            oldLeaveType.toLowerCase().includes('maladie');
+      if (!oldIsNoDeduct) {
+        const oldIsPermission = oldLeaveType.toLowerCase().includes('perm');
+        if (oldIsPermission) {
+          tempPermTaken -= oldBusinessDays;
+          tempPermRemaining = tempPermInitial - tempPermTaken;
+        } else {
+          tempCPTaken -= oldBusinessDays;
+          tempCPRemaining = tempCPInitial - tempCPTaken;
+        }
       }
+    }
 
-      // Check ownership & admin permission
-      const isOwner = targetRow.get(LeaveRequestsColumns.employee_id) === employee.id;
-      const isAdmin = employee.role === 'hr';
+    // Evaluate balance for the new request
+    const isNoDeduct = leave_type.toLowerCase().includes('sans solde') || 
+                       leave_type.toLowerCase().includes('rattraper') || 
+                       leave_type.toLowerCase().includes('maladie');
 
-      if (!isOwner && !isAdmin) {
-        return { error: 'Non autorisé à modifier cette demande.', status: 403 };
+    let balanceUpdated = false;
+
+    if (!isNoDeduct) {
+      const isPermission = leave_type.toLowerCase().includes('perm');
+      const remainingVal = isPermission ? tempPermRemaining : tempCPRemaining;
+
+      if (remainingVal < businessDays) {
+        return NextResponse.json(
+          { error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingVal} j.` },
+          { status: 400 }
+        );
       }
-
-      // Check status permission
-      const requestStatus = targetRow.get(LeaveRequestsColumns.status);
-      if (requestStatus !== 'En attente' && !isAdmin) {
-        return { error: 'Seules les demandes en attente peuvent être modifiées.', status: 400 };
-      }
-
-      // 2. Get balance & adjust if request was approved
-      const employeeId = targetRow.get(LeaveRequestsColumns.employee_id);
-      const balancesSheet = await getSheet(SheetTabs.balances);
-      const balanceRows = await balancesSheet.getRows();
-      const employeeBalanceRow = balanceRows.find(
-        (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
-      );
-
-      if (!employeeBalanceRow) {
-        return { error: 'Aucun solde de congés trouvé pour cet employé.', status: 404 };
-      }
-
-      const oldLeaveType = targetRow.get(LeaveRequestsColumns.leave_type) || '';
-      const oldBusinessDays = parseSheetFloat(targetRow.get(LeaveRequestsColumns.business_days));
 
       if (requestStatus === 'Approuvé') {
-        const oldIsNoDeduct = oldLeaveType.toLowerCase().includes('sans solde') || 
-                              oldLeaveType.toLowerCase().includes('rattraper') || 
-                              oldLeaveType.toLowerCase().includes('maladie');
-        if (!oldIsNoDeduct) {
-          // Revert old CP or Permission
-          const oldIsPermission = oldLeaveType.toLowerCase().includes('perm');
-          const oldInitialCol = oldIsPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
-          const oldTakenCol = oldIsPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
-          const oldRemainingCol = oldIsPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
-
-          const oldInitialVal = parseSheetFloat(employeeBalanceRow.get(oldInitialCol));
-          const oldTakenVal = parseSheetFloat(employeeBalanceRow.get(oldTakenCol));
-
-          const revertedTaken = oldTakenVal - oldBusinessDays;
-          const revertedRemaining = oldInitialVal - revertedTaken;
-
-          employeeBalanceRow.set(oldTakenCol, formatSheetFloat(revertedTaken));
-          employeeBalanceRow.set(oldRemainingCol, formatSheetFloat(revertedRemaining));
+        if (isPermission) {
+          tempPermTaken += businessDays;
+          tempPermRemaining = tempPermInitial - tempPermTaken;
+        } else {
+          tempCPTaken += businessDays;
+          tempCPRemaining = tempCPInitial - tempCPTaken;
         }
       }
+    }
 
-      // Evaluate balance for the new request
-      const isNoDeduct = leave_type.toLowerCase().includes('sans solde') || 
-                         leave_type.toLowerCase().includes('rattraper') || 
-                         leave_type.toLowerCase().includes('maladie');
+    // Apply database updates for balance if the request was approved or old request was approved
+    if (requestStatus === 'Approuvé') {
+      const { error: balanceUpdateErr } = await supabase
+        .from('leave_balances')
+        .update({
+          taken_days: tempCPTaken,
+          remaining_balance: tempCPRemaining,
+          taken_perm: tempPermTaken,
+          remaining_perm: tempPermRemaining
+        })
+        .eq('employee_id', employeeId);
 
-      if (!isNoDeduct) {
-        const isPermission = leave_type.toLowerCase().includes('perm');
-        const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
-        const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
-        const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
-
-        const initialBalanceValue = parseSheetFloat(employeeBalanceRow.get(initialCol));
-        const remainingBalance = parseSheetFloat(employeeBalanceRow.get(remainingCol));
-
-        if (remainingBalance < businessDays) {
-          return {
-            error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingBalance} j.`,
-            status: 400
-          };
-        }
-
-        if (requestStatus === 'Approuvé') {
-          // Deduct new CP or Permission
-          const currentTakenValue = parseSheetFloat(employeeBalanceRow.get(takenCol));
-          const newTaken = currentTakenValue + businessDays;
-          const newRemaining = initialBalanceValue - newTaken;
-
-          employeeBalanceRow.set(takenCol, formatSheetFloat(newTaken));
-          employeeBalanceRow.set(remainingCol, formatSheetFloat(newRemaining));
-        }
+      if (balanceUpdateErr) {
+        throw balanceUpdateErr;
       }
+      balanceUpdated = true;
+    }
 
-      // Save balance updates
-      await employeeBalanceRow.save();
+    // 3. Check overlap with other requests of the same employee
+    const { data: otherRequests, error: otherReqErr } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .neq('request_id', request_id)
+      .neq('status', 'Refusé');
 
-      // 3. Check overlap with other requests of the same employee
-      const otherRequests = requestRows.filter(
-        (row) => row.get(LeaveRequestsColumns.employee_id) === employeeId &&
-                 row.get(LeaveRequestsColumns.request_id) !== request_id &&
-                 row.get(LeaveRequestsColumns.status) !== 'Refusé'
-      );
+    if (otherReqErr) {
+      throw otherReqErr;
+    }
 
-      const hasOverlap = otherRequests.some(row => {
-        const existingStart = parseDateFromFrench(row.get(LeaveRequestsColumns.start_date));
-        const existingEnd = parseDateFromFrench(row.get(LeaveRequestsColumns.end_date));
-        return (start_date <= existingEnd) && (end_date >= existingStart);
-      });
-
-      if (hasOverlap) {
-        return {
-          error: 'Vous avez déjà une demande en attente ou approuvée sur cette période.',
-          status: 400
-        };
-      }
-
-      // 4. Update request row
-      const nowStr = new Date().toISOString();
-      targetRow.set(LeaveRequestsColumns.start_date, formatDateToFrench(start_date));
-      targetRow.set(LeaveRequestsColumns.end_date, formatDateToFrench(end_date));
-      targetRow.set(LeaveRequestsColumns.business_days, formatSheetFloat(businessDays));
-      targetRow.set(LeaveRequestsColumns.leave_type, leave_type);
-      targetRow.set(LeaveRequestsColumns.updated_at, nowStr);
-
-      await targetRow.save();
-
-      return { success: true };
+    const hasOverlap = (otherRequests || []).some(req => {
+      return (start_date <= req.end_date) && (end_date >= req.start_date);
     });
 
-    if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    if (hasOverlap) {
+      // Rollback balance update in case of overlap error
+      if (balanceUpdated) {
+        await supabase
+          .from('leave_balances')
+          .update({
+            taken_days: balance.taken_days,
+            remaining_balance: balance.remaining_balance,
+            taken_perm: balance.taken_perm,
+            remaining_perm: balance.remaining_perm
+          })
+          .eq('employee_id', employeeId);
+      }
+      return NextResponse.json(
+        { error: 'Vous avez déjà une demande en attente ou approuvée sur cette période.' },
+        { status: 400 }
+      );
+    }
+
+    // 4. Update request row
+    const nowStr = new Date().toISOString();
+    const { error: updateReqErr } = await supabase
+      .from('leave_requests')
+      .update({
+        start_date,
+        end_date,
+        business_days: businessDays,
+        leave_type,
+        updated_at: nowStr
+      })
+      .eq('request_id', request_id);
+
+    if (updateReqErr) {
+      throw updateReqErr;
+    }
+
+    // 5. Sync updates to Google Sheets (awaited for reliability)
+    try {
+      await syncLeaveRequest(request_id);
+      if (balanceUpdated) {
+        await syncEmployeeBalance(employeeId);
+      }
+    } catch (syncErr) {
+      console.error('[UpdateRoute] Sync to Google Sheets failed:', syncErr);
     }
 
     return NextResponse.json({ message: 'Demande modifiée avec succès.' });

@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { calculateBusinessDays, generateUUID } from '../../../../lib/utils';
-import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs, parseSheetFloat, formatSheetFloat, formatDateToFrench, parseDateFromFrench } from '../../../../lib/sheetsColumns';
+import { syncLeaveRequest } from '../../../../lib/sheetsSync';
 
 export async function POST(req) {
-  // 1. Authenticate and verify role 'employee' (which includes HR users acting as employees)
+  // 1. Authenticate and verify role 'employee' (includes HR)
   const auth = await verifyRole(req, ['employee', 'hr']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
@@ -16,7 +15,7 @@ export async function POST(req) {
     const body = await req.json();
     const { start_date, end_date, leave_type } = body;
 
-    // Validation of mandatory fields
+    // Validation
     if (!start_date || !end_date || !leave_type) {
       return NextResponse.json(
         { error: 'Champs obligatoires manquants : start_date, end_date, leave_type.' },
@@ -39,110 +38,114 @@ export async function POST(req) {
       );
     }
 
-    // Use mutex to prevent race conditions during balance checks and creations
-    const result = await runWithMutex(async () => {
-      // 3. Verify in Leave_Balances sheet that balance is sufficient
-      const balancesSheet = await getSheet(SheetTabs.balances);
-      const balanceRows = await balancesSheet.getRows();
+    const supabase = getSupabaseAdmin();
 
-      const employeeBalanceRow = balanceRows.find(
-        (row) => row.get(LeaveBalancesColumns.employee_id) === employee.id ||
-                 row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === employee.email.toLowerCase()
+    // 3. Fetch employee balance from Supabase
+    const { data: balance, error: balanceError } = await supabase
+      .from('leave_balances')
+      .select('*')
+      .eq('employee_id', employee.id)
+      .maybeSingle();
+
+    if (balanceError) {
+      throw balanceError;
+    }
+
+    if (!balance) {
+      return NextResponse.json(
+        { error: `Aucun solde de congés trouvé pour l'employé : ${employee.email}. Veuillez contacter les RH.` },
+        { status: 404 }
       );
+    }
 
-      if (!employeeBalanceRow) {
-        return {
-          error: `Aucun solde de congés trouvé pour l'employé : ${employee.email}. Veuillez contacter les RH.`,
-          status: 404
-        };
+    // Check balance depending on leave type (Permission vs normal CP/RTT)
+    const isPermission = leave_type.toLowerCase().includes('perm');
+    const isNoDeduct = leave_type.toLowerCase().includes('sans solde') || 
+                       leave_type.toLowerCase().includes('rattraper') || 
+                       leave_type.toLowerCase().includes('maladie');
+    
+    if (!isNoDeduct) {
+      const remainingBalance = isPermission 
+        ? Number(balance.remaining_perm || 0)
+        : Number(balance.remaining_balance || 0);
+
+      if (remainingBalance < businessDays) {
+        return NextResponse.json(
+          { error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingBalance} j.` },
+          { status: 400 }
+        );
       }
+    }
 
-      // Check balance depending on leave type (Permission vs normal CP/RTT)
-      const isPermission = leave_type.toLowerCase().includes('perm');
-      const isNoDeduct = leave_type.toLowerCase().includes('sans solde') || 
-                         leave_type.toLowerCase().includes('rattraper') || 
-                         leave_type.toLowerCase().includes('maladie');
-      
-      if (!isNoDeduct) {
-        const balanceField = isPermission 
-          ? LeaveBalancesColumns.remaining_perm 
-          : LeaveBalancesColumns.remaining_balance;
-        
-        const remainingBalance = parseSheetFloat(employeeBalanceRow.get(balanceField));
+    // 4. Check for duplicate / overlapping requests
+    const { data: employeeRequests, error: requestsError } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('employee_id', employee.id)
+      .neq('status', 'Refusé');
 
-        if (remainingBalance < businessDays) {
-          return {
-            error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingBalance} j.`,
-            status: 400
-          };
-        }
-      }
+    if (requestsError) {
+      throw requestsError;
+    }
 
-      // 3.5 Check for duplicate / overlapping requests
-      const requestsSheet = await getSheet(SheetTabs.requests);
-      const requestRows = await requestsSheet.getRows();
-      const employeeRequests = requestRows.filter(
-        (row) => row.get(LeaveRequestsColumns.employee_id) === employee.id &&
-                 row.get(LeaveRequestsColumns.status) !== 'Refusé'
-      );
-
-      const newStart = start_date;
-      const newEnd = end_date;
-
-      const hasOverlap = employeeRequests.some(row => {
-        const existingStart = parseDateFromFrench(row.get(LeaveRequestsColumns.start_date));
-        const existingEnd = parseDateFromFrench(row.get(LeaveRequestsColumns.end_date));
-        return (newStart <= existingEnd) && (newEnd >= existingStart);
-      });
-
-      if (hasOverlap) {
-        return {
-          error: 'Vous avez déjà une demande en attente ou approuvée sur cette période.',
-          status: 400
-        };
-      }
-
-      // 4. Add new request row in Leave_Requests with status "Pending"
-      const requestId = generateUUID();
-      const nowStr = new Date().toISOString();
-
-      await requestsSheet.addRow({
-        [LeaveRequestsColumns.request_id]: requestId,
-        [LeaveRequestsColumns.employee_id]: employee.id,
-        [LeaveRequestsColumns.employee_name]: employeeBalanceRow.get(LeaveBalancesColumns.employee_name) || employee.name || 'Utilisateur',
-        [LeaveRequestsColumns.start_date]: formatDateToFrench(start_date),
-        [LeaveRequestsColumns.end_date]: formatDateToFrench(end_date),
-        [LeaveRequestsColumns.business_days]: formatSheetFloat(businessDays),
-        [LeaveRequestsColumns.leave_type]: leave_type,
-        [LeaveRequestsColumns.status]: 'En attente',
-        [LeaveRequestsColumns.created_at]: nowStr,
-        [LeaveRequestsColumns.updated_at]: nowStr,
-        [LeaveRequestsColumns.hr_comment]: ''
-      });
-
-      return {
-        success: true,
-        data: {
-          request_id: requestId,
-          employee_id: employee.id,
-          employee_name: employeeBalanceRow.get(LeaveBalancesColumns.employee_name) || employee.name,
-          start_date,
-          end_date,
-          business_days: businessDays,
-          leave_type,
-          status: 'En attente',
-          created_at: nowStr
-        }
-      };
+    const hasOverlap = (employeeRequests || []).some(req => {
+      // Both start_date and end_date in DB are ISO YYYY-MM-DD strings
+      return (start_date <= req.end_date) && (end_date >= req.start_date);
     });
 
-    if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    if (hasOverlap) {
+      return NextResponse.json(
+        { error: 'Vous avez déjà une demande en attente ou approuvée sur cette période.' },
+        { status: 400 }
+      );
+    }
+
+    // 5. Create new request row in Supabase
+    const requestId = generateUUID();
+    const nowStr = new Date().toISOString();
+    const fullName = `${balance.employee_first_name} ${balance.employee_name}`.trim() || employee.name;
+
+    const { error: insertError } = await supabase
+      .from('leave_requests')
+      .insert({
+        request_id: requestId,
+        employee_id: employee.id,
+        employee_name: fullName,
+        start_date,
+        end_date,
+        business_days: businessDays,
+        leave_type,
+        status: 'En attente',
+        hr_comment: '',
+        created_at: nowStr,
+        updated_at: nowStr
+      });
+
+    if (insertError) {
+      throw insertError;
+    }
+
+    // 6. Sync changes to Google Sheets in the background (awaited for reliability)
+    try {
+      await syncLeaveRequest(requestId);
+    } catch (syncErr) {
+      console.error('[SubmitRoute] Sync to Google Sheets failed:', syncErr);
+      // We don't crash the request if Sheets sync fails, to keep the app working.
     }
 
     return NextResponse.json({
       message: 'Demande de congés soumise avec succès.',
-      request: result.data
+      request: {
+        request_id: requestId,
+        employee_id: employee.id,
+        employee_name: fullName,
+        start_date,
+        end_date,
+        business_days: businessDays,
+        leave_type,
+        status: 'En attente',
+        created_at: nowStr
+      }
     });
 
   } catch (error) {

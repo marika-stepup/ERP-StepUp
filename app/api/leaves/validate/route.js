@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs, parseSheetFloat, formatSheetFloat } from '../../../../lib/sheetsColumns';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
+import { syncLeaveRequest, syncEmployeeBalance } from '../../../../lib/sheetsSync';
 
 export async function POST(req) {
   // 1. Authenticate and verify role 'hr', 'manager' or 'director'
@@ -23,170 +22,208 @@ export async function POST(req) {
     }
 
     const normalizedAction = action.trim().toLowerCase();
-    if (!['approuver', 'refuser', 'approve', 'reject'].includes(normalizedAction)) {
+    const isApprove = ['approuver', 'approve'].includes(normalizedAction);
+    const isReject = ['refuser', 'reject'].includes(normalizedAction);
+
+    if (!isApprove && !isReject) {
       return NextResponse.json(
         { error: "Action invalide. Utilisez 'Approuver' ou 'Refuser'." },
         { status: 400 }
       );
     }
 
-    // Use mutex to serialize database changes and prevent race conditions
-    const result = await runWithMutex(async () => {
-      // 2. Find request in Leave_Requests
-      const requestsSheet = await getSheet(SheetTabs.requests);
-      const requestRows = await requestsSheet.getRows();
+    const supabase = getSupabaseAdmin();
 
-      const targetRequestRow = requestRows.find(
-        (row) => row.get(LeaveRequestsColumns.request_id) === request_id
-      );
+    // 2. Fetch the target request
+    const { data: targetRequest, error: reqError } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('request_id', request_id)
+      .maybeSingle();
 
-      if (!targetRequestRow) {
-        return {
-          error: `Demande de congés avec l'identifiant "${request_id}" introuvable.`,
-          status: 404
-        };
-      }
-
-      // Check if already processed
-      const currentStatus = targetRequestRow.get(LeaveRequestsColumns.status);
-      if (currentStatus !== 'En attente') {
-        return {
-          error: `Cette demande a déjà été traitée. Statut actuel : ${currentStatus}.`,
-          status: 400
-        };
-      }
-
-      const employeeId = targetRequestRow.get(LeaveRequestsColumns.employee_id);
-      const businessDays = parseSheetFloat(targetRequestRow.get(LeaveRequestsColumns.business_days));
-      const leaveType = targetRequestRow.get(LeaveRequestsColumns.leave_type) || '';
-      const nowStr = new Date().toISOString();
-
-      // Find employee balance row in Leave_Balances
-      const balancesSheet = await getSheet(SheetTabs.balances);
-      const balanceRows = await balancesSheet.getRows();
-
-      const balanceRow = balanceRows.find(
-        (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
-      );
-
-      if (!balanceRow) {
-        return {
-          error: `Aucun solde de congés trouvé pour l'identifiant employé : ${employeeId}.`,
-          status: 404
-        };
-      }
-
-      // Check manager hierarchy constraint: current user must be the N+1 manager of the requester
-      const managerName = balanceRow.get(LeaveBalancesColumns.manager_name)?.trim() || '';
-      const currentUserEmail = auth.user.email;
-      const currentUserRow = balanceRows.find(
-        (row) => row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === currentUserEmail?.toLowerCase()
-      );
-
-      if (!currentUserRow) {
-        return {
-          error: `Utilisateur actuel non trouvé dans la liste des membres.`,
-          status: 403
-        };
-      }
-
-      const currentFirstName = currentUserRow.get(LeaveBalancesColumns.employee_first_name)?.trim() || '';
-      const currentLastName = currentUserRow.get(LeaveBalancesColumns.employee_name)?.trim() || '';
-      const currentFullName1 = `${currentFirstName} ${currentLastName}`;
-      const currentFullName2 = `${currentLastName} ${currentFirstName}`;
-
-      const matchesManager = 
-        managerName.toLowerCase() === currentFirstName.toLowerCase() ||
-        managerName.toLowerCase() === currentLastName.toLowerCase() ||
-        managerName.toLowerCase() === currentFullName1.toLowerCase() ||
-        managerName.toLowerCase() === currentFullName2.toLowerCase();
-
-      if (!managerName || managerName === 'Aucun' || !matchesManager) {
-        return {
-          error: `Accès refusé. Seul le N+1 (Manager) de l'employé est autorisé à approuver ou refuser cette demande.`,
-          status: 403
-        };
-      }
-
-      if (normalizedAction === 'approuver' || normalizedAction === 'approve') {
-
-        const isPermission = leaveType.toLowerCase().includes('perm');
-        const isNoDeduct = leaveType.toLowerCase().includes('sans solde') || 
-                           leaveType.toLowerCase().includes('rattraper') || 
-                           leaveType.toLowerCase().includes('maladie');
-
-        if (!isNoDeduct) {
-          // Determine column fields depending on CP or Permission type
-          const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
-          const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
-          const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
-
-          const initialBalanceValue = parseSheetFloat(balanceRow.get(initialCol));
-          const currentTakenValue = parseSheetFloat(balanceRow.get(takenCol));
-          const currentRemainingValue = parseSheetFloat(balanceRow.get(remainingCol));
-
-          // Re-verify balance
-          if (currentRemainingValue < businessDays) {
-            return {
-              error: `Impossible d'approuver la demande. L'employé dispose de seulement ${currentRemainingValue} jours restants, demandés ${businessDays} jours.`,
-              status: 400
-            };
-          }
-
-          // Calculate updates
-          const newTaken = currentTakenValue + businessDays;
-          const newRemaining = initialBalanceValue - newTaken;
-
-          // Update Leave_Balances row
-          balanceRow.set(takenCol, formatSheetFloat(newTaken));
-          balanceRow.set(remainingCol, formatSheetFloat(newRemaining));
-          await balanceRow.save();
-        }
-
-        // Update Leave_Requests status to "Approuvé"
-        targetRequestRow.set(LeaveRequestsColumns.status, 'Approuvé');
-        targetRequestRow.set(LeaveRequestsColumns.hr_comment, hr_comment || 'Approuvé');
-        targetRequestRow.set(LeaveRequestsColumns.updated_at, nowStr);
-        await targetRequestRow.save();
-
-        return {
-          success: true,
-          status: 'Approuvé',
-          data: {
-            request_id,
-            employee_id: employeeId,
-            business_days: businessDays
-          }
-        };
-
-      } else {
-        // Refuse request
-        // Update Leave_Requests status to "Refusé"
-        targetRequestRow.set(LeaveRequestsColumns.status, 'Refusé');
-        targetRequestRow.set(LeaveRequestsColumns.hr_comment, hr_comment || 'Refusé');
-        targetRequestRow.set(LeaveRequestsColumns.updated_at, nowStr);
-        await targetRequestRow.save();
-
-        return {
-          success: true,
-          status: 'Refusé',
-          data: {
-            request_id,
-            employee_id: employeeId,
-            business_days: businessDays
-          }
-        };
-      }
-    });
-
-    if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    if (reqError) {
+      throw reqError;
     }
 
-    return NextResponse.json({
-      message: `La demande de congés a été ${result.status === 'Approuvé' ? 'approuvée' : 'refusée'} avec succès.`,
-      data: result.data
-    });
+    if (!targetRequest) {
+      return NextResponse.json(
+        { error: `Demande de congés avec l'identifiant "${request_id}" introuvable.` },
+        { status: 404 }
+      );
+    }
+
+    if (targetRequest.status !== 'En attente') {
+      return NextResponse.json(
+        { error: `Cette demande a déjà été traitée. Statut actuel : ${targetRequest.status}.` },
+        { status: 400 }
+      );
+    }
+
+    const employeeId = targetRequest.employee_id;
+    const businessDays = Number(targetRequest.business_days || 0);
+    const leaveType = targetRequest.leave_type || '';
+    const nowStr = new Date().toISOString();
+
+    // 3. Fetch employee profile and manager details
+    const { data: requesterProfile, error: reqProfileErr } = await supabase
+      .from('leave_balances')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .maybeSingle();
+
+    if (reqProfileErr) {
+      throw reqProfileErr;
+    }
+
+    if (!requesterProfile) {
+      return NextResponse.json(
+        { error: `Aucun solde de congés trouvé pour l'identifiant employé : ${employeeId}.` },
+        { status: 404 }
+      );
+    }
+
+    // 4. Check manager hierarchy constraint
+    const managerName = (requesterProfile.manager_name || '').trim();
+    
+    // Fetch logged-in user details to match name
+    const { data: currentUserProfile, error: currentProfileErr } = await supabase
+      .from('leave_balances')
+      .select('*')
+      .eq('employee_id', auth.user.id)
+      .maybeSingle();
+
+    if (currentProfileErr) {
+      throw currentProfileErr;
+    }
+
+    if (!currentUserProfile) {
+      return NextResponse.json(
+        { error: `Utilisateur actuel non trouvé dans la liste des membres.` },
+        { status: 403 }
+      );
+    }
+
+    const currentFirstName = (currentUserProfile.employee_first_name || '').trim();
+    const currentLastName = (currentUserProfile.employee_name || '').trim();
+    const currentFullName1 = `${currentFirstName} ${currentLastName}`;
+    const currentFullName2 = `${currentLastName} ${currentFirstName}`;
+
+    const matchesManager = 
+      managerName.toLowerCase() === currentFirstName.toLowerCase() ||
+      managerName.toLowerCase() === currentLastName.toLowerCase() ||
+      managerName.toLowerCase() === currentFullName1.toLowerCase() ||
+      managerName.toLowerCase() === currentFullName2.toLowerCase();
+
+    if (!managerName || managerName === 'Aucun' || !matchesManager) {
+      return NextResponse.json(
+        { error: `Accès refusé. Seul le N+1 (Manager) de l'employé (${managerName}) est autorisé à approuver ou refuser cette demande.` },
+        { status: 403 }
+      );
+    }
+
+    // 5. Process validation action
+    if (isApprove) {
+      const isPermission = leaveType.toLowerCase().includes('perm');
+      const isNoDeduct = leaveType.toLowerCase().includes('sans solde') || 
+                         leaveType.toLowerCase().includes('rattraper') || 
+                         leaveType.toLowerCase().includes('maladie');
+
+      if (!isNoDeduct) {
+        const initialVal = isPermission ? Number(requesterProfile.initial_perm || 0) : Number(requesterProfile.initial_balance || 0);
+        const takenVal = isPermission ? Number(requesterProfile.taken_perm || 0) : Number(requesterProfile.taken_days || 0);
+        const remainingVal = isPermission ? Number(requesterProfile.remaining_perm || 0) : Number(requesterProfile.remaining_balance || 0);
+
+        if (remainingVal < businessDays) {
+          return NextResponse.json(
+            { error: `Impossible d'approuver la demande. L'employé dispose de seulement ${remainingVal} jours restants, demandés ${businessDays} jours.` },
+            { status: 400 }
+          );
+        }
+
+        const newTaken = takenVal + businessDays;
+        const newRemaining = initialVal - newTaken;
+
+        // Update balance in Supabase
+        const balanceUpdatePayload = isPermission 
+          ? { taken_perm: newTaken, remaining_perm: newRemaining }
+          : { taken_days: newTaken, remaining_balance: newRemaining };
+
+        const { error: balanceUpdateErr } = await supabase
+          .from('leave_balances')
+          .update(balanceUpdatePayload)
+          .eq('employee_id', employeeId);
+
+        if (balanceUpdateErr) {
+          throw balanceUpdateErr;
+        }
+      }
+
+      // Update request status in Supabase
+      const { error: reqUpdateErr } = await supabase
+        .from('leave_requests')
+        .update({
+          status: 'Approuvé',
+          hr_comment: hr_comment || 'Approuvé',
+          updated_at: nowStr
+        })
+        .eq('request_id', request_id);
+
+      if (reqUpdateErr) {
+        throw reqUpdateErr;
+      }
+
+      // Sync to Google Sheets (awaited for reliability)
+      try {
+        await syncLeaveRequest(request_id);
+        if (!isNoDeduct) {
+          await syncEmployeeBalance(employeeId);
+        }
+      } catch (syncErr) {
+        console.error('[ValidateRoute] Syncing to Google Sheets failed:', syncErr);
+      }
+
+      return NextResponse.json({
+        message: 'La demande de congés a été approuvée avec succès.',
+        data: {
+          request_id,
+          employee_id: employeeId,
+          business_days: businessDays,
+          status: 'Approuvé'
+        }
+      });
+
+    } else {
+      // Reject request
+      const { error: reqUpdateErr } = await supabase
+        .from('leave_requests')
+        .update({
+          status: 'Refusé',
+          hr_comment: hr_comment || 'Refusé',
+          updated_at: nowStr
+        })
+        .eq('request_id', request_id);
+
+      if (reqUpdateErr) {
+        throw reqUpdateErr;
+      }
+
+      // Sync to Google Sheets
+      try {
+        await syncLeaveRequest(request_id);
+      } catch (syncErr) {
+        console.error('[ValidateRoute] Syncing to Google Sheets failed:', syncErr);
+      }
+
+      return NextResponse.json({
+        message: 'La demande de congés a été refusée avec succès.',
+        data: {
+          request_id,
+          employee_id: employeeId,
+          business_days: businessDays,
+          status: 'Refusé'
+        }
+      });
+    }
 
   } catch (error) {
     console.error('Error validating leave request:', error);

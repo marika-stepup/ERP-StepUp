@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet } from '../../../../lib/googleSheets';
-import { LeaveRequestsColumns, SheetTabs, parseSheetFloat } from '../../../../lib/sheetsColumns';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 
 export async function GET(req) {
   // 1. Authenticate user
@@ -12,35 +10,39 @@ export async function GET(req) {
   const user = auth.user;
 
   try {
-    // 2. Fetch Leave_Requests
-    const requestsSheet = await getSheet(SheetTabs.requests);
-    const rows = await requestsSheet.getRows();
+    const supabase = getSupabaseAdmin();
 
-    // 3. Filter by employee_id
-    const userRequests = rows
-      .filter((row) => row.get(LeaveRequestsColumns.employee_id) === user.id)
-      .map((row) => ({
-        request_id: row.get(LeaveRequestsColumns.request_id),
-        start_date: row.get(LeaveRequestsColumns.start_date),
-        end_date: row.get(LeaveRequestsColumns.end_date),
-        business_days: parseSheetFloat(row.get(LeaveRequestsColumns.business_days)),
-        leave_type: row.get(LeaveRequestsColumns.leave_type),
-        status: row.get(LeaveRequestsColumns.status),
-        created_at: row.get(LeaveRequestsColumns.created_at),
-        updated_at: row.get(LeaveRequestsColumns.updated_at),
-        hr_comment: row.get(LeaveRequestsColumns.hr_comment)
-      }))
-      // Sort by creation date descending
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // 2. Fetch requests from Supabase
+    const { data: dbRequests, error: dbError } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('employee_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (dbError) {
+      throw dbError;
+    }
+
+    const requests = (dbRequests || []).map((req) => ({
+      request_id: req.request_id,
+      start_date: req.start_date,
+      end_date: req.end_date,
+      business_days: Number(req.business_days || 0),
+      leave_type: req.leave_type,
+      status: req.status,
+      created_at: req.created_at,
+      updated_at: req.updated_at,
+      hr_comment: req.hr_comment || ''
+    }));
 
     return NextResponse.json({
       success: true,
-      count: userRequests.length,
-      requests: userRequests
+      count: requests.length,
+      requests
     });
 
   } catch (error) {
-    console.error('Error fetching user requests:', error);
+    console.error('Error fetching user requests from Supabase:', error);
     return NextResponse.json(
       { error: 'Erreur interne du serveur lors de la récupération des demandes.' },
       { status: 500 }

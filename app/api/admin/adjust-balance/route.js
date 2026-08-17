@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, SheetTabs, parseSheetFloat, formatSheetFloat } from '../../../../lib/sheetsColumns';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
+import { syncEmployeeBalance } from '../../../../lib/sheetsSync';
 import { splitFullName } from '../../../../lib/utils';
 
 export async function POST(req) {
@@ -39,80 +38,98 @@ export async function POST(req) {
       );
     }
 
-    // Use mutex to serialize changes and prevent race conditions
-    const result = await runWithMutex(async () => {
-      const balancesSheet = await getSheet(SheetTabs.balances);
-      const rows = await balancesSheet.getRows();
+    const supabase = getSupabaseAdmin();
 
-      const balanceRow = rows.find(
-        (row) => row.get(LeaveBalancesColumns.employee_id) === employee_id || 
-                 row.get(LeaveBalancesColumns.employee_email)?.toLowerCase() === employee_id.toLowerCase()
+    // 2. Fetch target member from Supabase (by ID or email)
+    const { data: member, error: fetchErr } = await supabase
+      .from('leave_balances')
+      .select('*')
+      .or(`employee_id.eq.${employee_id},employee_email.eq.${employee_id.toLowerCase().trim()}`)
+      .maybeSingle();
+
+    if (fetchErr) {
+      throw fetchErr;
+    }
+
+    if (!member) {
+      return NextResponse.json(
+        { error: `Membre avec l'identifiant ou l'e-mail "${employee_id}" introuvable.` },
+        { status: 404 }
       );
+    }
 
-      if (!balanceRow) {
-        return {
-          error: `Membre avec l'identifiant ou l'e-mail "${employee_id}" introuvable.`,
-          status: 404
-        };
+    const targetEmpId = member.employee_id;
+    let name = member.employee_name || '';
+    let firstName = member.employee_first_name || '';
+
+    if (!firstName && name) {
+      const split = splitFullName(name);
+      firstName = split.firstName;
+      name = split.lastName || name;
+    }
+
+    let resultData = {};
+
+    if (normalizedType === 'cp') {
+      const currentTaken = Number(member.taken_days || 0);
+      const newRemaining = numericValue - currentTaken;
+
+      const { error: updateErr } = await supabase
+        .from('leave_balances')
+        .update({
+          initial_balance: numericValue,
+          remaining_balance: newRemaining
+        })
+        .eq('employee_id', targetEmpId);
+
+      if (updateErr) {
+        throw updateErr;
       }
 
-      let name = balanceRow.get(LeaveBalancesColumns.employee_name) || '';
-      let firstName = balanceRow.get(LeaveBalancesColumns.employee_first_name) || '';
+      resultData = {
+        employee_id: targetEmpId,
+        employee_name: name,
+        employee_first_name: firstName,
+        type: 'cp',
+        initial_balance: numericValue,
+        remaining_balance: newRemaining
+      };
+    } else {
+      const currentTaken = Number(member.taken_perm || 0);
+      const newRemaining = numericValue - currentTaken;
 
-      if (!firstName && name) {
-        const split = splitFullName(name);
-        firstName = split.firstName;
-        name = split.lastName || name;
+      const { error: updateErr } = await supabase
+        .from('leave_balances')
+        .update({
+          initial_perm: numericValue,
+          remaining_perm: newRemaining
+        })
+        .eq('employee_id', targetEmpId);
+
+      if (updateErr) {
+        throw updateErr;
       }
 
-      if (normalizedType === 'cp') {
-        const currentTaken = parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_days));
-        const newRemaining = numericValue - currentTaken;
+      resultData = {
+        employee_id: targetEmpId,
+        employee_name: name,
+        employee_first_name: firstName,
+        type: 'perm',
+        initial_perm: numericValue,
+        remaining_perm: newRemaining
+      };
+    }
 
-        balanceRow.set(LeaveBalancesColumns.initial_balance, formatSheetFloat(numericValue));
-        balanceRow.set(LeaveBalancesColumns.remaining_balance, formatSheetFloat(newRemaining));
-        await balanceRow.save();
-
-        return {
-          success: true,
-          data: {
-            employee_id: balanceRow.get(LeaveBalancesColumns.employee_id),
-            employee_name: name,
-            employee_first_name: firstName,
-            type: 'cp',
-            initial_balance: numericValue,
-            remaining_balance: newRemaining
-          }
-        };
-      } else {
-        const currentTaken = parseSheetFloat(balanceRow.get(LeaveBalancesColumns.taken_perm));
-        const newRemaining = numericValue - currentTaken;
-
-        balanceRow.set(LeaveBalancesColumns.initial_perm, formatSheetFloat(numericValue));
-        balanceRow.set(LeaveBalancesColumns.remaining_perm, formatSheetFloat(newRemaining));
-        await balanceRow.save();
-
-        return {
-          success: true,
-          data: {
-            employee_id: balanceRow.get(LeaveBalancesColumns.employee_id),
-            employee_name: name,
-            employee_first_name: firstName,
-            type: 'perm',
-            initial_perm: numericValue,
-            remaining_perm: newRemaining
-          }
-        };
-      }
-    });
-
-    if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    // 3. Sync update to Google Sheets (awaited for reliability)
+    try {
+      await syncEmployeeBalance(targetEmpId);
+    } catch (syncErr) {
+      console.error('[AdjustBalance] Sync to Google Sheets failed:', syncErr);
     }
 
     return NextResponse.json({
       message: 'Solde du membre ajusté avec succès.',
-      balance: result.data
+      balance: resultData
     });
 
   } catch (error) {

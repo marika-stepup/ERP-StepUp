@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet, runWithMutex } from '../../../../lib/googleSheets';
-import { LeaveBalancesColumns, LeaveRequestsColumns, SheetTabs, parseSheetFloat, formatSheetFloat } from '../../../../lib/sheetsColumns';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
+import { syncEmployeeBalance, deleteLeaveRequestFromSheets } from '../../../../lib/sheetsSync';
 
 export async function POST(req) {
   const auth = await verifyRole(req, ['employee', 'hr']);
@@ -18,74 +17,113 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Identifiant de demande manquant.' }, { status: 400 });
     }
 
-    const result = await runWithMutex(async () => {
-      const requestsSheet = await getSheet(SheetTabs.requests);
-      const rows = await requestsSheet.getRows();
-      const targetRow = rows.find(row => row.get(LeaveRequestsColumns.request_id) === request_id);
+    const supabase = getSupabaseAdmin();
 
-      if (!targetRow) {
-        return { error: 'Demande introuvable.', status: 404 };
-      }
+    // 1. Fetch request from Supabase
+    const { data: targetRequest, error: reqErr } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('request_id', request_id)
+      .maybeSingle();
 
-      // Check ownership & admin permission
-      const isOwner = targetRow.get(LeaveRequestsColumns.employee_id) === employee.id;
-      const isAdmin = employee.role === 'hr';
+    if (reqErr) {
+      throw reqErr;
+    }
 
-      if (!isOwner && !isAdmin) {
-        return { error: 'Non autorisé à supprimer cette demande.', status: 403 };
-      }
+    if (!targetRequest) {
+      return NextResponse.json({ error: 'Demande introuvable.' }, { status: 404 });
+    }
 
-      // Check status permission
-      const requestStatus = targetRow.get(LeaveRequestsColumns.status);
-      if (requestStatus !== 'En attente' && !isAdmin) {
-        return { error: 'Seules les demandes en attente peuvent être supprimées.', status: 400 };
-      }
+    // Check ownership & admin permission
+    const isOwner = targetRequest.employee_id === employee.id;
+    const isAdmin = employee.role === 'hr';
 
-      // If the request was approved and is deleted by admin, restore employee balance
-      if (requestStatus === 'Approuvé') {
-        const leaveType = targetRow.get(LeaveRequestsColumns.leave_type) || '';
-        const isNoDeduct = leaveType.toLowerCase().includes('sans solde') || 
-                           leaveType.toLowerCase().includes('rattraper') || 
-                           leaveType.toLowerCase().includes('maladie');
+    if (!isOwner && !isAdmin) {
+      return NextResponse.json({ error: 'Non autorisé à supprimer cette demande.' }, { status: 403 });
+    }
 
-        if (!isNoDeduct) {
-          const employeeId = targetRow.get(LeaveRequestsColumns.employee_id);
-          const businessDays = parseSheetFloat(targetRow.get(LeaveRequestsColumns.business_days));
+    // Check status permission
+    const requestStatus = targetRequest.status;
+    if (requestStatus !== 'En attente' && !isAdmin) {
+      return NextResponse.json({ error: 'Seules les demandes en attente peuvent être supprimées.' }, { status: 400 });
+    }
 
-          const balancesSheet = await getSheet(SheetTabs.balances);
-          const balanceRows = await balancesSheet.getRows();
-          const balanceRow = balanceRows.find(
-            (row) => row.get(LeaveBalancesColumns.employee_id) === employeeId
-          );
+    const employeeId = targetRequest.employee_id;
+    const businessDays = Number(targetRequest.business_days || 0);
+    let balanceUpdated = false;
 
-          if (!balanceRow) {
-            return { error: `Aucun solde de congés trouvé pour l'employé lors de la suppression.`, status: 404 };
-          }
+    // 2. If approved, restore employee balance
+    if (requestStatus === 'Approuvé') {
+      const leaveType = targetRequest.leave_type || '';
+      const isNoDeduct = leaveType.toLowerCase().includes('sans solde') || 
+                         leaveType.toLowerCase().includes('rattraper') || 
+                         leaveType.toLowerCase().includes('maladie');
 
-          const isPermission = leaveType.toLowerCase().includes('perm');
-          const initialCol = isPermission ? LeaveBalancesColumns.initial_perm : LeaveBalancesColumns.initial_balance;
-          const takenCol = isPermission ? LeaveBalancesColumns.taken_perm : LeaveBalancesColumns.taken_days;
-          const remainingCol = isPermission ? LeaveBalancesColumns.remaining_perm : LeaveBalancesColumns.remaining_balance;
+      if (!isNoDeduct) {
+        // Fetch balance
+        const { data: balance, error: balanceErr } = await supabase
+          .from('leave_balances')
+          .select('*')
+          .eq('employee_id', employeeId)
+          .maybeSingle();
 
-          const initialBalanceValue = parseSheetFloat(balanceRow.get(initialCol));
-          const currentTakenValue = parseSheetFloat(balanceRow.get(takenCol));
-
-          const newTaken = currentTakenValue - businessDays;
-          const newRemaining = initialBalanceValue - newTaken;
-
-          balanceRow.set(takenCol, formatSheetFloat(newTaken));
-          balanceRow.set(remainingCol, formatSheetFloat(newRemaining));
-          await balanceRow.save();
+        if (balanceErr) {
+          throw balanceErr;
         }
+
+        if (!balance) {
+          return NextResponse.json({ error: `Aucun solde de congés trouvé pour l'employé lors de la suppression.` }, { status: 404 });
+        }
+
+        const isPermission = leaveType.toLowerCase().includes('perm');
+        
+        if (isPermission) {
+          const newTaken = Number(balance.taken_perm || 0) - businessDays;
+          const newRemaining = Number(balance.initial_perm || 0) - newTaken;
+
+          const { error: updateErr } = await supabase
+            .from('leave_balances')
+            .update({ taken_perm: newTaken, remaining_perm: newRemaining })
+            .eq('employee_id', employeeId);
+
+          if (updateErr) {
+            throw updateErr;
+          }
+        } else {
+          const newTaken = Number(balance.taken_days || 0) - businessDays;
+          const newRemaining = Number(balance.initial_balance || 0) - newTaken;
+
+          const { error: updateErr } = await supabase
+            .from('leave_balances')
+            .update({ taken_days: newTaken, remaining_balance: newRemaining })
+            .eq('employee_id', employeeId);
+
+          if (updateErr) {
+            throw updateErr;
+          }
+        }
+        balanceUpdated = true;
       }
+    }
 
-      // Delete row
-      await targetRow.delete();
-      return { success: true };
-    });
+    // 3. Delete the request from Supabase
+    const { error: deleteErr } = await supabase
+      .from('leave_requests')
+      .delete()
+      .eq('request_id', request_id);
 
-    if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    if (deleteErr) {
+      throw deleteErr;
+    }
+
+    // 4. Sync updates to Google Sheets (awaited for reliability)
+    try {
+      await deleteLeaveRequestFromSheets(request_id);
+      if (balanceUpdated) {
+        await syncEmployeeBalance(employeeId);
+      }
+    } catch (syncErr) {
+      console.error('[DeleteRoute] Sync to Google Sheets failed:', syncErr);
     }
 
     return NextResponse.json({ message: 'Demande supprimée avec succès.' });

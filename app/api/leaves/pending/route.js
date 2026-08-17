@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyRole } from '../../../../lib/supabaseAuth';
-import { getSheet } from '../../../../lib/googleSheets';
-import { LeaveRequestsColumns, SheetTabs, parseSheetFloat } from '../../../../lib/sheetsColumns';
+import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 
 export async function GET(req) {
   // 1. Authenticate and verify role 'hr', 'manager' or 'director'
@@ -11,35 +9,41 @@ export async function GET(req) {
   }
 
   try {
-    // 2. Fetch the Leave_Requests sheet
-    const requestsSheet = await getSheet(SheetTabs.requests);
-    const rows = await requestsSheet.getRows();
+    const supabase = getSupabaseAdmin();
 
-    // 3. Filter rows with status "Pending"
-    const pendingRequests = rows
-      .filter((row) => row.get(LeaveRequestsColumns.status) === 'En attente')
-      .map((row) => ({
-        request_id: row.get(LeaveRequestsColumns.request_id),
-        employee_id: row.get(LeaveRequestsColumns.employee_id),
-        employee_name: row.get(LeaveRequestsColumns.employee_name),
-        start_date: row.get(LeaveRequestsColumns.start_date),
-        end_date: row.get(LeaveRequestsColumns.end_date),
-        business_days: parseSheetFloat(row.get(LeaveRequestsColumns.business_days)),
-        leave_type: row.get(LeaveRequestsColumns.leave_type),
-        status: row.get(LeaveRequestsColumns.status),
-        created_at: row.get(LeaveRequestsColumns.created_at),
-        updated_at: row.get(LeaveRequestsColumns.updated_at),
-        hr_comment: row.get(LeaveRequestsColumns.hr_comment)
-      }));
+    // 2. Fetch pending requests from Supabase
+    const { data: pendingRequests, error: dbError } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('status', 'En attente')
+      .order('created_at', { ascending: false });
+
+    if (dbError) {
+      throw dbError;
+    }
+
+    const requests = (pendingRequests || []).map((req) => ({
+      request_id: req.request_id,
+      employee_id: req.employee_id,
+      employee_name: req.employee_name,
+      start_date: req.start_date,
+      end_date: req.end_date,
+      business_days: Number(req.business_days || 0),
+      leave_type: req.leave_type,
+      status: req.status,
+      created_at: req.created_at,
+      updated_at: req.updated_at,
+      hr_comment: req.hr_comment || ''
+    }));
 
     return NextResponse.json({
       success: true,
-      count: pendingRequests.length,
-      requests: pendingRequests
+      count: requests.length,
+      requests
     });
 
   } catch (error) {
-    console.error('Error fetching pending leave requests:', error);
+    console.error('Error fetching pending leave requests from Supabase:', error);
     return NextResponse.json(
       { error: 'Erreur interne du serveur lors de la récupération des demandes en attente.' },
       { status: 500 }

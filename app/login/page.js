@@ -58,7 +58,7 @@ export default function LoginPage() {
         />
 
         <h1>Step Hub</h1>
-        <p>Portail interne de l'agence. Connectez-vous pour accéder à votre espace de gestion des congés.</p>
+        <p>Portail interne de l'agence. Connectez-vous pour accéder à votre espace de travail.</p>
 
         {error && <div className="error-message">{error}</div>}
         {success && <div className="success-message">Connexion réussie ! Redirection...</div>}
@@ -117,7 +117,7 @@ export default function LoginPage() {
         </form>
 
         <div className="footer" style={{ marginTop: '2rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          Accès restreint aux collaborateurs autorisés de l'agence Step Up.
+          Accès restreint aux collaborateurs autorisés de Step Up Agence.
         </div>
       </div>
     </div>
