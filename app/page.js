@@ -190,6 +190,7 @@ export default function Page() {
   const [pointageStats, setPointageStats] = useState(null);
   const [pointageLoading, setPointageLoading] = useState(false);
   const [clockingEmployeeId, setClockingEmployeeId] = useState(null);
+  const [pointageSubTab, setPointageSubTab] = useState('expected');
 
   // Pagination / Limit States
   const [globalDashboardLimit, setGlobalDashboardLimit] = useState(5);
@@ -2939,50 +2940,26 @@ export default function Page() {
         {profileLoaded && activeTab === 'pointage' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Pointeur') && (
           <div className="pointage-layout" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-            {/* Top Toolbar: Date & Filters */}
+            {/* Top Toolbar: Date & Search */}
             <div className="panel" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <div className="form-group" style={{ marginBottom: 0, minWidth: '180px' }}>
-                  <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date de pointage</label>
-                  <input
-                    type="date"
-                    value={pointageDate}
-                    onChange={(e) => setPointageDate(e.target.value)}
-                    style={{ margin: 0, padding: '0.5rem' }}
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0, minWidth: '180px' }}>
-                  <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Filtrer par service</label>
-                  <select
-                    value={pointageServiceFilter}
-                    onChange={(e) => setPointageServiceFilter(e.target.value)}
-                    style={{ margin: 0, padding: '0.5rem' }}
-                  >
-                    <option value="Tous">Tous les services</option>
-                    <option value="Direction">Direction</option>
-                    <option value="Admin">Admin</option>
-                    <option value="Team leader">Team leader</option>
-                    <option value="Web">Web</option>
-                    <option value="Graphiste">Graphiste</option>
-                    <option value="SEO">SEO</option>
-                    <option value="SEA & Data analyst">SEA & Data analyst</option>
-                    <option value="Marketing de croissance">Marketing de croissance</option>
-                    <option value="Community management">Community management</option>
-                    <option value="Commercial">Commercial</option>
-                    <option value="Pointeur">Pointeur</option>
-                  </select>
-                </div>
+              <div className="form-group" style={{ marginBottom: 0, minWidth: '180px' }}>
+                <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date de pointage</label>
+                <input
+                  type="date"
+                  value={pointageDate}
+                  onChange={(e) => setPointageDate(e.target.value)}
+                  style={{ margin: 0, padding: '0.5rem' }}
+                />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0, minWidth: '260px', position: 'relative' }}>
+              <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '280px', position: 'relative' }}>
                 <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Rechercher un collaborateur</label>
                 <input
                   type="text"
-                  placeholder="Rechercher..."
+                  placeholder="Rechercher par prénom..."
                   value={pointageSearchQuery}
                   onChange={(e) => setPointageSearchQuery(e.target.value)}
-                  style={{ margin: 0, padding: '0.5rem' }}
+                  style={{ margin: 0, padding: '0.5rem', width: '100%' }}
                 />
               </div>
             </div>
@@ -3042,11 +3019,91 @@ export default function Page() {
               </div>
             )}
 
+            {/* Mobile sub-tab switcher */}
+            {(() => {
+              const expectedCount = pointageEmployees.filter(emp => {
+                const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                const notClockedIn = !emp.time_log || !emp.time_log.clock_in;
+                return matchesSearch && notClockedIn;
+              }).length;
+
+              const presentCount = pointageEmployees.filter(emp => {
+                const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                const isClockedIn = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
+                return matchesSearch && isClockedIn;
+              }).length;
+
+              return (
+                <div className="pointage-subtabs" style={{ display: 'none', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPointageSubTab('expected')}
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem 1rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: pointageSubTab === 'expected' ? 'var(--brand-orange)' : 'var(--panel-white)',
+                      color: pointageSubTab === 'expected' ? '#fff' : 'var(--text-primary)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Non arrivés
+                    <span style={{
+                      background: pointageSubTab === 'expected' ? 'rgba(255,255,255,0.2)' : 'var(--background-light)',
+                      color: pointageSubTab === 'expected' ? '#fff' : 'var(--brand-orange)',
+                      padding: '0.1rem 0.5rem',
+                      borderRadius: '10px',
+                      fontSize: '0.75rem'
+                    }}>{expectedCount}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPointageSubTab('present')}
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem 1rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: pointageSubTab === 'present' ? 'var(--brand-orange)' : 'var(--panel-white)',
+                      color: pointageSubTab === 'present' ? '#fff' : 'var(--text-primary)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Présents
+                    <span style={{
+                      background: pointageSubTab === 'present' ? 'rgba(255,255,255,0.2)' : 'var(--background-light)',
+                      color: pointageSubTab === 'present' ? '#fff' : 'var(--brand-orange)',
+                      padding: '0.1rem 0.5rem',
+                      borderRadius: '10px',
+                      fontSize: '0.75rem'
+                    }}>{presentCount}</span>
+                  </button>
+                </div>
+              );
+            })()}
+
             {/* The 2 Columns Board */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+            <div className="pointage-columns-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
 
               {/* Column 1: A l'étape d'arrivée (Non présents) */}
-              <div className="panel" style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
+              <div className={`panel pointage-column-panel expected-panel ${pointageSubTab === 'expected' ? 'mobile-show' : 'mobile-hide'}`} style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '2px solid var(--border-light)', paddingBottom: '0.75rem' }}>
                   <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     Non arrivés
@@ -3157,7 +3214,7 @@ export default function Page() {
               </div>
 
               {/* Column 2: Présents dans les locaux */}
-              <div className="panel" style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
+              <div className={`panel pointage-column-panel present-panel ${pointageSubTab === 'present' ? 'mobile-show' : 'mobile-hide'}`} style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '2px solid var(--border-light)', paddingBottom: '0.75rem' }}>
                   <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     Présents

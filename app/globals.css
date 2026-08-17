@@ -1435,3 +1435,19 @@ body.dark .login-logo-img {
   filter: brightness(0) invert(1) !important;
   opacity: 0.95;
 }
+
+/* Pointage mobile & tablet sub-tabs styling */
+@media (max-width: 1023px) {
+  .pointage-subtabs {
+    display: flex !important;
+  }
+  .pointage-columns-container {
+    grid-template-columns: 1fr !important;
+  }
+  .mobile-hide {
+    display: none !important;
+  }
+  .mobile-show {
+    display: block !important;
+  }
+}
