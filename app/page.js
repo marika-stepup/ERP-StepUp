@@ -22,7 +22,9 @@ import {
   Edit,
   ShieldAlert,
   Smartphone,
-  ChevronDown
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown
 } from 'lucide-react';
 
 const formatDateStr = (str) => {
@@ -120,6 +122,22 @@ export default function Page() {
   const [activeTab, setActiveTab] = useState('mySpace'); // 'mySpace', 'globalDashboard', 'adminRH'
   const [ganttServiceFilter, setGanttServiceFilter] = useState('Tous');
   const [adminServiceFilter, setAdminServiceFilter] = useState('Tous');
+  const [adminSortField, setAdminSortField] = useState('default'); // 'default', 'firstname', 'service', 'manager', 'hireDate'
+  const [adminSortDirection, setAdminSortDirection] = useState('asc'); // 'asc', 'desc'
+
+  const handleSort = (field) => {
+    if (adminSortField === field) {
+      if (adminSortDirection === 'asc') {
+        setAdminSortDirection('desc');
+      } else {
+        setAdminSortField('default');
+        setAdminSortDirection('asc');
+      }
+    } else {
+      setAdminSortField(field);
+      setAdminSortDirection('asc');
+    }
+  };
 
   // Dark/Light Mode state
   const [darkMode, setDarkMode] = useState(false);
@@ -2233,28 +2251,34 @@ export default function Page() {
                     const svc = (m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié';
                     return svc === ganttServiceFilter;
                   });
-                  if (filteredMembers.length > globalDashboardLimit) {
+                  if (filteredMembers.length > 0) {
                     return (
-                      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-                        <button
-                          type="button"
-                          className="btn-accent"
-                          onClick={() => setGlobalDashboardLimit(prev => prev + 5)}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem', marginTop: '1rem', padding: '0.5rem 0' }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Afficher :</span>
+                        <select
+                          value={globalDashboardLimit}
+                          onChange={(e) => setGlobalDashboardLimit(Number(e.target.value))}
                           style={{
-                            background: 'none',
-                            border: '1px solid var(--brand-orange)',
-                            color: 'var(--brand-orange)',
-                            padding: '0.5rem 1.5rem',
-                            borderRadius: '20px',
+                            padding: '0.35rem 0.5rem',
+                            fontSize: '0.85rem',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-light)',
+                            backgroundColor: 'var(--panel-white)',
+                            color: 'var(--text-primary)',
                             cursor: 'pointer',
-                            fontWeight: 600,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
+                            width: '120px',
+                            display: 'inline-block',
+                            outline: 'none'
                           }}
                         >
-                          <Search size={16} /> Voir plus de collaborateurs ({filteredMembers.length - globalDashboardLimit} restants)
-                        </button>
+                          <option value={5}>5 lignes</option>
+                          <option value={10}>10 lignes</option>
+                          <option value={15}>15 lignes</option>
+                          <option value={20}>20 lignes</option>
+                          <option value={25}>25 lignes</option>
+                          <option value={50}>50 lignes</option>
+                          <option value={100}>100 lignes</option>
+                        </select>
                       </div>
                     );
                   }
@@ -2661,21 +2685,110 @@ export default function Page() {
                       <thead>
                         <tr>
                           <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
-                          <th>Membre</th>
-                          <th>Service</th>
+                          <th
+                            onClick={() => handleSort('firstname')}
+                            style={{ cursor: 'pointer', userSelect: 'none' }}
+                            className="sortable-header"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <span>Membre</span>
+                              <span style={{ display: 'inline-flex', color: adminSortField === 'firstname' ? 'var(--brand-navy)' : 'var(--text-secondary)', opacity: adminSortField === 'firstname' ? 1 : 0.4 }}>
+                                {adminSortField === 'firstname' ? (
+                                  adminSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                ) : (
+                                  <ChevronsUpDown size={14} />
+                                )}
+                              </span>
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSort('service')}
+                            style={{ cursor: 'pointer', userSelect: 'none' }}
+                            className="sortable-header"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <span>Service</span>
+                              <span style={{ display: 'inline-flex', color: adminSortField === 'service' ? 'var(--brand-navy)' : 'var(--text-secondary)', opacity: adminSortField === 'service' ? 1 : 0.4 }}>
+                                {adminSortField === 'service' ? (
+                                  adminSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                ) : (
+                                  <ChevronsUpDown size={14} />
+                                )}
+                              </span>
+                            </div>
+                          </th>
                           <th>Rôle</th>
-                          <th>N+1 (Manager)</th>
-                          <th>Date d'embauche</th>
+                          <th
+                            onClick={() => handleSort('manager')}
+                            style={{ cursor: 'pointer', userSelect: 'none' }}
+                            className="sortable-header"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <span>N+1 (Manager)</span>
+                              <span style={{ display: 'inline-flex', color: adminSortField === 'manager' ? 'var(--brand-navy)' : 'var(--text-secondary)', opacity: adminSortField === 'manager' ? 1 : 0.4 }}>
+                                {adminSortField === 'manager' ? (
+                                  adminSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                ) : (
+                                  <ChevronsUpDown size={14} />
+                                )}
+                              </span>
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSort('hireDate')}
+                            style={{ cursor: 'pointer', userSelect: 'none' }}
+                            className="sortable-header"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <span>Date d'embauche</span>
+                              <span style={{ display: 'inline-flex', color: adminSortField === 'hireDate' ? 'var(--brand-navy)' : 'var(--text-secondary)', opacity: adminSortField === 'hireDate' ? 1 : 0.4 }}>
+                                {adminSortField === 'hireDate' ? (
+                                  adminSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                ) : (
+                                  <ChevronsUpDown size={14} />
+                                )}
+                              </span>
+                            </div>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {(() => {
                           const sorted = [...allMembers].sort((a, b) => {
-                            const indexA = memberOrder.indexOf(a.employee_id);
-                            const indexB = memberOrder.indexOf(b.employee_id);
-                            const finalA = indexA !== -1 ? indexA : 9999;
-                            const finalB = indexB !== -1 ? indexB : 9999;
-                            return finalA - finalB;
+                            if (adminSortField === 'default') {
+                              const indexA = memberOrder.indexOf(a.employee_id);
+                              const indexB = memberOrder.indexOf(b.employee_id);
+                              const finalA = indexA !== -1 ? indexA : 9999;
+                              const finalB = indexB !== -1 ? indexB : 9999;
+                              return finalA - finalB;
+                            }
+
+                            let valA = '';
+                            let valB = '';
+
+                            if (adminSortField === 'firstname') {
+                              valA = (a.employee_first_name || '').trim().toLowerCase();
+                              valB = (b.employee_first_name || '').trim().toLowerCase();
+                            } else if (adminSortField === 'service') {
+                              valA = ((a.service === 'Directeur' ? 'Direction' : a.service) || '').trim().toLowerCase();
+                              valB = ((b.service === 'Directeur' ? 'Direction' : b.service) || '').trim().toLowerCase();
+                            } else if (adminSortField === 'manager') {
+                              valA = (a.manager_name || '').trim().toLowerCase();
+                              valB = (b.manager_name || '').trim().toLowerCase();
+                            } else if (adminSortField === 'hireDate') {
+                              valA = a.hire_date || '';
+                              valB = b.hire_date || '';
+                            }
+
+                            if (valA === '' && valB !== '') return 1;
+                            if (valB === '' && valA !== '') return -1;
+                            if (valA === '' && valB === '') return 0;
+
+                            if (adminSortDirection === 'asc') {
+                              return valA.localeCompare(valB, 'fr', { numeric: true });
+                            } else {
+                              return valB.localeCompare(valA, 'fr', { numeric: true });
+                            }
                           });
                           const filtered = sorted.filter(m => {
                             if (adminServiceFilter === 'Tous') return true;
@@ -2696,7 +2809,7 @@ export default function Page() {
                           return filtered.slice(0, adminRHLimit).map((m) => (
                             <tr
                               key={m.employee_id}
-                              draggable={true}
+                              draggable={adminSortField === 'default'}
                               onDragStart={(e) => {
                                 setDraggedMemberId(m.employee_id);
                                 e.dataTransfer.effectAllowed = 'move';
@@ -2729,7 +2842,11 @@ export default function Page() {
                                   <button
                                     type="button"
                                     className="drag-handle-btn"
-                                    title="Faire glisser pour réordonner"
+                                    title={adminSortField === 'default' ? "Faire glisser pour réordonner" : "Désactivé en mode tri par colonne"}
+                                    style={{ 
+                                      opacity: adminSortField === 'default' ? 1 : 0.2, 
+                                      cursor: adminSortField === 'default' ? 'grab' : 'not-allowed' 
+                                    }}
                                   >
                                     <svg width="10" height="15" viewBox="0 0 10 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                                       <circle cx="2" cy="2.5" r="0.75" fill="currentColor" stroke="none" />
@@ -2811,28 +2928,34 @@ export default function Page() {
                       const svc = (m.service === 'Directeur' ? 'Direction' : m.service) || 'Non spécifié';
                       return svc === adminServiceFilter;
                     });
-                    if (filtered.length > adminRHLimit) {
+                    if (filtered.length > 0) {
                       return (
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-                          <button
-                            type="button"
-                            className="btn-accent"
-                            onClick={() => setAdminRHLimit(prev => prev + 5)}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem', marginTop: '1rem', padding: '0.5rem 0' }}>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Afficher :</span>
+                          <select
+                            value={adminRHLimit}
+                            onChange={(e) => setAdminRHLimit(Number(e.target.value))}
                             style={{
-                              background: 'none',
-                              border: '1px solid var(--brand-orange)',
-                              color: 'var(--brand-orange)',
-                              padding: '0.5rem 1.5rem',
-                              borderRadius: '20px',
+                              padding: '0.35rem 0.5rem',
+                              fontSize: '0.85rem',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border-light)',
+                              backgroundColor: 'var(--panel-white)',
+                              color: 'var(--text-primary)',
                               cursor: 'pointer',
-                              fontWeight: 600,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem'
+                              width: '120px',
+                              display: 'inline-block',
+                              outline: 'none'
                             }}
                           >
-                            <Search size={14} /> Voir plus de collaborateurs ({filtered.length - adminRHLimit} restants)
-                          </button>
+                            <option value={5}>5 lignes</option>
+                            <option value={10}>10 lignes</option>
+                            <option value={15}>15 lignes</option>
+                            <option value={20}>20 lignes</option>
+                            <option value={25}>25 lignes</option>
+                            <option value={50}>50 lignes</option>
+                            <option value={100}>100 lignes</option>
+                          </select>
                         </div>
                       );
                     }
@@ -3199,24 +3322,33 @@ export default function Page() {
                             </div>
                           );
                         })}
-                        {filtered.length > pointageExpectedLimit && (
-                          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', width: '100%' }}>
-                            <button
-                              type="button"
-                              onClick={() => setPointageExpectedLimit(prev => prev + 5)}
+                        {filtered.length > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginTop: '1rem', width: '100%', padding: '0.25rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Afficher :</span>
+                            <select
+                              value={pointageExpectedLimit}
+                              onChange={(e) => setPointageExpectedLimit(Number(e.target.value))}
                               style={{
-                                background: 'none',
-                                border: '1px solid var(--brand-orange)',
-                                color: 'var(--brand-orange)',
-                                padding: '0.4rem 1rem',
-                                borderRadius: '20px',
+                                padding: '0.35rem 0.5rem',
+                                fontSize: '0.85rem',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-light)',
+                                backgroundColor: 'var(--panel-white)',
+                                color: 'var(--text-primary)',
                                 cursor: 'pointer',
-                                fontWeight: 600,
-                                fontSize: '0.8rem'
+                                width: '120px',
+                                display: 'inline-block',
+                                outline: 'none'
                               }}
                             >
-                              <ChevronDown size={14} /> Voir plus ({filtered.length - pointageExpectedLimit} restants)
-                            </button>
+                              <option value={5}>5 lignes</option>
+                              <option value={10}>10 lignes</option>
+                              <option value={15}>15 lignes</option>
+                              <option value={20}>20 lignes</option>
+                              <option value={25}>25 lignes</option>
+                              <option value={50}>50 lignes</option>
+                              <option value={100}>100 lignes</option>
+                            </select>
                           </div>
                         )}
                       </>
@@ -3301,24 +3433,33 @@ export default function Page() {
                             </button>
                           </div>
                         ))}
-                        {filtered.length > pointagePresentLimit && (
-                          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', width: '100%' }}>
-                            <button
-                              type="button"
-                              onClick={() => setPointagePresentLimit(prev => prev + 5)}
+                        {filtered.length > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginTop: '1rem', width: '100%', padding: '0.25rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Afficher :</span>
+                            <select
+                              value={pointagePresentLimit}
+                              onChange={(e) => setPointagePresentLimit(Number(e.target.value))}
                               style={{
-                                background: 'none',
-                                border: '1px solid var(--brand-orange)',
-                                color: 'var(--brand-orange)',
-                                padding: '0.4rem 1rem',
-                                borderRadius: '20px',
+                                padding: '0.35rem 0.5rem',
+                                fontSize: '0.85rem',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-light)',
+                                backgroundColor: 'var(--panel-white)',
+                                color: 'var(--text-primary)',
                                 cursor: 'pointer',
-                                fontWeight: 600,
-                                fontSize: '0.8rem'
+                                width: '120px',
+                                display: 'inline-block',
+                                outline: 'none'
                               }}
                             >
-                              <ChevronDown size={14} /> Voir plus ({filtered.length - pointagePresentLimit} restants)
-                            </button>
+                              <option value={5}>5 lignes</option>
+                              <option value={10}>10 lignes</option>
+                              <option value={15}>15 lignes</option>
+                              <option value={20}>20 lignes</option>
+                              <option value={25}>25 lignes</option>
+                              <option value={50}>50 lignes</option>
+                              <option value={100}>100 lignes</option>
+                            </select>
                           </div>
                         )}
                       </>

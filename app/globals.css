@@ -1451,3 +1451,13 @@ body.dark .login-logo-img {
     display: block !important;
   }
 }
+
+.sortable-header {
+  transition: background-color 0.2s ease;
+}
+.sortable-header:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+body.dark .sortable-header:hover {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
