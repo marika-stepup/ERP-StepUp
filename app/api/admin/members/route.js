@@ -53,7 +53,8 @@ export async function GET(req) {
         remaining_perm: Number(row.remaining_perm || 0),
         manager_name: row.manager_name || 'Aucun',
         service: row.service || 'Non spécifié',
-        hire_date: row.hire_date || ''
+        hire_date: row.hire_date || '',
+        work_schedule: row.work_schedule || null
       };
     });
 

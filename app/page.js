@@ -374,6 +374,9 @@ export default function Page() {
     'Direction',
     'Admin',
     'Team leader',
+    'Chef de projet',
+    'Account Manager',
+    'Stratège',
     'Web',
     'Graphiste',
     'SEO',
@@ -716,6 +719,9 @@ export default function Page() {
         'Direction',
         'Admin',
         'Team leader',
+        'Chef de projet',
+        'Account Manager',
+        'Stratège',
         'Web',
         'Graphiste',
         'SEO',
@@ -2010,6 +2016,9 @@ export default function Page() {
                             'Direction',
                             'Admin',
                             'Team leader',
+                            'Chef de projet',
+                            'Account Manager',
+                            'Stratège',
                             'Web',
                             'Graphiste',
                             'SEO',
@@ -2432,6 +2441,9 @@ export default function Page() {
                         <option value="Direction">Direction</option>
                         <option value="Admin">Admin</option>
                         <option value="Team leader">Team leader</option>
+                        <option value="Chef de projet">Chef de projet</option>
+                        <option value="Account Manager">Account Manager</option>
+                        <option value="Stratège">Stratège</option>
                         <option value="Web">Web</option>
                         <option value="Graphiste">Graphiste</option>
                         <option value="SEO">SEO</option>
@@ -3488,6 +3500,9 @@ export default function Page() {
                   <option value="Direction">Direction</option>
                   <option value="Admin">Admin</option>
                   <option value="Team leader">Team leader</option>
+                  <option value="Chef de projet">Chef de projet</option>
+                  <option value="Account Manager">Account Manager</option>
+                  <option value="Stratège">Stratège</option>
                   <option value="Web">Web</option>
                   <option value="Graphiste">Graphiste</option>
                   <option value="SEO">SEO</option>
