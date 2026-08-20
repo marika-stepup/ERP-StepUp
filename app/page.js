@@ -215,6 +215,8 @@ export default function Page() {
   const [adminRHLimit, setAdminRHLimit] = useState(5);
   const [pointageExpectedLimit, setPointageExpectedLimit] = useState(5);
   const [pointagePresentLimit, setPointagePresentLimit] = useState(5);
+  const [expectedSort, setExpectedSort] = useState('time-asc');
+  const [presentSort, setPresentSort] = useState('time-asc');
 
   const [memberError, setMemberError] = useState(null);
   const [memberSuccess, setMemberSuccess] = useState(false);
@@ -1119,6 +1121,15 @@ export default function Page() {
       setMemberLoading(false);
     }
   };
+  const getExpectedArrivalTime = (emp, dateString) => {
+    if (!dateString) return '08:00';
+    const dateObj = new Date(dateString);
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayOfWeek = days[dateObj.getDay()];
+    const schedule = emp.work_schedule || {};
+    const daySchedule = schedule[dayOfWeek] || schedule.default || { arrival: '08:00', departure: '17:00' };
+    return daySchedule.arrival || '08:00';
+  };
 
   // 7.5 Time logs & Pointage Handlers
   const fetchPointageData = async (forceSpinner = false) => {
@@ -1552,7 +1563,7 @@ export default function Page() {
                         color: 'var(--text-primary)',
                         padding: '0.6rem 1rem',
                         width: '100%',
-                        textAlign: 'left',
+                        textAlign: 'center',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.75rem',
@@ -2843,9 +2854,9 @@ export default function Page() {
                                     type="button"
                                     className="drag-handle-btn"
                                     title={adminSortField === 'default' ? "Faire glisser pour réordonner" : "Désactivé en mode tri par colonne"}
-                                    style={{ 
-                                      opacity: adminSortField === 'default' ? 1 : 0.2, 
-                                      cursor: adminSortField === 'default' ? 'grab' : 'not-allowed' 
+                                    style={{
+                                      opacity: adminSortField === 'default' ? 1 : 0.2,
+                                      cursor: adminSortField === 'default' ? 'grab' : 'not-allowed'
                                     }}
                                   >
                                     <svg width="10" height="15" viewBox="0 0 10 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -3240,18 +3251,41 @@ export default function Page() {
               {/* Column 1: A l'étape d'arrivée (Non présents) */}
               <div className={`panel pointage-column-panel expected-panel ${pointageSubTab === 'expected' ? 'mobile-show' : 'mobile-hide'}`} style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '2px solid var(--border-light)', paddingBottom: '0.75rem' }}>
-                  <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    Non arrivés
-                  </h2>
-                  <span className="badge-role employee" style={{ padding: '0.2rem 0.5rem', borderRadius: '12px', fontSize: '0.75rem' }}>
-                    {pointageEmployees.filter(emp => {
-                      // Match filter
-                      const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
-                      const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
-                      const notClockedIn = !emp.time_log || !emp.time_log.clock_in;
-                      return matchesSearch && matchesService && notClockedIn;
-                    }).length}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)' }}>
+                      Non arrivés
+                    </h2>
+                    <span className="badge-role employee" style={{ padding: '0.2rem 0.5rem', borderRadius: '12px', fontSize: '0.75rem' }}>
+                      {pointageEmployees.filter(emp => {
+                        // Match filter
+                        const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                        const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
+                        const notClockedIn = !emp.time_log || !emp.time_log.clock_in;
+                        return matchesSearch && matchesService && notClockedIn;
+                      }).length}
+                    </span>
+                  </div>
+                  <select
+                    value={expectedSort}
+                    onChange={(e) => setExpectedSort(e.target.value)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '0.8rem',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-light)',
+                      backgroundColor: 'var(--panel-white)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      width: '160px'
+                    }}
+                  >
+                    <option value="time-asc">Tri : Horaire (croiss.)</option>
+                    <option value="time-desc">Tri : Horaire (décroiss.)</option>
+                    <option value="name-asc">Tri : Prénom (A-Z)</option>
+                    <option value="name-desc">Tri : Prénom (Z-A)</option>
+                    <option value="service-asc">Tri : Service (A-Z)</option>
+                  </select>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '300px' }}>
@@ -3265,7 +3299,33 @@ export default function Page() {
                       return matchesSearch && matchesService && notClockedIn;
                     });
 
-                    if (filtered.length === 0) {
+                    const sorted = [...filtered].sort((a, b) => {
+                      if (expectedSort === 'time-asc') {
+                        const timeA = getExpectedArrivalTime(a, pointageDate);
+                        const timeB = getExpectedArrivalTime(b, pointageDate);
+                        if (timeA !== timeB) return timeA.localeCompare(timeB);
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      } else if (expectedSort === 'time-desc') {
+                        const timeA = getExpectedArrivalTime(a, pointageDate);
+                        const timeB = getExpectedArrivalTime(b, pointageDate);
+                        if (timeA !== timeB) return timeB.localeCompare(timeA);
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      } else if (expectedSort === 'name-asc') {
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      } else if (expectedSort === 'name-desc') {
+                        const comp = (b.employee_first_name || '').localeCompare(a.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                        if (comp !== 0) return comp;
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      } else if (expectedSort === 'service-asc') {
+                        const svcA = a.service || '';
+                        const svcB = b.service || '';
+                        if (svcA !== svcB) return svcA.localeCompare(svcB, 'fr', { sensitivity: 'base' });
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      }
+                      return 0;
+                    });
+
+                    if (sorted.length === 0) {
                       return (
                         <div style={{ textAlign: 'center', padding: '4rem 1rem', background: 'var(--panel-white)', borderRadius: '8px', border: '1px dashed var(--border-light)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                           Aucun collaborateur attendu dans cette liste.
@@ -3275,7 +3335,7 @@ export default function Page() {
 
                     return (
                       <>
-                        {filtered.slice(0, pointageExpectedLimit).map(emp => {
+                        {sorted.slice(0, pointageExpectedLimit).map(emp => {
                           // Get schedule of day dynamically
                           const dateObj = new Date(pointageDate);
                           const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -3360,17 +3420,40 @@ export default function Page() {
               {/* Column 2: Présents dans les locaux */}
               <div className={`panel pointage-column-panel present-panel ${pointageSubTab === 'present' ? 'mobile-show' : 'mobile-hide'}`} style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '2px solid var(--border-light)', paddingBottom: '0.75rem' }}>
-                  <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    Présents
-                  </h2>
-                  <span className="badge-role manager" style={{ padding: '0.2rem 0.5rem', borderRadius: '12px', fontSize: '0.75rem' }}>
-                    {pointageEmployees.filter(emp => {
-                      const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
-                      const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
-                      const isClockedIn = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
-                      return matchesSearch && matchesService && isClockedIn;
-                    }).length}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)' }}>
+                      Présents
+                    </h2>
+                    <span className="badge-role manager" style={{ padding: '0.2rem 0.5rem', borderRadius: '12px', fontSize: '0.75rem' }}>
+                      {pointageEmployees.filter(emp => {
+                        const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                        const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
+                        const isClockedIn = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
+                        return matchesSearch && matchesService && isClockedIn;
+                      }).length}
+                    </span>
+                  </div>
+                  <select
+                    value={presentSort}
+                    onChange={(e) => setPresentSort(e.target.value)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '0.8rem',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-light)',
+                      backgroundColor: 'var(--panel-white)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      width: '160px'
+                    }}
+                  >
+                    <option value="time-asc">Tri : Arrivée (croiss.)</option>
+                    <option value="time-desc">Tri : Arrivée (décroiss.)</option>
+                    <option value="name-asc">Tri : Prénom (A-Z)</option>
+                    <option value="name-desc">Tri : Prénom (Z-A)</option>
+                    <option value="service-asc">Tri : Service (A-Z)</option>
+                  </select>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '300px' }}>
@@ -3384,7 +3467,33 @@ export default function Page() {
                       return matchesSearch && matchesService && isClockedIn;
                     });
 
-                    if (filtered.length === 0) {
+                    const sorted = [...filtered].sort((a, b) => {
+                      if (presentSort === 'time-asc') {
+                        const timeA = a.time_log?.clock_in || '00:00';
+                        const timeB = b.time_log?.clock_in || '00:00';
+                        if (timeA !== timeB) return timeA.localeCompare(timeB);
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      } else if (presentSort === 'time-desc') {
+                        const timeA = a.time_log?.clock_in || '00:00';
+                        const timeB = b.time_log?.clock_in || '00:00';
+                        if (timeA !== timeB) return timeB.localeCompare(timeA);
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      } else if (presentSort === 'name-asc') {
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      } else if (presentSort === 'name-desc') {
+                        const comp = (b.employee_first_name || '').localeCompare(a.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                        if (comp !== 0) return comp;
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      } else if (presentSort === 'service-asc') {
+                        const svcA = a.service || '';
+                        const svcB = b.service || '';
+                        if (svcA !== svcB) return svcA.localeCompare(svcB, 'fr', { sensitivity: 'base' });
+                        return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
+                      }
+                      return 0;
+                    });
+
+                    if (sorted.length === 0) {
                       return (
                         <div style={{ textAlign: 'center', padding: '4rem 1rem', background: 'var(--panel-white)', borderRadius: '8px', border: '1px dashed var(--border-light)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                           Aucun collaborateur présent actuellement.
@@ -3394,7 +3503,7 @@ export default function Page() {
 
                     return (
                       <>
-                        {filtered.slice(0, pointagePresentLimit).map(emp => (
+                        {sorted.slice(0, pointagePresentLimit).map(emp => (
                           <div key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-white)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border-light)' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                               <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{emp.employee_first_name}</span>
