@@ -34,6 +34,16 @@ const formatDateStr = (str) => {
   return str;
 };
 
+const formatDuration = (days) => {
+  const d = parseFloat(days);
+  if (isNaN(d)) return '-';
+  if (d < 1) {
+    const hours = d * 8;
+    return `${parseFloat(hours.toFixed(2))} h`.replace('.', ',');
+  }
+  return `${d} j`.replace('.', ',');
+};
+
 const getTodayDateString = () => {
   const d = new Date();
   const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
@@ -225,6 +235,8 @@ export default function Page() {
   const [editingLeave, setEditingLeave] = useState(null);
   const [editStartDate, setEditStartDate] = useState('');
   const [editEndDate, setEditEndDate] = useState('');
+  const [editStartTime, setEditStartTime] = useState('08:00');
+  const [editEndTime, setEditEndTime] = useState('17:00');
   const [editLeaveType, setEditLeaveType] = useState('Congés Payés');
   const [editLeaveError, setEditLeaveError] = useState(null);
   const [editLeaveLoading, setEditLeaveLoading] = useState(false);
@@ -818,6 +830,8 @@ export default function Page() {
         body: JSON.stringify({
           start_date: startDate,
           end_date: endDate,
+          start_time: startTime,
+          end_time: endTime,
           leave_type: leaveType,
           reason: reason
         })
@@ -1010,7 +1024,33 @@ export default function Page() {
     };
     setEditStartDate(parseDateToInputVal(req.start_date));
     setEditEndDate(parseDateToInputVal(req.end_date));
-    setEditLeaveType(req.leave_type);
+
+    // Parse times from leave_type if present, e.g. "Permission Spéciale (08:00 - 10:00)"
+    let typeVal = req.leave_type;
+    let sTime = '08:00';
+    let eTime = '17:00';
+    const timeMatch = req.leave_type.match(/\(([^)]+)\)/);
+    if (timeMatch && timeMatch[1]) {
+      const times = timeMatch[1].split('-');
+      if (times.length === 2) {
+        sTime = times[0].trim();
+        eTime = times[1].trim();
+        typeVal = req.leave_type.replace(/\s*\([^)]+\)/g, '').trim();
+      }
+    }
+
+    // Normalize type values to match select options
+    if (typeVal === 'CP') typeVal = 'CP';
+    else if (typeVal === 'Congés Payés') typeVal = 'Congés Payés';
+    else if (typeVal === 'Congé Sans Solde') typeVal = 'Congé Sans Solde';
+    else if (typeVal === 'Permission') typeVal = 'Permission';
+    else if (typeVal === 'Permission Exceptionnelle') typeVal = 'Permission Exceptionnelle';
+    else if (typeVal === 'Permission à rattraper') typeVal = 'Permission à rattraper';
+    else if (typeVal === 'Maladie') typeVal = 'Maladie';
+
+    setEditLeaveType(typeVal);
+    setEditStartTime(sTime);
+    setEditEndTime(eTime);
     setEditLeaveError(null);
   };
 
@@ -1030,6 +1070,8 @@ export default function Page() {
           request_id: editingLeave.request_id,
           start_date: editStartDate,
           end_date: editEndDate,
+          start_time: editStartTime,
+          end_time: editEndTime,
           leave_type: editLeaveType
         })
       });
@@ -1785,9 +1827,11 @@ export default function Page() {
                   {submitError && <div className="error-message" style={{ marginTop: '1rem', marginBottom: '1rem' }}>{submitError}</div>}
                   {submitSuccess && <div className="success-message" style={{ marginTop: '1rem', marginBottom: '1rem' }}>Votre demande a été soumise.</div>}
 
-                  <button type="submit" className="btn-accent" disabled={submitting}>
-                    {submitting ? 'Envoi...' : 'Soumettre la demande'}
-                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem', width: '100%' }}>
+                    <button type="submit" className="btn-accent" disabled={submitting}>
+                      {submitting ? 'Envoi...' : 'Soumettre la demande'}
+                    </button>
+                  </div>
                 </form>
               </div>
             </div>
@@ -1874,7 +1918,7 @@ export default function Page() {
                               Du {formatDateStr(req.start_date)}<br />
                               Au {formatDateStr(req.end_date)}
                             </td>
-                            <td><strong>{req.business_days} j</strong></td>
+                            <td><strong>{formatDuration(req.business_days)}</strong></td>
                             <td>
                               {req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}
                             </td>
@@ -2168,7 +2212,7 @@ export default function Page() {
                                       const fridayReq = employeeReqs.find(req =>
                                         prevDateString >= req.start_date &&
                                         prevDateString <= req.end_date &&
-                                        (req.leave_type === 'CP' || req.leave_type === 'Congés Payés')
+                                        (req.leave_type.startsWith('CP') || req.leave_type.startsWith('Congés Payés'))
                                       );
                                       if (fridayReq) {
                                         isSaturdayCP = true;
@@ -2200,10 +2244,10 @@ export default function Page() {
                                   } else if (activeReq) {
                                     if (activeReq.status === 'Approuvé') {
                                       cellClass += ' status-approved';
-                                      cellText = '1';
+                                      cellText = activeReq.business_days < 1 ? activeReq.business_days.toString().replace('.', ',') : '1';
                                     } else {
                                       cellClass += ' status-pending';
-                                      cellText = '1';
+                                      cellText = activeReq.business_days < 1 ? activeReq.business_days.toString().replace('.', ',') : '1';
                                     }
 
                                     // Check if service conflict/overlap exists on this day
@@ -2370,7 +2414,7 @@ export default function Page() {
                           <div>
                             <strong style={{ fontSize: '1.1rem' }}>{employeeMember?.employee_first_name || req.employee_name}</strong>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                              Type: <strong>{req.leave_type}</strong> | Jours demandés: <strong>{req.business_days} j</strong>
+                              Type: <strong>{req.leave_type}</strong> | Durée: <strong>{formatDuration(req.business_days)}</strong>
                             </div>
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
                               Demande soumise le : <strong>{req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}</strong>
@@ -3058,7 +3102,7 @@ export default function Page() {
                               <td>
                                 Du {formatDateStr(req.start_date)} au {formatDateStr(req.end_date)}
                               </td>
-                              <td><strong>{req.business_days} j</strong></td>
+                              <td><strong>{formatDuration(req.business_days)}</strong></td>
                               <td>
                                 <span className={`status-badge ${req.status === 'En attente' ? 'status-pending' :
                                   req.status === 'Approuvé' ? 'status-approved' : 'status-rejected'
@@ -3922,26 +3966,50 @@ export default function Page() {
             </p>
 
             <form onSubmit={handleUpdateLeave} style={{ padding: 0, border: 'none', background: 'none', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label>Date de Début</label>
-                <input
-                  type="date"
-                  value={editStartDate}
-                  onChange={(e) => setEditStartDate(e.target.value)}
-                  required
-                  disabled={editLeaveLoading}
-                />
+              <div className="form-row" style={{ display: 'flex', gap: '1rem' }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Date de Début</label>
+                  <input
+                    type="date"
+                    value={editStartDate}
+                    onChange={(e) => setEditStartDate(e.target.value)}
+                    required
+                    disabled={editLeaveLoading}
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Heure de Début</label>
+                  <input
+                    type="time"
+                    value={editStartTime}
+                    onChange={(e) => setEditStartTime(e.target.value)}
+                    required
+                    disabled={editLeaveLoading}
+                  />
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>Date de Fin</label>
-                <input
-                  type="date"
-                  value={editEndDate}
-                  onChange={(e) => setEditEndDate(e.target.value)}
-                  required
-                  disabled={editLeaveLoading}
-                />
+              <div className="form-row" style={{ display: 'flex', gap: '1rem' }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Date de Fin</label>
+                  <input
+                    type="date"
+                    value={editEndDate}
+                    onChange={(e) => setEditEndDate(e.target.value)}
+                    required
+                    disabled={editLeaveLoading}
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Heure de Fin</label>
+                  <input
+                    type="time"
+                    value={editEndTime}
+                    onChange={(e) => setEditEndTime(e.target.value)}
+                    required
+                    disabled={editLeaveLoading}
+                  />
+                </div>
               </div>
 
               <div className="form-group">

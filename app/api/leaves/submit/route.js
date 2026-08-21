@@ -13,7 +13,8 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { start_date, end_date, leave_type } = body;
+    const { start_date, end_date, start_time, end_time } = body;
+    let { leave_type } = body;
 
     // Validation
     if (!start_date || !end_date || !leave_type) {
@@ -25,10 +26,47 @@ export async function POST(req) {
 
     // 2. Calculate working days
     let businessDays;
-    try {
-      businessDays = calculateBusinessDays(start_date, end_date);
-    } catch (dateErr) {
-      return NextResponse.json({ error: dateErr.message }, { status: 400 });
+    const isSingleDay = start_date === end_date;
+    const hasCustomHours = start_time && end_time && (start_time !== '08:00' || end_time !== '17:00');
+
+    if (isSingleDay && start_time && end_time) {
+      const [startH, startM] = start_time.split(':').map(Number);
+      const [endH, endM] = end_time.split(':').map(Number);
+      const durationInHours = ((endH * 60 + endM) - (startH * 60 + startM)) / 60;
+
+      if (durationInHours <= 0) {
+        return NextResponse.json(
+          { error: "L'heure de fin doit être supérieure à l'heure de début." },
+          { status: 400 }
+        );
+      }
+
+      if (durationInHours < 1) {
+        return NextResponse.json(
+          { error: "La durée minimale d'un congé ou d'une permission est de 1 heure." },
+          { status: 400 }
+        );
+      }
+
+      if (durationInHours < 8) {
+        businessDays = durationInHours / 8;
+        leave_type = `${leave_type} (${start_time} - ${end_time})`;
+      } else {
+        try {
+          businessDays = calculateBusinessDays(start_date, end_date);
+        } catch (dateErr) {
+          return NextResponse.json({ error: dateErr.message }, { status: 400 });
+        }
+        if (hasCustomHours) {
+          leave_type = `${leave_type} (${start_time} - ${end_time})`;
+        }
+      }
+    } else {
+      try {
+        businessDays = calculateBusinessDays(start_date, end_date);
+      } catch (dateErr) {
+        return NextResponse.json({ error: dateErr.message }, { status: 400 });
+      }
     }
 
     if (businessDays <= 0) {
