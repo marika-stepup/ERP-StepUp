@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react';
 import { supabaseClient } from '../lib/supabaseClient';
 import { splitFullName, isMadagascarHoliday, calculateBusinessDays } from '../lib/utils';
 import { SyncQueueManager } from '../lib/syncQueue';
+import EspaceProduction from './components/EspaceProduction';
+import EspaceManager from './components/EspaceManager';
 import {
   Clock,
   Download,
@@ -1708,6 +1710,22 @@ export default function Page() {
                   >
                     Tableau de bord global
                   </button>
+                  {(balance?.service === 'Direction' || balance?.service === 'Directeur') && (
+                    <>
+                      <button
+                        className={`tab-button ${activeTab === 'production' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('production')}
+                      >
+                        Espace production
+                      </button>
+                      <button
+                        className={`tab-button ${activeTab === 'productionManager' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('productionManager')}
+                      >
+                        Espace manager
+                      </button>
+                    </>
+                  )}
                 </>
               )}
               {(userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Pointeur') && (
@@ -3729,6 +3747,12 @@ export default function Page() {
             )}
 
           </div>
+        )}
+        {profileLoaded && activeTab === 'production' && (balance?.service === 'Direction' || balance?.service === 'Directeur') && (
+          <EspaceProduction user={user} token={token} />
+        )}
+        {profileLoaded && activeTab === 'productionManager' && (balance?.service === 'Direction' || balance?.service === 'Directeur') && (
+          <EspaceManager user={user} token={token} allMembers={allMembers} />
         )}
       </div>
 
