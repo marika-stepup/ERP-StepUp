@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { syncProductionClient } from '../../../../lib/productionSheetsSync';
@@ -120,7 +122,21 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { name, code, contract_period, total_budget_hours } = body;
+    const { 
+      name, 
+      code, 
+      contract_period, 
+      total_budget_hours,
+      start_date,
+      end_date,
+      posts_facebook,
+      posts_instagram,
+      posts_linkedin,
+      posts_google,
+      newsletter_count,
+      blog_count,
+      unquantifiable_tasks
+    } = body;
 
     if (!name || !code || !contract_period) {
       return NextResponse.json({ error: 'Champs requis manquants (name, code, contract_period).' }, { status: 400 });
@@ -134,7 +150,16 @@ export async function POST(req) {
         name,
         code,
         contract_period,
-        total_budget_hours: Number(total_budget_hours) || 0
+        total_budget_hours: Number(total_budget_hours) || 0,
+        start_date: start_date || null,
+        end_date: end_date || null,
+        posts_facebook: Number(posts_facebook) || 0,
+        posts_instagram: Number(posts_instagram) || 0,
+        posts_linkedin: Number(posts_linkedin) || 0,
+        posts_google: Number(posts_google) || 0,
+        newsletter_count: Number(newsletter_count) || 0,
+        blog_count: Number(blog_count) || 0,
+        unquantifiable_tasks: unquantifiable_tasks || null
       })
       .select()
       .single();

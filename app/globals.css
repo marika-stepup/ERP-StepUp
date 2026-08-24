@@ -1935,26 +1935,28 @@ body.dark .status-badge.en-cours {
 }
 
 .btn-play-task {
-  background: #10b981;
-  color: white;
+  background: transparent;
+  color: #10b981;
   border: none;
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-play-task:hover {
-  background: #059669;
-  transform: scale(1.05);
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  transform: scale(1.15);
 }
 
 .btn-play-task:disabled {
-  background: #cbd5e1;
+  background: transparent;
+  color: #cbd5e1;
   cursor: not-allowed;
 }
 

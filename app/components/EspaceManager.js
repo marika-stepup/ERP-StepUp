@@ -9,22 +9,28 @@ import {
   UserCheck 
 } from 'lucide-react';
 
-export default function EspaceManager({ user, token, allMembers }) {
-  const [clients, setClients] = useState([]);
+export default function EspaceManager({ user, token, allMembers, clients, loading, refreshData }) {
   const [selectedClient, setSelectedClient] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [timeLogs, setTimeLogs] = useState([]);
   
   // Modals / Form states
   const [showAddClient, setShowAddClient] = useState(false);
-  const [newClientName, setNewClientName] = useState('');
-  const [newClientCode, setNewClientCode] = useState('');
+  const [newClientInput, setNewClientInput] = useState('');
   const [newClientPeriod, setNewClientPeriod] = useState(() => {
     const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
     const d = new Date();
     return `${months[d.getMonth()]} ${d.getFullYear()}`;
   });
   const [newClientBudget, setNewClientBudget] = useState('20');
+  const [newClientStartDate, setNewClientStartDate] = useState('');
+  const [newClientEndDate, setNewClientEndDate] = useState('');
+  const [newClientFB, setNewClientFB] = useState('0');
+  const [newClientIG, setNewClientIG] = useState('0');
+  const [newClientLI, setNewClientLI] = useState('0');
+  const [newClientGP, setNewClientGP] = useState('0');
+  const [newClientNL, setNewClientNL] = useState('0');
+  const [newClientBlog, setNewClientBlog] = useState('0');
+  const [newClientUnquantifiable, setNewClientUnquantifiable] = useState('');
 
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskCategory, setNewTaskCategory] = useState('');
@@ -39,36 +45,19 @@ export default function EspaceManager({ user, token, allMembers }) {
   const [manualMinutes, setManualMinutes] = useState('0');
   const [manualDate, setManualDate] = useState(() => new Date().toISOString().split('T')[0]);
 
-  // Fetch initial data
-  const fetchData = async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const res = await fetch('/api/production/clients', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setClients(data.clients || []);
-        
-        // Retain or select first client
-        if (data.clients && data.clients.length > 0) {
-          if (selectedClient) {
-            const updated = data.clients.find(c => c.id === selectedClient.id);
-            setSelectedClient(updated || data.clients[0]);
-          } else {
-            setSelectedClient(data.clients[0]);
-          }
-        } else {
-          setSelectedClient(null);
-        }
+  // Sync selected client when props update
+  useEffect(() => {
+    if (clients && clients.length > 0) {
+      if (selectedClient) {
+        const updated = clients.find(c => c.id === selectedClient.id);
+        setSelectedClient(updated || clients[0]);
+      } else {
+        setSelectedClient(clients[0]);
       }
-    } catch (err) {
-      console.error('Error loading production data:', err);
-    } finally {
-      setLoading(false);
+    } else {
+      setSelectedClient(null);
     }
-  };
+  }, [clients]);
 
   const fetchLogs = async (clientId) => {
     if (!token || !clientId) return;
@@ -86,10 +75,6 @@ export default function EspaceManager({ user, token, allMembers }) {
   };
 
   useEffect(() => {
-    fetchData();
-  }, [token]);
-
-  useEffect(() => {
     if (selectedClient) {
       fetchLogs(selectedClient.id);
     } else {
@@ -100,7 +85,26 @@ export default function EspaceManager({ user, token, allMembers }) {
   // Actions: Client
   const handleAddClient = async (e) => {
     e.preventDefault();
-    if (!newClientName || !newClientCode || !newClientPeriod) return;
+    if (!newClientInput || !newClientPeriod) return;
+
+    let code = '';
+    let name = newClientInput.trim();
+
+    // Try to match prefix code like "SD-000 - STEP UP" or "SD-000 STEP UP"
+    const match = newClientInput.match(/^([a-zA-Z0-9]+-\d+)\s*[-:]?\s*(.*)$/) || newClientInput.match(/^([a-zA-Z0-9]+)\s*[-:]\s*(.*)$/);
+    if (match) {
+      code = match[1].trim().toUpperCase();
+      name = match[2].trim();
+    } else {
+      // Fallback unique code generation
+      code = name.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/).map(w => w[0]).join('').toUpperCase();
+      if (code.length < 3) {
+        code = name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase();
+      }
+      if (code.length < 3) {
+        code = code + Math.floor(100 + Math.random() * 900);
+      }
+    }
 
     try {
       const res = await fetch('/api/production/clients', {
@@ -110,20 +114,37 @@ export default function EspaceManager({ user, token, allMembers }) {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          name: newClientName,
-          code: newClientCode,
+          name,
+          code,
           contract_period: newClientPeriod,
-          total_budget_hours: parseFloat(newClientBudget) || 0
+          total_budget_hours: parseFloat(newClientBudget) || 0,
+          start_date: newClientStartDate || null,
+          end_date: newClientEndDate || null,
+          posts_facebook: parseInt(newClientFB) || 0,
+          posts_instagram: parseInt(newClientIG) || 0,
+          posts_linkedin: parseInt(newClientLI) || 0,
+          posts_google: parseInt(newClientGP) || 0,
+          newsletter_count: parseInt(newClientNL) || 0,
+          blog_count: parseInt(newClientBlog) || 0,
+          unquantifiable_tasks: newClientUnquantifiable || null
         })
       });
 
       if (res.ok) {
         const data = await res.json();
-        setNewClientName('');
-        setNewClientCode('');
+        setNewClientInput('');
+        setNewClientStartDate('');
+        setNewClientEndDate('');
+        setNewClientFB('0');
+        setNewClientIG('0');
+        setNewClientLI('0');
+        setNewClientGP('0');
+        setNewClientNL('0');
+        setNewClientBlog('0');
+        setNewClientUnquantifiable('');
         setNewClientBudget('20');
         setShowAddClient(false);
-        await fetchData();
+        await refreshData();
         if (data.client) {
           setSelectedClient(data.client);
         }
@@ -162,7 +183,7 @@ export default function EspaceManager({ user, token, allMembers }) {
         setNewTaskBudget('4');
         setNewTaskDueDate('');
         setShowAddTask(false);
-        await fetchData();
+        await refreshData();
       } else {
         const errData = await res.json();
         alert(errData.error || 'Erreur lors de la création de la tâche.');
@@ -183,7 +204,7 @@ export default function EspaceManager({ user, token, allMembers }) {
         body: JSON.stringify({ status: newStatus })
       });
       if (res.ok) {
-        await fetchData();
+        await refreshData();
       }
     } catch (err) {
       console.error('Error updating task status:', err);
@@ -198,7 +219,7 @@ export default function EspaceManager({ user, token, allMembers }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        await fetchData();
+        await refreshData();
       }
     } catch (err) {
       console.error('Error deleting task:', err);
@@ -232,14 +253,16 @@ export default function EspaceManager({ user, token, allMembers }) {
           employee_name: `${member.employee_first_name} ${member.employee_name}`,
           duration_seconds: totalSeconds,
           log_type: 'production',
-          logged_at: new Date(manualDate).toISOString()
+          logged_at: new Date(manualDate).toISOString(),
+          start_time: new Date(manualDate).toISOString(),
+          end_time: new Date(manualDate).toISOString()
         })
       });
 
       if (res.ok) {
         setManualHours('1');
         setManualMinutes('0');
-        await fetchData();
+        await refreshData();
         if (selectedClient) {
           await fetchLogs(selectedClient.id);
         }
@@ -260,7 +283,7 @@ export default function EspaceManager({ user, token, allMembers }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        await fetchData();
+        await refreshData();
         if (selectedClient) {
           await fetchLogs(selectedClient.id);
         }
@@ -602,51 +625,104 @@ export default function EspaceManager({ user, token, allMembers }) {
       {/* MODAL: ADD CLIENT */}
       {showAddClient && (
         <div className="modal-overlay">
-          <div className="modal-content">
-            <h2 className="modal-title">Nouveau Client de Production</h2>
+          <div className="modal-content" style={{ maxWidth: '600px', width: '90%' }}>
+            <h2 className="modal-title" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Nouveau Client de Production</h2>
             <form onSubmit={handleAddClient}>
               <div className="form-group">
-                <label>Nom du client</label>
+                <label>Nom du client (avec code facultatif)</label>
                 <input 
                   type="text" 
-                  value={newClientName} 
-                  onChange={(e) => setNewClientName(e.target.value)} 
-                  placeholder="ex: STEP UP" 
+                  value={newClientInput} 
+                  onChange={(e) => setNewClientInput(e.target.value)} 
+                  placeholder="ex: SD-000 - STEP UP" 
                   required 
                 />
               </div>
-              <div className="form-group">
-                <label>Code client</label>
-                <input 
-                  type="text" 
-                  value={newClientCode} 
-                  onChange={(e) => setNewClientCode(e.target.value)} 
-                  placeholder="ex: SD-000" 
-                  required 
+
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label>Période du contrat</label>
+                  <input 
+                    type="text" 
+                    value={newClientPeriod} 
+                    onChange={(e) => setNewClientPeriod(e.target.value)} 
+                    placeholder="ex: Août 2026" 
+                    required 
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Budget total (heures)</label>
+                  <input 
+                    type="number" 
+                    value={newClientBudget} 
+                    onChange={(e) => setNewClientBudget(e.target.value)} 
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
+                <div className="form-group">
+                  <label>Date de début du contrat</label>
+                  <input 
+                    type="date" 
+                    value={newClientStartDate} 
+                    onChange={(e) => setNewClientStartDate(e.target.value)} 
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Date de fin du contrat</label>
+                  <input 
+                    type="date" 
+                    value={newClientEndDate} 
+                    onChange={(e) => setNewClientEndDate(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>
+                <h3 className="form-sub-title" style={{ fontSize: '0.95rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.3rem', color: 'var(--brand-orange)' }}>Délivrables par mois</h3>
+                <div className="form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem', marginTop: '0.5rem' }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.8rem' }}>Facebook Posts</label>
+                    <input type="number" min="0" value={newClientFB} onChange={(e) => setNewClientFB(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.8rem' }}>Instagram Posts</label>
+                    <input type="number" min="0" value={newClientIG} onChange={(e) => setNewClientIG(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.8rem' }}>LinkedIn Posts</label>
+                    <input type="number" min="0" value={newClientLI} onChange={(e) => setNewClientLI(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.8rem' }}>Google Posts</label>
+                    <input type="number" min="0" value={newClientGP} onChange={(e) => setNewClientGP(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.8rem' }}>Newsletters</label>
+                    <input type="number" min="0" value={newClientNL} onChange={(e) => setNewClientNL(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.8rem' }}>Billets Blog</label>
+                    <input type="number" min="0" value={newClientBlog} onChange={(e) => setNewClientBlog(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                <label>Tâches inquantifiables (ex: modération, rédaction web...)</label>
+                <textarea 
+                  value={newClientUnquantifiable} 
+                  onChange={(e) => setNewClientUnquantifiable(e.target.value)} 
+                  placeholder="Saisissez ici les tâches inquantifiables ou notes particulières..."
+                  style={{ width: '100%', minHeight: '80px', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', resize: 'vertical', fontFamily: 'inherit' }}
                 />
               </div>
-              <div className="form-group">
-                <label>Période du contrat</label>
-                <input 
-                  type="text" 
-                  value={newClientPeriod} 
-                  onChange={(e) => setNewClientPeriod(e.target.value)} 
-                  placeholder="ex: Août 2026" 
-                  required 
-                />
-              </div>
-              <div className="form-group">
-                <label>Budget total du contrat (heures)</label>
-                <input 
-                  type="number" 
-                  value={newClientBudget} 
-                  onChange={(e) => setNewClientBudget(e.target.value)} 
-                  required 
-                />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowAddClient(false)}>Annuler</button>
-                <button type="submit" className="btn btn-primary">Créer le client</button>
+
+              <div className="modal-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem' }}>
+                <button type="button" className="btn btn-outline" style={{ minWidth: '120px' }} onClick={() => setShowAddClient(false)}>Annuler</button>
+                <button type="submit" className="btn btn-primary" style={{ minWidth: '150px' }}>Créer le client</button>
               </div>
             </form>
           </div>

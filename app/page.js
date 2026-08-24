@@ -169,6 +169,34 @@ export default function Page() {
   const [allMembers, setAllMembers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
 
+  // Shared state for production tracker to optimize Vercel & Supabase request quotas
+  const [productionClients, setProductionClients] = useState([]);
+  const [productionLoading, setProductionLoading] = useState(true);
+
+  const fetchProductionClientsData = async () => {
+    if (!tokenRef.current) return;
+    setProductionLoading(true);
+    try {
+      const res = await fetch('/api/production/clients', {
+        headers: { Authorization: `Bearer ${tokenRef.current}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProductionClients(data.clients || []);
+      }
+    } catch (err) {
+      console.error('Error fetching production clients:', err);
+    } finally {
+      setProductionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tokenRef.current && (balance?.service === 'Direction' || balance?.service === 'Directeur')) {
+      fetchProductionClientsData();
+    }
+  }, [balance?.service]);
+
   // Form States (Submit Leave)
   const [leaveType, setLeaveType] = useState('CP'); // 'CP' or 'Permission'
   const [startDate, setStartDate] = useState('');
@@ -3748,11 +3776,29 @@ export default function Page() {
 
           </div>
         )}
-        {profileLoaded && activeTab === 'production' && (balance?.service === 'Direction' || balance?.service === 'Directeur') && (
-          <EspaceProduction user={user} token={token} />
-        )}
-        {profileLoaded && activeTab === 'productionManager' && (balance?.service === 'Direction' || balance?.service === 'Directeur') && (
-          <EspaceManager user={user} token={token} allMembers={allMembers} />
+        {profileLoaded && (balance?.service === 'Direction' || balance?.service === 'Directeur') && (
+          <>
+            <div style={{ display: activeTab === 'production' ? 'block' : 'none' }}>
+              <EspaceProduction 
+                user={user} 
+                token={token} 
+                clients={productionClients}
+                loading={productionLoading}
+                refreshData={fetchProductionClientsData}
+                employeeName={balance.employee_first_name && balance.employee_name ? `${balance.employee_first_name} ${balance.employee_name}` : (user?.user_metadata?.full_name || user?.email || 'Collaborateur')}
+              />
+            </div>
+            <div style={{ display: activeTab === 'productionManager' ? 'block' : 'none' }}>
+              <EspaceManager 
+                user={user} 
+                token={token} 
+                allMembers={allMembers} 
+                clients={productionClients}
+                loading={productionLoading}
+                refreshData={fetchProductionClientsData}
+              />
+            </div>
+          </>
         )}
       </div>
 

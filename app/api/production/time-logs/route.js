@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { syncProductionTimeLog } from '../../../../lib/productionSheetsSync';
@@ -88,10 +90,10 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { task_id, employee_id, employee_name, duration_seconds, log_type, logged_at } = body;
+    const { task_id, employee_id, employee_name, duration_seconds, log_type, logged_at, start_time, end_time } = body;
 
-    if (!task_id || !employee_id || !employee_name || duration_seconds === undefined) {
-      return NextResponse.json({ error: 'Champs requis manquants (task_id, employee_id, employee_name, duration_seconds).' }, { status: 400 });
+    if (!task_id || !employee_id || !employee_name) {
+      return NextResponse.json({ error: 'Champs requis manquants (task_id, employee_id, employee_name).' }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
@@ -106,6 +108,12 @@ export async function POST(req) {
 
     if (logged_at) {
       insertData.logged_at = logged_at;
+    }
+    if (start_time) {
+      insertData.start_time = start_time;
+    }
+    if (end_time !== undefined) {
+      insertData.end_time = end_time; // Can be null
     }
 
     const { data: newLog, error } = await supabase
@@ -138,6 +146,12 @@ export async function POST(req) {
     return NextResponse.json({ log: newLog }, { status: 201 });
   } catch (error) {
     console.error('Error creating production time log:', error);
+    if (error.code === '23505') {
+      return NextResponse.json(
+        { error: 'task_locked', message: "Action impossible : Cette tâche vient d'être prise par un autre collaborateur." },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { error: 'Erreur interne du serveur lors de la création du log de temps.' },
       { status: 500 }

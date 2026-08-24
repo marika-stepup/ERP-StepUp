@@ -7,6 +7,7 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET') return;
   // simple pass-through network-first service worker to satisfy PWA criteria
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });

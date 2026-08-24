@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../../lib/supabaseAuth';
-import { deleteProductionTimeLogFromSheets } from '../../../../../lib/productionSheetsSync';
+import { syncProductionTimeLog, deleteProductionTimeLogFromSheets } from '../../../../../lib/productionSheetsSync';
 
 async function checkDirectionService(authResult) {
   if (authResult.error) return { error: authResult.error };
@@ -17,6 +17,50 @@ async function checkDirectionService(authResult) {
   }
   
   return { user: authResult.user, profile: memberProfile };
+}
+
+export async function PATCH(req, { params }) {
+  const auth = await verifyRole(req, ['hr', 'manager', 'director', 'employee']);
+  const serviceCheck = await checkDirectionService(auth);
+  if (serviceCheck.error) {
+    return NextResponse.json({ error: serviceCheck.error.message }, { status: serviceCheck.error.status });
+  }
+
+  const { id } = params;
+
+  try {
+    const body = await req.json();
+    const { end_time, duration_seconds } = body;
+
+    if (!end_time || duration_seconds === undefined) {
+      return NextResponse.json({ error: 'Champs requis manquants (end_time, duration_seconds).' }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+
+    const { data: updatedLog, error } = await supabase
+      .from('production_time_logs')
+      .update({
+        end_time,
+        duration_seconds: Number(duration_seconds)
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Async sync to Google Sheets (since the log is now completed!)
+    syncProductionTimeLog(updatedLog.id);
+
+    return NextResponse.json({ log: updatedLog });
+  } catch (error) {
+    console.error('Error updating production time log:', error);
+    return NextResponse.json(
+      { error: 'Erreur interne du serveur lors de la mise à jour du log de temps.' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE(req, { params }) {
