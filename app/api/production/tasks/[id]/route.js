@@ -21,9 +21,8 @@ async function checkDirectionService(authResult) {
 
 export async function PATCH(req, { params }) {
   const auth = await verifyRole(req, ['hr', 'manager', 'director', 'employee']);
-  const serviceCheck = await checkDirectionService(auth);
-  if (serviceCheck.error) {
-    return NextResponse.json({ error: serviceCheck.error.message }, { status: serviceCheck.error.status });
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
 
   const { id } = params;

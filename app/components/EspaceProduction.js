@@ -6,7 +6,11 @@ import {
   Briefcase, 
   CheckCircle, 
   AlertCircle,
-  Lock
+  Lock,
+  Calendar,
+  Globe,
+  Mail,
+  BookOpen
 } from 'lucide-react';
 import { supabaseClient } from '../../lib/supabaseClient';
 
@@ -27,6 +31,11 @@ export default function EspaceProduction({ user, token, clients, loading, refres
   const [interruptionLogId, setInterruptionLogId] = useState(null);
   const [interruptionSeconds, setInterruptionSeconds] = useState(0);
 
+  // Allocation client pour interruptions
+  const [interruptionModalOpen, setInterruptionModalOpen] = useState(false);
+  const [interruptionTypeToStart, setInterruptionTypeToStart] = useState(null);
+  const [selectedInterruptionClientId, setSelectedInterruptionClientId] = useState('');
+
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
   const interruptionStartTimeRef = useRef(null);
@@ -44,7 +53,11 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       setSelectedClient(null);
     }
   }, [clients]);
+  const [selectedFilter, setSelectedFilter] = useState('Tous');
 
+  useEffect(() => {
+    setSelectedFilter('Tous');
+  }, [selectedClient?.id]);
   // Fetch active locks & re-hydrate running chrono
   const fetchActiveLocks = async () => {
     try {
@@ -176,7 +189,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
   // Timer interval updates
   useEffect(() => {
-    if (timerRunning) {
+    if (timerRunning || activeInterruption) {
       timerRef.current = setInterval(() => {
         if (activeInterruption) {
           const diff = Math.floor((Date.now() - interruptionStartTimeRef.current) / 1000);
@@ -326,9 +339,40 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     }
   };
 
-  const handleToggleInterruption = async (type) => {
-    if (!activeTask || !activeLogId) return;
+  const handleCompleteTask = async () => {
+    if (!activeTask) return;
+    if (!confirm("Êtes-vous sûr de vouloir marquer cette tâche comme terminée ? Cela arrêtera également le chronomètre.")) return;
 
+    const taskId = activeTask.id;
+    
+    // Stop the timer first to save any logged seconds
+    await handleStopTimer();
+
+    try {
+      // Mark task as completed (status = 'Fait')
+      const res = await fetch(`/api/production/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'Fait' })
+      });
+
+      if (res.ok) {
+        // Refresh data again to display the task as completed
+        await refreshData();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Erreur lors de la complétion de la tâche.");
+      }
+    } catch (err) {
+      console.error('Error completing task:', err);
+      alert("Erreur lors de la complétion de la tâche.");
+    }
+  };
+
+  const handleToggleInterruption = async (type) => {
     const now = new Date().toISOString();
 
     if (activeInterruption === type) {
@@ -339,7 +383,9 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       setInterruptionLogId(null);
       setInterruptionSeconds(0);
 
-      startTimeRef.current = startTimeRef.current + (Date.now() - interruptionStartTimeRef.current);
+      if (activeTask) {
+        startTimeRef.current = startTimeRef.current + (Date.now() - interruptionStartTimeRef.current);
+      }
 
       try {
         if (currentInterLogId && interSeconds > 0) {
@@ -358,53 +404,93 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       } catch (err) {
         console.error('Error stopping interruption:', err);
       }
-    } else {
-      if (activeInterruption && interruptionLogId && interruptionSeconds > 0) {
-        try {
-          await fetch(`/api/production/time-logs/${interruptionLogId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              end_time: now,
-              duration_seconds: interruptionSeconds
-            })
-          });
-        } catch (err) {
-          console.error('Error stopping previous interruption:', err);
-        }
-      }
+    }
+  };
 
+  const handleStartInterruption = async (type, targetClientId) => {
+    const now = new Date().toISOString();
+
+    // 1. Stop current active interruption if any
+    if (activeInterruption && interruptionLogId && interruptionSeconds > 0) {
       try {
-        const res = await fetch('/api/production/time-logs', {
-          method: 'POST',
+        await fetch(`/api/production/time-logs/${interruptionLogId}`, {
+          method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`
           },
           body: JSON.stringify({
-            task_id: activeTask.id,
-            employee_id: user.id,
-            employee_name: employeeName || 'Collaborateur',
-            duration_seconds: 0,
-            log_type: `interruption:${type}`,
-            start_time: now,
-            end_time: null
+            end_time: now,
+            duration_seconds: interruptionSeconds
           })
         });
-
-        if (res.ok) {
-          const data = await res.json();
-          setActiveInterruption(type);
-          setInterruptionLogId(data.log.id);
-          setInterruptionSeconds(0);
-          interruptionStartTimeRef.current = Date.now();
-        }
       } catch (err) {
-        console.error('Error starting new interruption:', err);
+        console.error('Error stopping previous interruption:', err);
       }
+    }
+
+    // 2. Determine target task ID (based on chosen client)
+    let targetTaskId = null;
+    if (targetClientId) {
+      const clientObj = clients.find(c => c.id === targetClientId);
+      if (clientObj && clientObj.tasks && clientObj.tasks.length > 0) {
+        targetTaskId = clientObj.tasks[0].id;
+      }
+    }
+
+    if (!targetTaskId && activeTask) {
+      targetTaskId = activeTask.id;
+    }
+
+    if (!targetTaskId) {
+      alert("Impossible de démarrer l'interruption : le client choisi n'a aucune tâche configurée.");
+      return;
+    }
+
+    // 3. Start the new interruption
+    try {
+      const res = await fetch('/api/production/time-logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          task_id: targetTaskId,
+          employee_id: user.id,
+          employee_name: employeeName || 'Collaborateur',
+          duration_seconds: 0,
+          log_type: `interruption:${type}`,
+          start_time: now,
+          end_time: null
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setActiveInterruption(type);
+        setInterruptionLogId(data.log.id);
+        setInterruptionSeconds(0);
+        interruptionStartTimeRef.current = Date.now();
+      }
+    } catch (err) {
+      console.error('Error starting new interruption:', err);
+    }
+  };
+
+  const handleInterruptionClick = (type) => {
+    if (activeInterruption === type) {
+      // Toggle off
+      handleToggleInterruption(type);
+    } else if (type === 'pause') {
+      // Pause is independent and always allowed! We attribute it to the active task's client or selected client.
+      const clientId = activeTask ? activeTask.client_id : (selectedClient?.id || clients[0]?.id || '');
+      handleStartInterruption('pause', clientId);
+    } else {
+      // Open modal to choose client (Slack, Point Interne, Appel Impromptu)
+      setInterruptionTypeToStart(type);
+      setSelectedInterruptionClientId(activeTask?.client_id || selectedClient?.id || clients[0]?.id || '');
+      setInterruptionModalOpen(true);
     }
   };
 
@@ -424,6 +510,17 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     return `${minutes} min`;
   };
 
+  const getCategoryType = (category) => {
+    const cat = category.toLowerCase();
+    if (cat.includes('linkedin')) return 'LinkedIn';
+    if (cat.includes('facebook') || cat.startsWith('fb')) return 'Facebook';
+    if (cat.includes('instagram') || cat.startsWith('insta') || cat.startsWith('ig')) return 'Instagram';
+    if (cat.includes('google')) return 'Google Posts';
+    if (cat.includes('newsletter')) return 'Newsletter';
+    if (cat.includes('bb') || cat.includes('blog')) return 'Billet Blog';
+    return category; // fallback
+  };
+
   const getGroupedTasks = () => {
     if (!selectedClient) return {};
     const grouped = {};
@@ -438,46 +535,157 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
   const groupedTasks = getGroupedTasks();
 
+  // Get distinct filter types for the client's existing tasks
+  const availableFilterTypes = [
+    'Tous',
+    ...new Set(Object.keys(groupedTasks).map(getCategoryType))
+  ];
+
+  // Filter grouped tasks based on selection
+  const filteredGroupedTasks = {};
+  Object.entries(groupedTasks).forEach(([category, tasks]) => {
+    if (selectedFilter === 'Tous' || getCategoryType(category) === selectedFilter) {
+      filteredGroupedTasks[category] = tasks;
+    }
+  });
+
   return (
     <div className="espace-production">
       {/* HEADER CONTROLS */}
-      <div className="prod-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <h1 className="prod-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Briefcase size={24} style={{ color: 'var(--brand-orange)' }} />
-            Espace Client :
-          </h1>
-          <select 
-            className="client-selector"
-            value={selectedClient?.id || ''}
-            onChange={(e) => {
-              const client = clients.find(c => c.id === e.target.value);
-              setSelectedClient(client || null);
-            }}
-            disabled={timerRunning}
-          >
-            {clients.map(c => (
-              <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
-            ))}
-            {clients.length === 0 && <option value="">Aucun client</option>}
-          </select>
+      <div className="prod-header" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <h1 className="prod-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Briefcase size={24} style={{ color: 'var(--brand-orange)' }} />
+              Espace Client :
+            </h1>
+            <select 
+              className="client-selector"
+              value={selectedClient?.id || ''}
+              onChange={(e) => {
+                const client = clients.find(c => c.id === e.target.value);
+                setSelectedClient(client || null);
+              }}
+              disabled={timerRunning}
+            >
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+              ))}
+              {clients.length === 0 && <option value="">Aucun client</option>}
+            </select>
+          </div>
+
+          {selectedClient && (
+            <div className="contract-progression">
+              <div className="progression-text">
+                <span>Progression du contrat ({selectedClient.contract_period}) :</span>
+                <strong>{selectedClient.progression_percent}% consommé</strong>
+              </div>
+              <div className="progress-bar-container">
+                <div 
+                  className="progress-bar-fill orange"
+                  style={{ width: `${Math.min(selectedClient.progression_percent, 100)}%` }}
+                ></div>
+              </div>
+              <div className="progression-hours">
+                {selectedClient.total_spent_hours}h passées / {selectedClient.total_budget_hours}h budgétées
+              </div>
+            </div>
+          )}
         </div>
 
         {selectedClient && (
-          <div className="contract-progression">
-            <div className="progression-text">
-              <span>Progression du contrat ({selectedClient.contract_period}) :</span>
-              <strong>{selectedClient.progression_percent}% consommé</strong>
+          <div className="contract-details-container" style={{ width: '100%', marginTop: '1.2rem', paddingTop: '1.2rem', borderTop: '1px solid var(--border-light)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                {selectedClient.start_date && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    <Calendar size={14} style={{ color: 'var(--brand-orange)' }} />
+                    <span>Début : <strong>{new Date(selectedClient.start_date).toLocaleDateString('fr-FR')}</strong></span>
+                  </div>
+                )}
+                {selectedClient.end_date && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    <Calendar size={14} style={{ color: 'var(--brand-orange)' }} />
+                    <span>Fin : <strong>{new Date(selectedClient.end_date).toLocaleDateString('fr-FR')}</strong></span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="progress-bar-container">
-              <div 
-                className="progress-bar-fill orange"
-                style={{ width: `${Math.min(selectedClient.progression_percent, 100)}%` }}
-              ></div>
+
+            {/* Deliverables grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
+                <div style={{ color: '#1877f2', display: 'flex' }}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ display: 'inline-block' }}>
+                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Facebook</div>
+                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_facebook || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
+                </div>
+              </div>
+
+              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
+                <div style={{ color: '#e1306c', display: 'flex' }}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block' }}>
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Instagram</div>
+                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_instagram || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
+                </div>
+              </div>
+
+              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
+                <div style={{ color: '#0a66c2', display: 'flex' }}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block' }}>
+                    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+                    <rect x="2" y="9" width="4" height="12" />
+                    <circle cx="4" cy="4" r="2" />
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>LinkedIn</div>
+                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_linkedin || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
+                </div>
+              </div>
+
+              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
+                <div style={{ color: '#4285f4', display: 'flex' }}><Globe size={18} /></div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Google Posts</div>
+                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_google || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
+                </div>
+              </div>
+
+              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
+                <div style={{ color: '#ea4335', display: 'flex' }}><Mail size={18} /></div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Newsletter</div>
+                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.newsletter_count || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
+                </div>
+              </div>
+
+              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
+                <div style={{ color: '#fbbc05', display: 'flex' }}><BookOpen size={18} /></div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Billet Blog</div>
+                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.blog_count || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
+                </div>
+              </div>
             </div>
-            <div className="progression-hours">
-              {selectedClient.total_spent_hours}h passées / {selectedClient.total_budget_hours}h budgétées
-            </div>
+
+            {/* Unquantifiable tasks */}
+            {selectedClient.unquantifiable_tasks && (
+              <div style={{ marginTop: '1rem', fontSize: '0.85rem', background: 'var(--background-light)', padding: '0.6rem 0.8rem', borderRadius: '6px', borderLeft: '3px solid var(--brand-orange)', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                <strong>Tâches inquantifiables :</strong> {selectedClient.unquantifiable_tasks}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -540,9 +748,58 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                     })()}
                   </div>
 
-                  <button className="btn-stop-timer" onClick={handleStopTimer}>
-                    <Square size={16} fill="white" style={{ marginRight: '0.5rem' }} /> STOP
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: '360px', justifyContent: 'center' }}>
+                    <button className="btn-stop-timer" onClick={handleStopTimer} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Square size={14} fill="white" style={{ marginRight: '0.5rem' }} /> STOP
+                    </button>
+                    <button 
+                      className="btn-complete-timer" 
+                      onClick={handleCompleteTask}
+                      style={{
+                        flex: 1,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.9rem',
+                        fontWeight: '700',
+                        backgroundColor: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s ease',
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+                    >
+                      <CheckCircle size={14} style={{ marginRight: '0.5rem' }} /> TERMINÉ
+                    </button>
+                  </div>
+                </div>
+              ) : activeInterruption ? (
+                <div className="timer-content">
+                  <h3 className="timer-task-name" style={{ color: 'var(--brand-orange)' }}>
+                    Interruption : {
+                      activeInterruption === 'slack' ? 'Slack / Mails' :
+                      activeInterruption === 'meeting' ? 'Point Interne' : 'Appel Impromptu'
+                    }
+                  </h3>
+                  <p className="timer-task-meta">Aucune tâche client en cours de suivi.</p>
+                  
+                  <div className="timer-display">
+                    {formatSecondsToHMS(interruptionSeconds)}
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: '360px', justifyContent: 'center', marginTop: '1.5rem' }}>
+                    <button 
+                      className="btn-stop-timer" 
+                      onClick={() => handleToggleInterruption(activeInterruption)} 
+                      style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Square size={14} fill="white" style={{ marginRight: '0.5rem' }} /> STOP
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="no-active-timer">
@@ -560,29 +817,25 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               <div className="interruptions-grid">
                 <button 
                   className={`btn-interrupt slack ${activeInterruption === 'slack' ? 'active' : ''}`}
-                  onClick={() => handleToggleInterruption('slack')}
-                  disabled={!activeTask}
+                  onClick={() => handleInterruptionClick('slack')}
                 >
                   <span className="dot"></span> Slack / Mails
                 </button>
                 <button 
                   className={`btn-interrupt meeting ${activeInterruption === 'meeting' ? 'active' : ''}`}
-                  onClick={() => handleToggleInterruption('meeting')}
-                  disabled={!activeTask}
+                  onClick={() => handleInterruptionClick('meeting')}
                 >
                   <span className="dot"></span> Point Interne
                 </button>
                 <button 
                   className={`btn-interrupt pause-type ${activeInterruption === 'pause' ? 'active' : ''}`}
-                  onClick={() => handleToggleInterruption('pause')}
-                  disabled={!activeTask}
+                  onClick={() => handleInterruptionClick('pause')}
                 >
                   <span className="dot"></span> Pause
                 </button>
                 <button 
                   className={`btn-interrupt call ${activeInterruption === 'call' ? 'active' : ''}`}
-                  onClick={() => handleToggleInterruption('call')}
-                  disabled={!activeTask}
+                  onClick={() => handleInterruptionClick('call')}
                 >
                   <span className="dot"></span> Appel Impromptu
                 </button>
@@ -602,11 +855,40 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               {Object.keys(groupedTasks).length === 0 ? (
                 <p className="no-data-text" style={{ textAlign: 'center', padding: '2rem' }}>Aucune tâche configurée pour ce client.</p>
               ) : (
-                <div className="deliverable-categories">
-                  {Object.entries(groupedTasks).map(([category, tasks]) => (
+                <>
+                  {/* Category Filter Badges */}
+                  {availableFilterTypes.length > 2 && (
+                    <div className="filter-tabs" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-light)' }}>
+                      {availableFilterTypes.map(type => (
+                        <button
+                          key={type}
+                          onClick={() => setSelectedFilter(type)}
+                          style={{
+                            padding: '0.35rem 0.85rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            borderRadius: '16px',
+                            border: '1px solid ' + (selectedFilter === type ? 'var(--brand-orange)' : 'var(--border-light)'),
+                            background: selectedFilter === type ? 'var(--brand-orange)' : 'var(--panel-white)',
+                            color: selectedFilter === type ? 'white' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="deliverable-categories">
+                    {Object.keys(filteredGroupedTasks).length === 0 ? (
+                      <p className="no-data-text" style={{ textAlign: 'center', padding: '1.5rem', width: '100%' }}>Aucune tâche ne correspond à ce filtre.</p>
+                    ) : (
+                      Object.entries(filteredGroupedTasks).map(([category, tasks]) => (
                     <div key={category} className="category-group">
                       <h3 className="category-title">{category}</h3>
-                      <div className="task-items-list">
+                      <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
                         {tasks.map(task => {
                           const budgetSec = task.budget_hours * 3600;
                           const spentSec = task.time_spent_seconds || 0;
@@ -684,11 +966,71 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                         })}
                       </div>
                     </div>
-                  ))}
-                </div>
+                      ))
+                    )}
+                  </div>
+                </>
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ALLOCATE INTERRUPTION CLIENT */}
+      {interruptionModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px', width: '90%' }}>
+            <h2 className="modal-title" style={{ textAlign: 'center', marginBottom: '1rem' }}>
+              Attribuer l'interruption
+            </h2>
+            <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+              À quel client souhaitez-vous attribuer ce temps de <strong>{
+                interruptionTypeToStart === 'slack' ? 'Slack / Mails' :
+                interruptionTypeToStart === 'meeting' ? 'Point Interne' : 'Appel Impromptu'
+              }</strong> ?
+            </p>
+            
+            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <label style={{ fontWeight: '600' }}>Client concerné</label>
+              <select 
+                value={selectedInterruptionClientId} 
+                onChange={(e) => setSelectedInterruptionClientId(e.target.value)}
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}
+              >
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} - {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                style={{ minWidth: '100px' }}
+                onClick={() => {
+                  setInterruptionModalOpen(false);
+                  setInterruptionTypeToStart(null);
+                }}
+              >
+                Annuler
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ minWidth: '120px' }}
+                onClick={() => {
+                  setInterruptionModalOpen(false);
+                  handleStartInterruption(interruptionTypeToStart, selectedInterruptionClientId);
+                  setInterruptionTypeToStart(null);
+                }}
+              >
+                Démarrer
+              </button>
+            </div>
           </div>
         </div>
       )}

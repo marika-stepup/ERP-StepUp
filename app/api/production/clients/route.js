@@ -178,3 +178,71 @@ export async function POST(req) {
     );
   }
 }
+
+export async function PATCH(req) {
+  const auth = await verifyRole(req, ['hr', 'manager', 'director', 'employee']);
+  const serviceCheck = await checkDirectionService(auth);
+  if (serviceCheck.error) {
+    return NextResponse.json({ error: serviceCheck.error.message }, { status: serviceCheck.error.status });
+  }
+
+  try {
+    const body = await req.json();
+    const { 
+      id,
+      name, 
+      code, 
+      contract_period, 
+      total_budget_hours,
+      start_date,
+      end_date,
+      posts_facebook,
+      posts_instagram,
+      posts_linkedin,
+      posts_google,
+      newsletter_count,
+      blog_count,
+      unquantifiable_tasks
+    } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID Client manquant.' }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+
+    const { data: updatedClient, error } = await supabase
+      .from('production_clients')
+      .update({
+        name,
+        code,
+        contract_period,
+        total_budget_hours: Number(total_budget_hours) || 0,
+        start_date: start_date || null,
+        end_date: end_date || null,
+        posts_facebook: Number(posts_facebook) || 0,
+        posts_instagram: Number(posts_instagram) || 0,
+        posts_linkedin: Number(posts_linkedin) || 0,
+        posts_google: Number(posts_google) || 0,
+        newsletter_count: Number(newsletter_count) || 0,
+        blog_count: Number(blog_count) || 0,
+        unquantifiable_tasks: unquantifiable_tasks || null
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Async sync to Google Sheets (non-blocking)
+    syncProductionClient(updatedClient.id);
+
+    return NextResponse.json({ client: updatedClient });
+  } catch (error) {
+    console.error('Error updating production client:', error);
+    return NextResponse.json(
+      { error: 'Erreur interne du serveur lors de la mise à jour du client.' },
+      { status: 500 }
+    );
+  }
+}
