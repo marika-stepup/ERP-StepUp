@@ -14,6 +14,14 @@ import {
 } from 'lucide-react';
 import { supabaseClient } from '../../lib/supabaseClient';
 
+const getInitials = (name) => {
+  if (!name) return '';
+  const parts = name.split(/[\s-]+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
 export default function EspaceProduction({ user, token, clients, loading, refreshData, employeeName }) {
   const [selectedClient, setSelectedClient] = useState(null);
 
@@ -1005,10 +1013,14 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                               <div className="task-item-header">
                                 <div className="task-item-details">
                                   <h4 className="task-item-name">{task.name}</h4>
-                                  <span className="task-item-budget">
+                                  <span className="task-item-budget" style={{ display: 'block' }}>
                                     {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
-                                    {task.due_date && ` (Échéance: ${new Date(task.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})`}
                                   </span>
+                                  {task.due_date && (
+                                    <span className="task-item-budget" style={{ display: 'block', marginTop: '0.1rem' }}>
+                                      Échéance: {new Date(task.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                                    </span>
+                                  )}
                                 </div>
 
                                 <div className="task-item-actions">
@@ -1017,8 +1029,23 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                                       <CheckCircle size={12} /> Fait
                                     </div>
                                   ) : isLockedByOther ? (
-                                    <div className="status-badge en-cours" style={{ background: 'var(--alert-red-bg, #fee2e2)', color: 'var(--alert-red, #ef4444)', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', fontWeight: 'bold', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                                      <Lock size={10} /> {lock.employee_name}
+                                    <div 
+                                      className="status-badge en-cours" 
+                                      title={lock.employee_name}
+                                      style={{ 
+                                        background: 'var(--alert-red-bg, #fee2e2)', 
+                                        color: 'var(--alert-red, #ef4444)', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '0.3rem', 
+                                        fontSize: '0.75rem', 
+                                        fontWeight: 'bold', 
+                                        padding: '0.2rem 0.5rem', 
+                                        borderRadius: '4px',
+                                        cursor: 'help'
+                                      }}
+                                    >
+                                      <Lock size={10} /> {getInitials(lock.employee_name)}
                                     </div>
                                   ) : isActive ? (
                                     <div className="status-badge en-cours">
