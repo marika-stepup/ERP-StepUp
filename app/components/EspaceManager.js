@@ -65,6 +65,18 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
   const [manualMinutes, setManualMinutes] = useState('0');
   const [manualDate, setManualDate] = useState(() => new Date().toISOString().split('T')[0]);
 
+  // Modals d'alerte et confirmation personnalisés
+  const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '' });
+  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
+
+  const showAlert = (title, message) => {
+    setAlertModal({ show: true, title, message });
+  };
+
+  const showConfirm = (title, message, onConfirm) => {
+    setConfirmModal({ show: true, title, message, onConfirm });
+  };
+
   // Sync selected client when props update
   useEffect(() => {
     if (clients && clients.length > 0) {
@@ -174,7 +186,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
         }
       } else {
         const errData = await res.json();
-        alert(errData.error || 'Erreur lors de la création du client.');
+        showAlert('Erreur', errData.error || 'Erreur lors de la création du client.');
       }
     } catch (err) {
       console.error('Error adding client:', err);
@@ -254,11 +266,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
         }
       } else {
         const errData = await res.json();
-        alert(errData.error || 'Erreur lors de la modification du client.');
+        showAlert('Erreur', errData.error || 'Erreur lors de la modification du client.');
       }
     } catch (err) {
       console.error('Error editing client:', err);
-      alert('Erreur lors de la modification du client.');
+      showAlert('Erreur', 'Erreur lors de la modification du client.');
     }
   };
 
@@ -291,7 +303,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
         await refreshData();
       } else {
         const errData = await res.json();
-        alert(errData.error || 'Erreur lors de la création de la tâche.');
+        showAlert('Erreur', errData.error || 'Erreur lors de la création de la tâche.');
       }
     } catch (err) {
       console.error('Error adding task:', err);
@@ -317,18 +329,23 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
   };
 
   const handleDeleteTask = async (taskId) => {
-    if (!confirm('Voulez-vous vraiment supprimer cette tâche ? Tous les logs associés seront supprimés.')) return;
-    try {
-      const res = await fetch(`/api/production/tasks/${taskId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        await refreshData();
+    showConfirm(
+      "Supprimer la tâche",
+      "Voulez-vous vraiment supprimer cette tâche ? Tous les logs associés seront supprimés.",
+      async () => {
+        try {
+          const res = await fetch(`/api/production/tasks/${taskId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            await refreshData();
+          }
+        } catch (err) {
+          console.error('Error deleting task:', err);
+        }
       }
-    } catch (err) {
-      console.error('Error deleting task:', err);
-    }
+    );
   };
 
   // Actions: Manual Entry
@@ -338,7 +355,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
     const totalSeconds = (parseInt(manualHours) || 0) * 3600 + (parseInt(manualMinutes) || 0) * 60;
     if (totalSeconds <= 0) {
-      alert('Veuillez spécifier une durée valide.');
+      showAlert('Durée non valide', 'Veuillez spécifier une durée valide.');
       return;
     }
 
@@ -373,7 +390,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
         }
       } else {
         const errData = await res.json();
-        alert(errData.error || 'Erreur lors de la création du log manuel.');
+        showAlert('Erreur', errData.error || 'Erreur lors de la création du log manuel.');
       }
     } catch (err) {
       console.error('Error adding manual log:', err);
@@ -381,21 +398,26 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
   };
 
   const handleDeleteLog = async (logId) => {
-    if (!confirm('Voulez-vous vraiment supprimer cet enregistrement de temps ?')) return;
-    try {
-      const res = await fetch(`/api/production/time-logs/${logId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        await refreshData();
-        if (selectedClient) {
-          await fetchLogs(selectedClient.id);
+    showConfirm(
+      "Supprimer l'enregistrement",
+      "Voulez-vous vraiment supprimer cet enregistrement de temps ?",
+      async () => {
+        try {
+          const res = await fetch(`/api/production/time-logs/${logId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            await refreshData();
+            if (selectedClient) {
+              await fetchLogs(selectedClient.id);
+            }
+          }
+        } catch (err) {
+          console.error('Error deleting log:', err);
         }
       }
-    } catch (err) {
-      console.error('Error deleting log:', err);
-    }
+    );
   };
 
   const formatSecondsToHMText = (totalSeconds) => {
@@ -1161,6 +1183,65 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                 <button type="submit" className="btn btn-primary">Créer la tâche</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM ALERT MODAL */}
+      {alertModal.show && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content" style={{ maxWidth: '400px', width: '90%', textAlign: 'center' }}>
+            <h2 className="modal-title" style={{ color: 'var(--brand-orange)', marginBottom: '1rem' }}>
+              {alertModal.title}
+            </h2>
+            <p style={{ color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+              {alertModal.message}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ minWidth: '100px' }}
+                onClick={() => setAlertModal({ show: false, title: '', message: '' })}
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM CONFIRMATION MODAL */}
+      {confirmModal.show && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content" style={{ maxWidth: '440px', width: '90%', textAlign: 'center' }}>
+            <h2 className="modal-title" style={{ marginBottom: '1rem' }}>
+              {confirmModal.title}
+            </h2>
+            <p style={{ color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+              {confirmModal.message}
+            </p>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                style={{ minWidth: '100px' }}
+                onClick={() => setConfirmModal({ show: false, title: '', message: '', onConfirm: null })}
+              >
+                Annuler
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ minWidth: '100px' }}
+                onClick={() => {
+                  if (confirmModal.onConfirm) confirmModal.onConfirm();
+                  setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+                }}
+              >
+                Confirmer
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -35,6 +35,19 @@ export default function EspaceProduction({ user, token, clients, loading, refres
   const [interruptionModalOpen, setInterruptionModalOpen] = useState(false);
   const [interruptionTypeToStart, setInterruptionTypeToStart] = useState(null);
   const [selectedInterruptionClientId, setSelectedInterruptionClientId] = useState('');
+  const [activeInterruptionClientId, setActiveInterruptionClientId] = useState(null);
+
+  // Modals d'alerte et confirmation personnalisés
+  const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '' });
+  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
+
+  const showAlert = (title, message) => {
+    setAlertModal({ show: true, title, message });
+  };
+
+  const showConfirm = (title, message, onConfirm) => {
+    setConfirmModal({ show: true, title, message, onConfirm });
+  };
 
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
@@ -93,28 +106,57 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       setActiveLocks(locks);
 
       // Re-hydrate active timer state using the pre-fetched clients prop (no database fetch required!)
-      if (myActiveProdLog && !timerRunning && clients && clients.length > 0) {
-        let matchedTask = null;
-        clients.forEach(c => {
-          const t = (c.tasks || []).find(task => task.id === myActiveProdLog.task_id);
-          if (t) matchedTask = t;
-        });
+      if (clients && clients.length > 0) {
+        if (myActiveProdLog && !timerRunning) {
+          let matchedTask = null;
+          clients.forEach(c => {
+            const t = (c.tasks || []).find(task => task.id === myActiveProdLog.task_id);
+            if (t) matchedTask = t;
+          });
 
-        if (matchedTask) {
-          setActiveTask(matchedTask);
-          setActiveLogId(myActiveProdLog.id);
-          
-          // Calculate elapsed seconds since start_time
-          const elapsed = Math.floor((Date.now() - new Date(myActiveProdLog.start_time).getTime()) / 1000);
-          setTimerSeconds(elapsed > 0 ? elapsed : 0);
-          startTimeRef.current = new Date(myActiveProdLog.start_time).getTime();
-          setTimerRunning(true);
+          if (matchedTask) {
+            setActiveTask(matchedTask);
+            setActiveLogId(myActiveProdLog.id);
+            
+            // Calculate elapsed seconds since start_time
+            const elapsed = Math.floor((Date.now() - new Date(myActiveProdLog.start_time).getTime()) / 1000);
+            setTimerSeconds(elapsed > 0 ? elapsed : 0);
+            startTimeRef.current = new Date(myActiveProdLog.start_time).getTime();
+            setTimerRunning(true);
 
-          // Re-hydrate interruption if present
-          if (myActiveInterLog) {
+            // Re-hydrate interruption if present
+            if (myActiveInterLog) {
+              const type = myActiveInterLog.log_type.split(':')[1];
+              setActiveInterruption(type);
+              setInterruptionLogId(myActiveInterLog.id);
+              
+              let matchedInterTaskClient = null;
+              clients.forEach(c => {
+                const t = (c.tasks || []).find(task => task.id === myActiveInterLog.task_id);
+                if (t) matchedInterTaskClient = c;
+              });
+              if (matchedInterTaskClient) {
+                setActiveInterruptionClientId(matchedInterTaskClient.id);
+              }
+
+              const elapsedInter = Math.floor((Date.now() - new Date(myActiveInterLog.start_time).getTime()) / 1000);
+              setInterruptionSeconds(elapsedInter > 0 ? elapsedInter : 0);
+              interruptionStartTimeRef.current = new Date(myActiveInterLog.start_time).getTime();
+            }
+          }
+        } else if (myActiveInterLog && !activeInterruption) {
+          // Re-hydrate active interruption when no production task is active
+          let matchedInterTaskClient = null;
+          clients.forEach(c => {
+            const t = (c.tasks || []).find(task => task.id === myActiveInterLog.task_id);
+            if (t) matchedInterTaskClient = c;
+          });
+
+          if (matchedInterTaskClient) {
             const type = myActiveInterLog.log_type.split(':')[1];
             setActiveInterruption(type);
             setInterruptionLogId(myActiveInterLog.id);
+            setActiveInterruptionClientId(matchedInterTaskClient.id);
             const elapsedInter = Math.floor((Date.now() - new Date(myActiveInterLog.start_time).getTime()) / 1000);
             setInterruptionSeconds(elapsedInter > 0 ? elapsedInter : 0);
             interruptionStartTimeRef.current = new Date(myActiveInterLog.start_time).getTime();
@@ -212,7 +254,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     // 1. Client-side anti-collision guard (optimistic check)
     const lock = activeLocks[task.id];
     if (lock && lock.employee_id !== user.id) {
-      alert(`🔒 Action impossible : Cette tâche est actuellement en cours par ${lock.employee_name}.`);
+      showAlert("Tâche verrouillée", `🔒 Action impossible : Cette tâche est actuellement en cours par ${lock.employee_name}.`);
       return;
     }
 
@@ -276,9 +318,9 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       }
 
       if (err.message === 'task_locked') {
-        alert("Action impossible : Cette tâche vient d'être prise par un autre collaborateur.");
+        showAlert("Action impossible", "Cette tâche vient d'être prise par un autre collaborateur.");
       } else {
-        alert("Erreur lors du démarrage du chronomètre. Veuillez réessayer.");
+        showAlert("Erreur", "Erreur lors du démarrage du chronomètre. Veuillez réessayer.");
       }
     }
   };
@@ -298,12 +340,13 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     setActiveLogId(null);
     setActiveInterruption(null);
     setInterruptionLogId(null);
+    setActiveInterruptionClientId(null);
     setTimerSeconds(0);
     setInterruptionSeconds(0);
 
     try {
       // 1. Stop active interruption log if it was running
-      if (currentInterruption && currentInterLogId && interSeconds > 0) {
+      if (currentInterLogId) {
         await fetch(`/api/production/time-logs/${currentInterLogId}`, {
           method: 'PATCH',
           headers: {
@@ -318,7 +361,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       }
 
       // 2. Stop main production time log
-      if (currentLogId && prodSeconds > 0) {
+      if (currentLogId) {
         await fetch(`/api/production/time-logs/${currentLogId}`, {
           method: 'PATCH',
           headers: {
@@ -341,35 +384,40 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
   const handleCompleteTask = async () => {
     if (!activeTask) return;
-    if (!confirm("Êtes-vous sûr de vouloir marquer cette tâche comme terminée ? Cela arrêtera également le chronomètre.")) return;
 
-    const taskId = activeTask.id;
-    
-    // Stop the timer first to save any logged seconds
-    await handleStopTimer();
+    showConfirm(
+      "Compléter la tâche",
+      "Êtes-vous sûr de vouloir marquer cette tâche comme terminée ? Cela arrêtera également le chronomètre.",
+      async () => {
+        const taskId = activeTask.id;
+        
+        // Stop the timer first to save any logged seconds
+        await handleStopTimer();
 
-    try {
-      // Mark task as completed (status = 'Fait')
-      const res = await fetch(`/api/production/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: 'Fait' })
-      });
+        try {
+          // Mark task as completed (status = 'Fait')
+          const res = await fetch(`/api/production/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ status: 'Fait' })
+          });
 
-      if (res.ok) {
-        // Refresh data again to display the task as completed
-        await refreshData();
-      } else {
-        const errData = await res.json();
-        alert(errData.error || "Erreur lors de la complétion de la tâche.");
+          if (res.ok) {
+            // Refresh data again to display the task as completed
+            await refreshData();
+          } else {
+            const errData = await res.json();
+            showAlert("Erreur", errData.error || "Erreur lors de la complétion de la tâche.");
+          }
+        } catch (err) {
+          console.error('Error completing task:', err);
+          showAlert("Erreur", "Erreur lors de la complétion de la tâche.");
+        }
       }
-    } catch (err) {
-      console.error('Error completing task:', err);
-      alert("Erreur lors de la complétion de la tâche.");
-    }
+    );
   };
 
   const handleToggleInterruption = async (type) => {
@@ -382,13 +430,14 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       setActiveInterruption(null);
       setInterruptionLogId(null);
       setInterruptionSeconds(0);
+      setActiveInterruptionClientId(null);
 
       if (activeTask) {
         startTimeRef.current = startTimeRef.current + (Date.now() - interruptionStartTimeRef.current);
       }
 
       try {
-        if (currentInterLogId && interSeconds > 0) {
+        if (currentInterLogId) {
           await fetch(`/api/production/time-logs/${currentInterLogId}`, {
             method: 'PATCH',
             headers: {
@@ -429,21 +478,28 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       }
     }
 
-    // 2. Determine target task ID (based on chosen client)
+    // 2. Resolve client ID before stopping the active task timer
+    let resolvedClientId = targetClientId;
+    if (!resolvedClientId && activeTask) {
+      resolvedClientId = activeTask.client_id;
+    }
+
+    // 3. Stop the active task timer if one is running, to avoid overlaps!
+    if (activeTask && timerRunning) {
+      await handleStopTimer();
+    }
+
+    // 4. Determine target task ID (based on chosen client)
     let targetTaskId = null;
-    if (targetClientId) {
-      const clientObj = clients.find(c => c.id === targetClientId);
+    if (resolvedClientId) {
+      const clientObj = clients.find(c => c.id === resolvedClientId);
       if (clientObj && clientObj.tasks && clientObj.tasks.length > 0) {
         targetTaskId = clientObj.tasks[0].id;
       }
     }
 
-    if (!targetTaskId && activeTask) {
-      targetTaskId = activeTask.id;
-    }
-
     if (!targetTaskId) {
-      alert("Impossible de démarrer l'interruption : le client choisi n'a aucune tâche configurée.");
+      showAlert("Action impossible", "Le client choisi n'a aucune tâche configurée.");
       return;
     }
 
@@ -471,6 +527,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
         setActiveInterruption(type);
         setInterruptionLogId(data.log.id);
         setInterruptionSeconds(0);
+        setActiveInterruptionClientId(resolvedClientId);
         interruptionStartTimeRef.current = Date.now();
       }
     } catch (err) {
@@ -548,6 +605,13 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       filteredGroupedTasks[category] = tasks;
     }
   });
+
+  // Resolve client names for active timers/interruptions
+  const activeTaskClientObj = activeTask ? clients.find(c => c.id === activeTask.client_id) : null;
+  const activeTaskClientName = activeTaskClientObj ? activeTaskClientObj.name : '';
+
+  const activeInterruptionClientObj = activeInterruptionClientId ? clients.find(c => c.id === activeInterruptionClientId) : null;
+  const activeInterruptionClientName = activeInterruptionClientObj ? activeInterruptionClientObj.name : '';
 
   return (
     <div className="espace-production">
@@ -714,7 +778,23 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               
               {activeTask ? (
                 <div className="timer-content">
-                  <h3 className="timer-task-name">{activeTask.name}</h3>
+                  {activeTaskClientName && (
+                    <div className="client-badge" style={{
+                      display: 'inline-block',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(234, 88, 12, 0.12)',
+                      color: 'var(--brand-orange)',
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      marginBottom: '0.5rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      {activeTaskClientName}
+                    </div>
+                  )}
+                  <h3 className="timer-task-name" style={{ marginTop: '0.25rem' }}>{activeTask.name}</h3>
                   <p className="timer-task-meta">
                     Budget vendu : {activeTask.budget_hours}h00 {activeTask.due_date && `| Échéance : ${new Date(activeTask.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`}
                   </p>
@@ -779,10 +859,29 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                 </div>
               ) : activeInterruption ? (
                 <div className="timer-content">
-                  <h3 className="timer-task-name" style={{ color: 'var(--brand-orange)' }}>
-                    Interruption : {
-                      activeInterruption === 'slack' ? 'Slack / Mails' :
-                      activeInterruption === 'meeting' ? 'Point Interne' : 'Appel Impromptu'
+                  {activeInterruptionClientName && (
+                    <div className="client-badge" style={{
+                      display: 'inline-block',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(234, 88, 12, 0.12)',
+                      color: 'var(--brand-orange)',
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      marginBottom: '0.5rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      {activeInterruptionClientName}
+                    </div>
+                  )}
+                  <h3 className="timer-task-name" style={{ color: 'var(--brand-orange)', marginTop: '0.25rem' }}>
+                    {
+                      activeInterruption === 'pause' ? 'Pause' :
+                      `Interruption : ${
+                        activeInterruption === 'slack' ? 'Slack / Mails' :
+                        activeInterruption === 'meeting' ? 'Point Interne' : 'Appel Impromptu'
+                      }`
                     }
                   </h3>
                   <p className="timer-task-meta">Aucune tâche client en cours de suivi.</p>
@@ -1029,6 +1128,65 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                 }}
               >
                 Démarrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM ALERT MODAL */}
+      {alertModal.show && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content" style={{ maxWidth: '400px', width: '90%', textAlign: 'center' }}>
+            <h2 className="modal-title" style={{ color: 'var(--brand-orange)', marginBottom: '1rem' }}>
+              {alertModal.title}
+            </h2>
+            <p style={{ color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+              {alertModal.message}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ minWidth: '100px' }}
+                onClick={() => setAlertModal({ show: false, title: '', message: '' })}
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM CONFIRMATION MODAL */}
+      {confirmModal.show && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content" style={{ maxWidth: '440px', width: '90%', textAlign: 'center' }}>
+            <h2 className="modal-title" style={{ marginBottom: '1rem' }}>
+              {confirmModal.title}
+            </h2>
+            <p style={{ color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+              {confirmModal.message}
+            </p>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                style={{ minWidth: '100px' }}
+                onClick={() => setConfirmModal({ show: false, title: '', message: '', onConfirm: null })}
+              >
+                Annuler
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ minWidth: '100px' }}
+                onClick={() => {
+                  if (confirmModal.onConfirm) confirmModal.onConfirm();
+                  setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+                }}
+              >
+                Confirmer
               </button>
             </div>
           </div>
