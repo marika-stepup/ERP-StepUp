@@ -653,264 +653,211 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
           <button className="btn btn-primary" onClick={() => setShowAddClient(true)}>Ajouter un client</button>
         </div>
       ) : (
-        <div className="prod-grid manager-grid">
-          {/* LEFT COLUMN: COLLABORATORS & TASKS LIST */}
-          <div className="prod-left-column">
-            
-            {/* TASKS LIST & MANAGER CREATION */}
-            <div className="panel deliverables-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h2 className="panel-title" style={{ margin: 0 }}>LIVRABLES / TÂCHES</h2>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowAddTask(true)}>
-                  <Plus size={14} /> Nouvelle Tâche
-                </button>
-              </div>
-              <p className="panel-subtitle">Administrez et mettez à jour les tâches du client.</p>
-
-              {Object.keys(groupedTasks).length === 0 ? (
-                <p className="no-data-text" style={{ textAlign: 'center', padding: '2rem' }}>Aucune tâche configurée pour ce client.</p>
-              ) : (
-                <>
-                  {/* Category Filter Badges */}
-                  {availableFilterTypes.length > 2 && (
-                    <div className="filter-tabs" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-light)' }}>
-                      {availableFilterTypes.map(type => (
-                        <button
-                          key={type}
-                          onClick={() => setSelectedFilter(type)}
-                          style={{
-                            padding: '0.35rem 0.85rem',
-                            fontSize: '0.75rem',
-                            fontWeight: '600',
-                            borderRadius: '16px',
-                            border: '1px solid ' + (selectedFilter === type ? 'var(--brand-orange)' : 'var(--border-light)'),
-                            background: selectedFilter === type ? 'var(--brand-orange)' : 'var(--panel-white)',
-                            color: selectedFilter === type ? 'white' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="deliverable-categories">
-                    {Object.keys(filteredGroupedTasks).length === 0 ? (
-                      <p className="no-data-text" style={{ textAlign: 'center', padding: '1.5rem', width: '100%' }}>Aucune tâche ne correspond à ce filtre.</p>
-                    ) : (
-                      Object.entries(filteredGroupedTasks).map(([category, tasks]) => (
-                    <div key={category} className="category-group">
-                      <h3 className="category-title">{category}</h3>
-                      <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
-                        {tasks.map(task => {
-                          const budgetSec = task.budget_hours * 3600;
-                          const spentSec = task.time_spent_seconds || 0;
-                          const isCompleted = task.status === 'Fait';
-                          const progressPercent = budgetSec > 0 ? Math.round((spentSec / budgetSec) * 100) : 0;
-
-                          return (
-                            <div key={task.id} className={`task-item-card ${isCompleted ? 'completed' : ''}`}>
-                              <div className="task-item-header">
-                                <div className="task-item-details">
-                                  <h4 className="task-item-name">{task.name}</h4>
-                                  <span className="task-item-budget">
-                                    {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
-                                    {task.due_date && ` (Échéance: ${new Date(task.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})`}
-                                  </span>
-                                </div>
-
-                                <div className="task-item-actions">
-                                  <select 
-                                    className="task-status-selector"
-                                    value={task.status} 
-                                    onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
-                                  >
-                                    <option value="Non démarré">À faire</option>
-                                    <option value="En cours">En cours</option>
-                                    <option value="Fait">Fait</option>
-                                  </select>
-
-                                  <button className="btn-icon-delete" onClick={() => handleDeleteTask(task.id)} title="Supprimer la tâche">
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="task-item-progress">
-                                <div className="progress-bar-container">
-                                  <div 
-                                    className={`progress-bar-fill ${isCompleted ? 'green' : 'blue'}`}
-                                    style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                                  ></div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                      ))
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* COLLABORATORS OVERVIEW */}
-            <div className="panel collaborators-summary-card">
-              <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <UserCheck size={18} style={{ color: 'var(--brand-orange)' }} />
-                TEMPS TOTAL PAR COLLABORATEUR
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
+          
+          {/* MIDDLE SECTION: LIVRABLES / TÂCHES (Full Width) */}
+          <div className="panel deliverables-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                LIVRABLES / TÂCHES
+                {selectedClient && (
+                  <span style={{ 
+                    fontSize: '0.85rem', 
+                    fontWeight: '600', 
+                    color: 'var(--brand-orange)', 
+                    backgroundColor: 'rgba(234, 88, 12, 0.12)', 
+                    padding: '0.2rem 0.6rem', 
+                    borderRadius: '12px' 
+                  }}>
+                    {selectedClient.name}
+                  </span>
+                )}
               </h2>
-              
-              {collaboratorSummaries.length === 0 ? (
-                <p className="no-data-text">Aucun temps enregistré sur ce contrat.</p>
-              ) : (
-                <div className="collaborator-list">
-                  {collaboratorSummaries.map(col => (
-                    <div key={col.name} className="collaborator-row">
-                      <div className="col-user-info">
-                        <User size={16} style={{ color: 'var(--text-secondary)' }} />
-                        <span>{col.name}</span>
-                      </div>
-                      <span className="col-time-badge">{formatSecondsToHMText(col.duration)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <button className="btn btn-primary btn-sm" onClick={() => setShowAddTask(true)}>
+                <Plus size={14} /> Nouvelle Tâche
+              </button>
             </div>
+            <p className="panel-subtitle">Administrez et mettez à jour les tâches du client.</p>
 
-          </div>
-
-          {/* RIGHT COLUMN: MANUAL ENTRY & HISTORY */}
-          <div className="prod-right-column">
-            
-            {/* MANUAL ENTRY CARD */}
-            <div className="panel manual-log-card" style={{ marginBottom: '1.5rem' }}>
-              <h2 className="panel-title">SAISIE MANUELLE</h2>
-              
-              {/* Manual Entry Form */}
-              <form onSubmit={handleAddManualLog} className="manual-log-form">
-                <h3 className="form-sub-title">Saisir du temps</h3>
-                <div className="manual-form-grid">
-                  <div className="form-group">
-                    <label>Collaborateur</label>
-                    <select 
-                      value={manualMemberId} 
-                      onChange={(e) => setManualMemberId(e.target.value)}
-                      required
-                    >
-                      <option value="">Sélectionner...</option>
-                      {allMembers.map(m => (
-                        <option key={m.employee_id} value={m.employee_id}>
-                          {m.employee_first_name} {m.employee_name} ({m.service})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Tâche</label>
-                    <select 
-                      value={manualTaskId} 
-                      onChange={(e) => setManualTaskId(e.target.value)}
-                      required
-                    >
-                      <option value="">Sélectionner...</option>
-                      {selectedClient.tasks && selectedClient.tasks.map(t => (
-                        <option key={t.id} value={t.id}>
-                          [{t.category}] {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group row-fields">
-                    <div>
-                      <label>Heures</label>
-                      <input 
-                        type="number" 
-                        min="0" 
-                        max="24"
-                        value={manualHours} 
-                        onChange={(e) => setManualHours(e.target.value)} 
-                        required 
-                      />
-                    </div>
-                    <div>
-                      <label>Minutes</label>
-                      <input 
-                        type="number" 
-                        min="0" 
-                        max="59"
-                        value={manualMinutes} 
-                        onChange={(e) => setManualMinutes(e.target.value)} 
-                        required 
-                      />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Date</label>
-                    <input 
-                      type="date" 
-                      value={manualDate} 
-                      onChange={(e) => setManualDate(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                </div>
-                <button type="submit" className="btn btn-outline btn-sm" style={{ marginTop: '0.5rem', width: '100%' }}>
-                  Enregistrer le temps
-                </button>
-              </form>
-            </div>
-
-            {/* HISTORY CARD */}
-            <div className="panel history-log-card">
-              <h2 className="panel-title">HISTORIQUE DES ENREGISTREMENTS</h2>
-              
-              <div className="time-logs-history">
-                {timeLogs.length === 0 ? (
-                  <p className="no-data-text">Aucun log enregistré.</p>
-                ) : (
-                  <div className="history-table-container">
-                    <table className="history-table">
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Collaborateur</th>
-                          <th>Tâche</th>
-                          <th>Durée</th>
-                          <th>Type</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {timeLogs.map(log => (
-                          <tr key={log.id}>
-                            <td>{new Date(log.logged_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</td>
-                            <td>{log.employee_name}</td>
-                            <td>{log.task_name}</td>
-                            <td>{formatSecondsToHMText(log.duration_seconds)}</td>
-                            <td>
-                              <span className={`log-type-tag ${log.log_type.startsWith('interruption') ? 'interruption' : 'production'}`}>
-                                {log.log_type === 'production' ? 'Prod' : 'Inter.'}
-                              </span>
-                            </td>
-                            <td>
-                              <button className="btn-icon-delete" onClick={() => handleDeleteLog(log.id)} title="Supprimer">
-                                <Trash2 size={12} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            {Object.keys(groupedTasks).length === 0 ? (
+              <p className="no-data-text" style={{ textAlign: 'center', padding: '2rem' }}>Aucune tâche configurée pour ce client.</p>
+            ) : (
+              <>
+                {/* Category Filter Badges */}
+                {availableFilterTypes.length > 2 && (
+                  <div className="filter-tabs" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-light)' }}>
+                    {availableFilterTypes.map(type => (
+                      <button
+                        key={type}
+                        onClick={() => setSelectedFilter(type)}
+                        style={{
+                          padding: '0.35rem 0.85rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          borderRadius: '16px',
+                          border: '1px solid ' + (selectedFilter === type ? 'var(--brand-orange)' : 'var(--border-light)'),
+                          background: selectedFilter === type ? 'var(--brand-orange)' : 'var(--panel-white)',
+                          color: selectedFilter === type ? 'white' : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {type}
+                      </button>
+                    ))}
                   </div>
                 )}
+
+                <div className="deliverable-categories">
+                  {Object.keys(filteredGroupedTasks).length === 0 ? (
+                    <p className="no-data-text" style={{ textAlign: 'center', padding: '1.5rem', width: '100%' }}>Aucune tâche ne correspond à ce filtre.</p>
+                  ) : (
+                    Object.entries(filteredGroupedTasks).map(([category, tasks]) => (
+                      <div key={category} className="category-group">
+                        <h3 className="category-title">{category}</h3>
+                        <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                          {tasks.map(task => {
+                            const budgetSec = task.budget_hours * 3600;
+                            const spentSec = task.time_spent_seconds || 0;
+                            const isCompleted = task.status === 'Fait';
+                            const progressPercent = budgetSec > 0 ? Math.round((spentSec / budgetSec) * 100) : 0;
+
+                            return (
+                              <div key={task.id} className={`task-item-card ${isCompleted ? 'completed' : ''}`}>
+                                <div className="task-item-header">
+                                  <div className="task-item-details">
+                                    <h4 className="task-item-name">{task.name}</h4>
+                                    <span className="task-item-budget" style={{ display: 'block' }}>
+                                      {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
+                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'nowrap' }}>
+                                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>Échéance :</span>
+                                      <input 
+                                        type="date"
+                                        value={task.due_date ? task.due_date.split('T')[0] : ''}
+                                        onChange={(e) => handleUpdateTaskDueDate(task.id, e.target.value)}
+                                        style={{
+                                          fontSize: '0.7rem',
+                                          padding: '0.1rem 0.25rem',
+                                          borderRadius: '4px',
+                                          border: '1px solid var(--border-light)',
+                                          backgroundColor: 'var(--panel-white)',
+                                          color: 'var(--text-primary)',
+                                          cursor: 'pointer',
+                                          width: '115px',
+                                          flexShrink: 0
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="task-item-actions">
+                                    <select 
+                                      className="task-status-selector"
+                                      value={task.status} 
+                                      onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
+                                    >
+                                      <option value="Non démarré">À faire</option>
+                                      <option value="En cours">En cours</option>
+                                      <option value="Fait">Fait</option>
+                                    </select>
+
+                                    <button className="btn-icon-delete" onClick={() => handleDeleteTask(task.id)} title="Supprimer la tâche">
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="task-item-progress">
+                                  <div className="progress-bar-container">
+                                    <div 
+                                      className={`progress-bar-fill ${isCompleted ? 'green' : 'blue'}`}
+                                      style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* TEMPS TOTAL PAR COLLABORATEUR (Full Width) */}
+          <div className="panel collaborators-summary-card">
+            <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <UserCheck size={18} style={{ color: 'var(--brand-orange)' }} />
+              TEMPS TOTAL PAR COLLABORATEUR
+            </h2>
+            
+            {collaboratorSummaries.length === 0 ? (
+              <p className="no-data-text">Aucun temps enregistré sur ce contrat.</p>
+            ) : (
+              <div className="collaborator-list">
+                {collaboratorSummaries.map(col => (
+                  <div key={col.name} className="collaborator-row">
+                    <div className="col-user-info">
+                      <User size={16} style={{ color: 'var(--text-secondary)' }} />
+                      <span>{col.name}</span>
+                    </div>
+                    <span className="col-time-badge">{formatSecondsToHMText(col.duration)}</span>
+                  </div>
+                ))}
               </div>
+            )}
+          </div>
+
+          {/* BOTTOM SECTION: HISTORIQUE DES ENREGISTREMENTS (Full Width) */}
+          <div className="panel history-log-card">
+            <h2 className="panel-title">HISTORIQUE DES ENREGISTREMENTS</h2>
+            
+            <div className="time-logs-history">
+              {timeLogs.length === 0 ? (
+                <p className="no-data-text">Aucun log enregistré.</p>
+              ) : (
+                <div className="history-table-container">
+                  <table className="history-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Collaborateur</th>
+                        <th>Tâche</th>
+                        <th>Durée</th>
+                        <th>Type</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timeLogs.map(log => (
+                        <tr key={log.id}>
+                          <td>{new Date(log.logged_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</td>
+                          <td>{log.employee_name}</td>
+                          <td>{log.task_name}</td>
+                          <td>{formatSecondsToHMText(log.duration_seconds)}</td>
+                          <td>
+                            <span className={`log-type-tag ${log.log_type.startsWith('interruption') ? 'interruption' : 'production'}`}>
+                              {log.log_type === 'production' ? 'Prod' : 'Inter.'}
+                            </span>
+                          </td>
+                          <td>
+                            <button className="btn-icon-delete" onClick={() => handleDeleteLog(log.id)} title="Supprimer">
+                              <Trash2 size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
+
         </div>
       )}
 
