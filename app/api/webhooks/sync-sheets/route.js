@@ -7,15 +7,19 @@ import {
 } from '../../../../lib/sheetsSync';
 
 export async function POST(req) {
-  // 1. Security Check for Webhook Secret (optional but highly recommended)
+  // 1. Strict Security Check for Webhook Secret (mandatory)
   const webhookSecret = process.env.WEBHOOK_SECRET;
   const { searchParams } = new URL(req.url);
   const querySecret = searchParams.get('secret');
   const headerSecret = req.headers.get('x-webhook-secret');
 
-  if (webhookSecret && querySecret !== webhookSecret && headerSecret !== webhookSecret) {
+  const isAuthorized = !!webhookSecret && (
+    querySecret === webhookSecret || headerSecret === webhookSecret
+  );
+
+  if (!isAuthorized) {
     console.warn('[Webhook] Unauthorized access attempt to sync-sheets.');
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Non autorisé : secret Webhook manquant ou invalide.' }, { status: 401 });
   }
 
   try {

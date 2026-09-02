@@ -63,22 +63,33 @@ async function registerUser(email, password, fullName, role) {
   }
 }
 
+import crypto from 'crypto';
+
+function generateSecurePassword() {
+  return crypto.randomBytes(12).toString('base64url') + '!A1';
+}
+
 async function run() {
+  const employeePwd = process.env.TEST_EMPLOYEE_PASSWORD || generateSecurePassword();
+  const hrPwd = process.env.TEST_HR_PASSWORD || generateSecurePassword();
+
   // Create an employee account
   await registerUser(
     'employee@entreprise.com',
-    'passEmployee123',
+    employeePwd,
     'Alice Martin',
     'employee'
   );
+  console.log(`🔑 Mot de passe généré pour employee@entreprise.com : ${employeePwd}`);
 
   // Create an HR account
   await registerUser(
     'hr@entreprise.com',
-    'passHR123',
+    hrPwd,
     'Bob Dupont',
     'hr'
   );
+  console.log(`🔑 Mot de passe généré pour hr@entreprise.com : ${hrPwd}`);
 
   console.log('\n--- Registration completed ---');
 }

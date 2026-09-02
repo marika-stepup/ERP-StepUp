@@ -7,12 +7,18 @@ import { getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { withRetry } from '../../../../lib/googleSheets';
 
 export async function GET(req) {
-  // Optional security token check
+  // Strict Security Check for CRON Secret (mandatory)
+  const cronSecret = process.env.CRON_SECRET;
   const { searchParams } = new URL(req.url);
   const secret = searchParams.get('secret');
+  const authHeader = req.headers.get('authorization');
   
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Non autorisé.' }, { status: 401 });
+  const isAuthorized = !!cronSecret && (
+    secret === cronSecret || authHeader === `Bearer ${cronSecret}`
+  );
+
+  if (!isAuthorized) {
+    return NextResponse.json({ error: 'Non autorisé : secret CRON manquant ou invalide.' }, { status: 401 });
   }
 
   try {

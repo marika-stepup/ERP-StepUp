@@ -43,14 +43,24 @@ const serviceAccountAuth = new JWT({
 });
 const doc = new GoogleSpreadsheet(spreadsheetId, serviceAccountAuth);
 
-const usersToRegister = [
-  { email: 'oli.a@stepupdigital.net', name: 'ANDRIAMAHEFA Olitahina', role: 'employee' },
-  { email: 'dany.r@stepupdigital.net', name: 'RAKOTOARISOA Dany', role: 'employee' },
-  { email: 'tsoavina.a@stepupdigital.net', name: 'ANDRIANAIVOMANANTSOA Mamintsoavina', role: 'employee' },
-  { email: 'ingrid.g@stepupdigital.net', name: 'Ingrid GENILLON', role: 'hr' }
-];
+// Load user password from environment or CLI argument
+const defaultPassword = process.env.INITIAL_USER_PASSWORD || process.argv[2];
+if (!defaultPassword) {
+  console.error('Usage: INITIAL_USER_PASSWORD=your_password node scripts/sync-users.js [optional_password]');
+  console.error('Veuillez fournir un mot de passe sécurisé via la variable INITIAL_USER_PASSWORD ou en argument CLI.');
+  process.exit(1);
+}
 
-const password = 'passStepUp123';
+// Users can be passed via USERS_JSON env var or read dynamically from the sheet
+let usersToRegister = [];
+if (process.env.USERS_JSON) {
+  try {
+    usersToRegister = JSON.parse(process.env.USERS_JSON);
+  } catch (err) {
+    console.error('Erreur de parsing de USERS_JSON:', err.message);
+  }
+}
+
 
 async function run() {
   console.log('Connecting to Google Sheets...');
@@ -58,11 +68,25 @@ async function run() {
   const balancesSheet = doc.sheetsByTitle[SheetTabs.balances];
   const rows = await balancesSheet.getRows();
 
+  // If no users explicitly provided, build user list from the Google Sheets rows
+  if (usersToRegister.length === 0) {
+    console.log(`Reading users dynamically from "${SheetTabs.balances}" sheet...`);
+    usersToRegister = rows
+      .map(row => ({
+        email: (row.get(LeaveBalancesColumns.employee_email) || '').trim(),
+        name: `${(row.get(LeaveBalancesColumns.employee_first_name) || '').trim()} ${(row.get(LeaveBalancesColumns.employee_name) || '').trim()}`.trim(),
+        role: (row.get(LeaveBalancesColumns.role) || 'employee').trim().toLowerCase()
+      }))
+      .filter(u => u.email.length > 0);
+  }
+
+  console.log(`Processing ${usersToRegister.length} user(s)...`);
+
   for (const user of usersToRegister) {
     console.log(`\nRegistering user in Supabase: ${user.email}...`);
     const { data, error } = await supabase.auth.signUp({
       email: user.email,
-      password: password,
+      password: defaultPassword,
       options: {
         data: {
           full_name: user.name,
@@ -74,10 +98,10 @@ async function run() {
     let employeeId = null;
     if (error) {
       if (error.message.includes('already registered') || error.status === 400) {
-        console.log(`⚠️ User ${user.email} already exists in Supabase. Attempting login to retrieve ID...`);
+        console.log(`ℹ️ User ${user.email} already exists in Supabase. Attempting login to retrieve ID...`);
         const { data: logData, error: logError } = await supabase.auth.signInWithPassword({
           email: user.email,
-          password: password
+          password: defaultPassword
         });
         if (logError) {
           console.error(`❌ Could not login or sign up for ${user.email}:`, logError.message);
