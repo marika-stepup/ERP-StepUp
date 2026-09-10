@@ -67,29 +67,41 @@ async function testEmail() {
     console.log('✅ Authentification SMTP réussie !');
 
     console.log(`Envoi d'un email de test à ${targetEmail}...`);
+    const logoPath = path.join(process.cwd(), 'public', 'Logo Step Up.png');
+    const defaultAttachments = fs.existsSync(logoPath) ? [
+      {
+        filename: 'Logo Step Up.png',
+        path: logoPath,
+        cid: 'stepup_logo'
+      }
+    ] : [];
+
     const info = await transporter.sendMail({
       from: emailFrom,
       to: targetEmail,
-      subject: '[ERP Step-Up] 🚀 Test de notification par email réussi !',
-      text: 'Félicitations ! Le système de notification automatique par email de l\'ERP Step-Up est correctement configuré et opérationnel.',
+      subject: '[ERP Step Up] 🚀 Test de notification par email réussi !',
+      text: 'Félicitations ! Le système de notification automatique par email de l\'ERP Step Up est correctement configuré et opérationnel.',
+      attachments: defaultAttachments,
       html: `
-        <div style="font-family: Arial, sans-serif; background-color: #f1f5f9; padding: 25px;">
-          <div style="max-width: 550px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <div style="background-color: #1e293b; padding: 20px; text-align: center; color: white;">
-              <h2 style="margin: 0;">ERP STEP-UP</h2>
-              <p style="margin: 5px 0 0 0; color: #94a3b8; font-size: 13px;">Système de Notification Automatique</p>
+        <div style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 25px;">
+          <div style="max-width: 550px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+            <div style="background-color: #EFEFEF; padding: 20px; text-align: center; border-bottom: 3px solid #E06900;">
+              <img src="cid:stepup_logo" alt="Step Up" style="height: 38px; width: auto; max-width: 170px; display: inline-block; vertical-align: middle;" />
+              <p style="margin: 5px 0 0 0; color: #64748b; font-size: 13px;">Portail Ressources Humaines & Congés</p>
             </div>
             <div style="padding: 25px; color: #334155; line-height: 1.6;">
               <div style="display: inline-block; background-color: #dcfce7; color: #166534; padding: 5px 12px; border-radius: 15px; font-weight: bold; font-size: 12px; margin-bottom: 15px;">
                 ✅ CONFIGURATION VALIDE
               </div>
               <p>Bonjour,</p>
-              <p>Ce message confirme que votre adresse Google et votre mot de passe d'application fonctionnent parfaitement pour envoyer les notifications de l'ERP Step-Up.</p>
+              <p>Ce message confirme que votre adresse Google et votre mot de passe d'application fonctionnent parfaitement pour envoyer les notifications de l'ERP Step Up.</p>
               <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 15px; margin: 15px 0; font-size: 13px;">
                 <strong>Expéditeur :</strong> ${emailUser}<br>
                 <strong>Date :</strong> ${new Date().toLocaleString('fr-FR')}
               </div>
-              <p>Les notifications pour les demandes de congés et permissions seront automatiquement transmises aux managers et collaborateurs.</p>
+              <div style="text-align: center; margin-top: 20px;">
+                <a href="${process.env.APP_URL || 'http://localhost:3000'}" style="display: inline-block; background-color: #E06900; color: #ffffff; text-decoration: none; padding: 10px 22px; border-radius: 6px; font-weight: 600; font-size: 14px;">Accéder à l'application</a>
+              </div>
             </div>
           </div>
         </div>

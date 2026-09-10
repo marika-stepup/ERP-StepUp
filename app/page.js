@@ -1533,7 +1533,8 @@ export default function Page() {
       if (!res.ok) {
         setHrError(data.error || "Erreur lors de l'envoi des rappels.");
       } else {
-        setHrSuccess(data.message || `${data.notificationsSentCount || 0} email(s) de rappel envoyé(s) avec succès !`);
+        const count = data.notificationsSentCount || 0;
+        setHrSuccess(data.message || `${count} email${count > 1 ? 's' : ''} de rappel envoyé${count > 1 ? 's' : ''} avec succès !`);
       }
     } catch (err) {
       setHrError("Une erreur réseau est survenue lors de l'envoi des rappels.");
@@ -2467,8 +2468,32 @@ export default function Page() {
             <div className="panel" style={{ borderTop: '4px solid var(--brand-orange)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div>
-                  <h2 className="panel-title" style={{ marginBottom: '0.25rem' }}>Suivi et validation finale RH</h2>
-                  <p className="panel-subtitle" style={{ marginBottom: 0 }}>Valider ou refuser les demandes de congé de l'entreprise.</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 0 }}>
+                      <ClipboardList size={20} style={{ color: 'var(--brand-orange)' }} />
+                      Suivi et validation RH
+                    </h2>
+                    {pendingRequests.length > 0 && (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '9999px',
+                        backgroundColor: 'var(--warning-bg)',
+                        color: 'var(--warning-color)',
+                        border: '1px solid var(--warning-border)'
+                      }}>
+                        <Clock size={12} />
+                        {pendingRequests.length} en attente
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.35rem', marginBottom: 0 }}>
+                    Valider ou refuser les demandes de congé et permission de l'équipe.
+                  </p>
                 </div>
                 {pendingRequests.length > 0 && (
                   <button
@@ -2481,9 +2506,11 @@ export default function Page() {
                       alignItems: 'center',
                       gap: '0.5rem',
                       fontSize: '0.85rem',
-                      padding: '0.45rem 0.9rem',
-                      borderRadius: '6px',
-                      cursor: sendingReminders ? 'not-allowed' : 'pointer'
+                      padding: '0.45rem 0.95rem',
+                      borderRadius: '8px',
+                      cursor: sendingReminders ? 'not-allowed' : 'pointer',
+                      fontWeight: 600,
+                      marginTop: 0
                     }}
                     title="Envoyer un email récapitulatif à chaque manager ayant des demandes en attente"
                   >

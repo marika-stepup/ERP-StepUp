@@ -114,7 +114,7 @@ export async function POST(req) {
 
     return NextResponse.json({
       success: true,
-      message: `${successfulSends} email(s) récapitulatif(s) envoyé(s) avec succès.`,
+      message: `${successfulSends} email${successfulSends > 1 ? 's' : ''} récapitulatif${successfulSends > 1 ? 's' : ''} envoyé${successfulSends > 1 ? 's' : ''} avec succès.`,
       totalPendingRequests: pendingRequests.length,
       notificationsSentCount: successfulSends,
       details: sendResults
