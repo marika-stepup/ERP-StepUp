@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { calculateBusinessDays, generateUUID } from '../../../../lib/utils';
 import { syncLeaveRequest } from '../../../../lib/sheetsSync';
+import { 
+  sendNewLeaveNotificationToManager, 
+  sendLeaveSubmissionConfirmationToEmployee, 
+  findManagerEmail 
+} from '../../../../lib/emailService';
 
 export async function POST(req) {
   // 1. Authenticate and verify role 'employee' (includes HR)
@@ -169,6 +174,68 @@ export async function POST(req) {
     } catch (syncErr) {
       console.error('[SubmitRoute] Sync to Google Sheets failed:', syncErr);
       // We don't crash the request if Sheets sync fails, to keep the app working.
+    }
+
+    // 7. Send automatic email notifications
+    try {
+      const { data: allMembers } = await supabase
+        .from('leave_balances')
+        .select('*');
+
+      const managerName = balance.manager_name;
+      const managerEmail = findManagerEmail(managerName, allMembers || []);
+
+      // A. Notification au manager ou aux RH
+      if (managerEmail) {
+        await sendNewLeaveNotificationToManager({
+          managerEmail,
+          managerName,
+          employeeName: fullName,
+          employeeService: balance.service,
+          leaveType,
+          startDate: start_date,
+          endDate: end_date,
+          businessDays,
+          createdDate: nowStr,
+          requestId
+        });
+      } else {
+        // Envoi à tous les RH/Directeurs si aucun manager spécifique
+        const hrUsers = (allMembers || []).filter(m => ['hr', 'director'].includes(m.role));
+        for (const hr of hrUsers) {
+          if (hr.employee_email) {
+            await sendNewLeaveNotificationToManager({
+              managerEmail: hr.employee_email,
+              managerName: `${hr.employee_first_name || ''} ${hr.employee_name || ''}`.trim() || 'Responsable RH',
+              employeeName: fullName,
+              employeeService: balance.service,
+              leaveType,
+              startDate: start_date,
+              endDate: end_date,
+              businessDays,
+              createdDate: nowStr,
+              requestId
+            });
+          }
+        }
+      }
+
+      // B. Confirmation par email à l'employé demandeur
+      const employeeEmail = balance.employee_email || employee.email;
+      if (employeeEmail) {
+        await sendLeaveSubmissionConfirmationToEmployee({
+          employeeEmail,
+          employeeName: fullName,
+          leaveType,
+          startDate: start_date,
+          endDate: end_date,
+          businessDays,
+          managerName: managerName || 'Responsable RH'
+        });
+      }
+    } catch (emailErr) {
+      console.error('[SubmitRoute] Erreur lors de l\'envoi des notifications par email :', emailErr);
+      // Ne pas bloquer la soumission si l'envoi d'email échoue
     }
 
     return NextResponse.json({

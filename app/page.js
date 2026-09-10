@@ -26,7 +26,8 @@ import {
   Smartphone,
   ChevronDown,
   ChevronUp,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Mail
 } from 'lucide-react';
 
 const formatDateStr = (str) => {
@@ -168,6 +169,7 @@ export default function Page() {
   const [myRequests, setMyRequests] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [sendingReminders, setSendingReminders] = useState(false);
 
   // Shared state for production tracker to optimize Vercel & Supabase request quotas
   const [productionClients, setProductionClients] = useState([]);
@@ -1514,6 +1516,32 @@ export default function Page() {
     );
   };
 
+  // 12. Send Email Digest / Reminders for Pending Requests
+  const handleSendEmailReminders = async () => {
+    setSendingReminders(true);
+    setHrError(null);
+    setHrSuccess(null);
+    try {
+      const res = await fetch('/api/admin/notify-pending', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setHrError(data.error || "Erreur lors de l'envoi des rappels.");
+      } else {
+        setHrSuccess(data.message || `${data.notificationsSentCount || 0} email(s) de rappel envoyé(s) avec succès !`);
+      }
+    } catch (err) {
+      setHrError("Une erreur réseau est survenue lors de l'envoi des rappels.");
+    } finally {
+      setSendingReminders(false);
+    }
+  };
+
   const handleLogout = async () => {
     await supabaseClient.auth.signOut();
     sessionStorage.removeItem('supabase_token');
@@ -2437,8 +2465,33 @@ export default function Page() {
 
             {/* Validation Panel */}
             <div className="panel" style={{ borderTop: '4px solid var(--brand-orange)' }}>
-              <h2 className="panel-title">Suivi et validation finale RH</h2>
-              <p className="panel-subtitle">Valider ou refuser les demandes de congé de l'entreprise.</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <h2 className="panel-title" style={{ marginBottom: '0.25rem' }}>Suivi et validation finale RH</h2>
+                  <p className="panel-subtitle" style={{ marginBottom: 0 }}>Valider ou refuser les demandes de congé de l'entreprise.</p>
+                </div>
+                {pendingRequests.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleSendEmailReminders}
+                    disabled={sendingReminders}
+                    className="btn-accent"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.85rem',
+                      padding: '0.45rem 0.9rem',
+                      borderRadius: '6px',
+                      cursor: sendingReminders ? 'not-allowed' : 'pointer'
+                    }}
+                    title="Envoyer un email récapitulatif à chaque manager ayant des demandes en attente"
+                  >
+                    <Mail size={16} />
+                    {sendingReminders ? 'Envoi en cours...' : 'Envoyer un rappel par email'}
+                  </button>
+                )}
+              </div>
 
               {hrError && <div className="error-message" style={{ marginBottom: '1rem' }}>{hrError}</div>}
               {hrSuccess && <div className="success-message" style={{ marginBottom: '1rem' }}>{hrSuccess}</div>}

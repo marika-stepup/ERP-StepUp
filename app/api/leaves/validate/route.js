@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { syncLeaveRequest, syncEmployeeBalance } from '../../../../lib/sheetsSync';
+import { sendLeaveDecisionToEmployee } from '../../../../lib/emailService';
 
 export async function POST(req) {
   // 1. Authenticate and verify role 'hr', 'manager' or 'director'
@@ -182,6 +183,28 @@ export async function POST(req) {
         console.error('[ValidateRoute] Syncing to Google Sheets failed:', syncErr);
       }
 
+      // Send email notification to employee
+      try {
+        const empFullName = `${requesterProfile.employee_first_name || ''} ${requesterProfile.employee_name || ''}`.trim() || targetRequest.employee_name;
+        const currentRemainingCP = !isNoDeduct && !leaveType.toLowerCase().includes('perm') ? (Number(requesterProfile.remaining_balance || 0) - businessDays) : requesterProfile.remaining_balance;
+        const currentRemainingPerm = !isNoDeduct && leaveType.toLowerCase().includes('perm') ? (Number(requesterProfile.remaining_perm || 0) - businessDays) : requesterProfile.remaining_perm;
+
+        await sendLeaveDecisionToEmployee({
+          employeeEmail: requesterProfile.employee_email,
+          employeeName: empFullName,
+          leaveType: targetRequest.leave_type,
+          startDate: targetRequest.start_date,
+          endDate: targetRequest.end_date,
+          businessDays: businessDays,
+          status: 'Approuvé',
+          hrComment: hr_comment || 'Votre demande a été validée.',
+          remainingBalance: currentRemainingCP,
+          remainingPerm: currentRemainingPerm
+        });
+      } catch (emailErr) {
+        console.error('[ValidateRoute] Erreur lors de l\'envoi de l\'email de décision (Approuvé) :', emailErr);
+      }
+
       return NextResponse.json({
         message: 'La demande de congés a été approuvée avec succès.',
         data: {
@@ -212,6 +235,25 @@ export async function POST(req) {
         await syncLeaveRequest(request_id);
       } catch (syncErr) {
         console.error('[ValidateRoute] Syncing to Google Sheets failed:', syncErr);
+      }
+
+      // Send email notification to employee
+      try {
+        const empFullName = `${requesterProfile.employee_first_name || ''} ${requesterProfile.employee_name || ''}`.trim() || targetRequest.employee_name;
+        await sendLeaveDecisionToEmployee({
+          employeeEmail: requesterProfile.employee_email,
+          employeeName: empFullName,
+          leaveType: targetRequest.leave_type,
+          startDate: targetRequest.start_date,
+          endDate: targetRequest.end_date,
+          businessDays: businessDays,
+          status: 'Refusé',
+          hrComment: hr_comment || 'Demande refusée par votre responsable.',
+          remainingBalance: requesterProfile.remaining_balance,
+          remainingPerm: requesterProfile.remaining_perm
+        });
+      } catch (emailErr) {
+        console.error('[ValidateRoute] Erreur lors de l\'envoi de l\'email de décision (Refusé) :', emailErr);
       }
 
       return NextResponse.json({
