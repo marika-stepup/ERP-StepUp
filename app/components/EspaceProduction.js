@@ -854,57 +854,65 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                     </div>
                   )}
 
-                  {/* 6. Two Action Buttons: Red STOP & Green TERMINÉ */}
-                  <div style={{ display: 'flex', gap: '0.85rem', width: '100%', maxWidth: '340px', justifyContent: 'center' }}>
-                    <button
-                      onClick={handleStopTimer}
-                      style={{
-                        flex: 1,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        padding: '0.7rem 1.25rem',
-                        background: '#ef4444',
-                        color: '#ffffff',
-                        fontWeight: '700',
-                        fontSize: '0.95rem',
-                        borderRadius: '8px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)',
-                        transition: 'all 0.15s ease'
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#dc2626'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.transform = 'translateY(0)'; }}
-                    >
-                      <Square size={13} fill="white" /> STOP
-                    </button>
-                    <button
-                      onClick={handleCompleteTask}
-                      style={{
-                        flex: 1,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        padding: '0.7rem 1.25rem',
-                        background: '#10b981',
-                        color: '#ffffff',
-                        fontWeight: '700',
-                        fontSize: '0.95rem',
-                        borderRadius: '8px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)',
-                        transition: 'all 0.15s ease'
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#059669'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#10b981'; e.currentTarget.style.transform = 'translateY(0)'; }}
-                    >
-                      <CheckCircle size={16} color="white" /> TERMINÉ
-                    </button>
-                  </div>
+                  {/* 6. Action Buttons: Red STOP (and Green TERMINÉ only for specific assigned tasks) */}
+                  {(() => {
+                    const isStandardMission = DELIVERABLE_CARDS.some(c => isStandardDeliverableTask(activeTask, c));
+                    return (
+                      <div style={{ display: 'flex', gap: '0.85rem', width: '100%', maxWidth: isStandardMission ? '240px' : '340px', justifyContent: 'center' }}>
+                        <button
+                          onClick={handleStopTimer}
+                          style={{
+                            flex: 1,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            padding: '0.75rem 1.25rem',
+                            background: '#ef4444',
+                            color: '#ffffff',
+                            fontWeight: '700',
+                            fontSize: '0.95rem',
+                            borderRadius: '8px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#dc2626'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                        >
+                          <Square size={13} fill="white" /> STOP
+                        </button>
+
+                        {!isStandardMission && (
+                          <button
+                            onClick={handleCompleteTask}
+                            style={{
+                              flex: 1,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.5rem',
+                              padding: '0.75rem 1.25rem',
+                              background: '#10b981',
+                              color: '#ffffff',
+                              fontWeight: '700',
+                              fontSize: '0.95rem',
+                              borderRadius: '8px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#059669'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#10b981'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                          >
+                            <CheckCircle size={16} color="white" /> TERMINÉ
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : activeInterruption ? (
                 <div className="active-timer-display" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
