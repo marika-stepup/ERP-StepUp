@@ -3,7 +3,7 @@ import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { splitFullName } from '../../../../lib/utils';
 
 export async function GET(req) {
-  // 1. Authenticate user (all authenticated roles can fetch member balances for the global dashboard)
+  // 1. Authenticate user (all authenticated roles can fetch member balances for the global dashboard, except Pointeur)
   const auth = await verifyRole(req, ['employee', 'manager', 'director', 'hr']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
@@ -11,6 +11,18 @@ export async function GET(req) {
 
   try {
     const supabase = getSupabaseAdmin();
+
+    // Data Minimization (GDPR Art. 5.1.c): The Pointeur role only manages clock-ins and does not need member balances
+    if (auth.user.role === 'employee') {
+      const { data: memberProfile } = await supabase
+        .from('leave_balances')
+        .select('service')
+        .eq('employee_id', auth.user.id)
+        .single();
+      if (memberProfile?.service === 'Pointeur') {
+        return NextResponse.json({ error: 'Accès restreint pour le profil Pointeur.' }, { status: 403 });
+      }
+    }
 
     // 2. Fetch the leave balances from Supabase
     const { data: balances, error: dbError } = await supabase

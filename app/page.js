@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { supabaseClient } from '../lib/supabaseClient';
-import { splitFullName, isMadagascarHoliday, calculateBusinessDays } from '../lib/utils';
+import { splitFullName, isMadagascarHoliday, calculateBusinessDays, normalizeLeaveType, getLeaveTypeConfig, LEAVE_TYPE_CONFIG } from '../lib/utils';
 import { SyncQueueManager } from '../lib/syncQueue';
 import EspaceProduction from './components/EspaceProduction';
 import EspaceManager from './components/EspaceManager';
@@ -27,7 +27,10 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
-  Mail
+  Mail,
+  ShieldCheck,
+  Lock,
+  Calendar
 } from 'lucide-react';
 
 const formatDateStr = (str) => {
@@ -160,6 +163,7 @@ export default function Page() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [showiOSInstallModal, setShowiOSInstallModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   // Business Data States
   const [balance, setBalance] = useState({
@@ -170,6 +174,11 @@ export default function Page() {
   const [allMembers, setAllMembers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [reminderRecipients, setReminderRecipients] = useState([]);
+  const [selectedReminderEmails, setSelectedReminderEmails] = useState([]);
+  const [lastReminderSentAt, setLastReminderSentAt] = useState(null);
+  const [reminderLoadingPreview, setReminderLoadingPreview] = useState(false);
 
   // Shared state for production tracker to optimize Vercel & Supabase request quotas
   const [productionClients, setProductionClients] = useState([]);
@@ -200,7 +209,7 @@ export default function Page() {
   }, [balance?.service]);
 
   // Form States (Submit Leave)
-  const [leaveType, setLeaveType] = useState('CP'); // 'CP' or 'Permission'
+  const [leaveType, setLeaveType] = useState('Congé payé'); // 'Congé payé', 'Permission spéciale', etc.
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('08:00');
   const [endDate, setEndDate] = useState('');
@@ -458,11 +467,16 @@ export default function Page() {
 
   // 1. Initial Session Check & Dark Mode check
   useEffect(() => {
-    // Check local storage for dark mode
+    // Check local storage for dark mode & last reminder timestamp
     const storedMode = localStorage.getItem('darkMode') === 'true';
     setDarkMode(storedMode);
     if (storedMode) {
       document.body.classList.add('dark');
+    }
+
+    const storedReminderTime = localStorage.getItem('lastReminderSentAt');
+    if (storedReminderTime) {
+      setLastReminderSentAt(storedReminderTime);
     }
 
     const checkUser = async () => {
@@ -1072,13 +1086,12 @@ export default function Page() {
     }
 
     // Normalize type values to match select options
-    if (typeVal === 'CP') typeVal = 'CP';
-    else if (typeVal === 'Congés Payés') typeVal = 'Congés Payés';
-    else if (typeVal === 'Congé Sans Solde') typeVal = 'Congé Sans Solde';
-    else if (typeVal === 'Permission') typeVal = 'Permission';
-    else if (typeVal === 'Permission Exceptionnelle') typeVal = 'Permission Exceptionnelle';
-    else if (typeVal === 'Permission à rattraper') typeVal = 'Permission à rattraper';
-    else if (typeVal === 'Maladie') typeVal = 'Maladie';
+    const cleanType = (typeVal || '').toLowerCase();
+    if (cleanType.includes('maladie')) typeVal = 'Congé maladie';
+    else if (cleanType.includes('rattraper')) typeVal = 'Permission à rattraper';
+    else if (cleanType.includes('sans solde') || cleanType === 'css') typeVal = 'Congé sans solde';
+    else if (cleanType.includes('perm')) typeVal = 'Permission spéciale';
+    else typeVal = 'Congé payé';
 
     setEditLeaveType(typeVal);
     setEditStartTime(sTime);
@@ -1516,25 +1529,80 @@ export default function Page() {
     );
   };
 
-  // 12. Send Email Digest / Reminders for Pending Requests
-  const handleSendEmailReminders = async () => {
+  // 12. Anti-Spam & Reminder Helpers for Pending Requests
+  const getMinutesSinceLastReminder = () => {
+    if (!lastReminderSentAt) return null;
+    const diffMs = Date.now() - new Date(lastReminderSentAt).getTime();
+    if (isNaN(diffMs)) return null;
+    return Math.floor(diffMs / 60000);
+  };
+
+  const formatRelativeReminderTime = () => {
+    const mins = getMinutesSinceLastReminder();
+    if (mins === null) return 'Aucun envoi récent';
+    if (mins < 1) return "À l'instant";
+    if (mins === 1) return 'Il y a 1 minute';
+    if (mins < 60) return `Il y a ${mins} minutes`;
+    const hours = Math.floor(mins / 60);
+    if (hours === 1) return 'Il y a 1 heure';
+    if (hours < 24) return `Il y a ${hours} heures`;
+    return new Date(lastReminderSentAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const openReminderModal = async (targetManagerEmail = null) => {
+    setHrError(null);
+    setHrSuccess(null);
+    setReminderLoadingPreview(true);
+    setShowReminderModal(true);
+
+    try {
+      const res = await fetch('/api/admin/notify-pending', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const list = data.recipients || [];
+        setReminderRecipients(list);
+        if (targetManagerEmail) {
+          setSelectedReminderEmails([targetManagerEmail.toLowerCase()]);
+        } else {
+          setSelectedReminderEmails(list.map(r => r.recipientEmail.toLowerCase()));
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching reminder preview:', err);
+    } finally {
+      setReminderLoadingPreview(false);
+    }
+  };
+
+  const handleConfirmSendEmailReminders = async () => {
+    if (selectedReminderEmails.length === 0) return;
     setSendingReminders(true);
     setHrError(null);
     setHrSuccess(null);
+
     try {
       const res = await fetch('/api/admin/notify-pending', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({
+          targetEmails: selectedReminderEmails
+        })
       });
       const data = await res.json();
       if (!res.ok) {
         setHrError(data.error || "Erreur lors de l'envoi des rappels.");
       } else {
+        const nowIso = new Date().toISOString();
+        setLastReminderSentAt(nowIso);
+        localStorage.setItem('lastReminderSentAt', nowIso);
         const count = data.notificationsSentCount || 0;
-        setHrSuccess(data.message || `${count} email${count > 1 ? 's' : ''} de rappel envoyé${count > 1 ? 's' : ''} avec succès !`);
+        setHrSuccess(data.message || `${count} email${count > 1 ? 's' : ''} récapitulatif${count > 1 ? 's' : ''} envoyé${count > 1 ? 's' : ''} avec succès !`);
+        setShowReminderModal(false);
       }
     } catch (err) {
       setHrError("Une erreur réseau est survenue lors de l'envoi des rappels.");
@@ -1716,6 +1784,33 @@ export default function Page() {
                     )}
                   </button>
 
+                  <button
+                    onClick={() => {
+                      setShowPrivacyModal(true);
+                      setMenuOpen(false);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      padding: '0.6rem 1rem',
+                      width: '100%',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      boxShadow: 'none',
+                      marginTop: 0
+                    }}
+                    className="menu-item-hover"
+                  >
+                    <ShieldCheck size={16} style={{ color: 'var(--brand-orange)' }} /> Confidentialité & RGPD
+                  </button>
+
                   <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: '0.25rem 0' }} />
 
                   <button
@@ -1820,13 +1915,13 @@ export default function Page() {
                 <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ClipboardList size={18} style={{ color: 'var(--brand-orange)' }} /> Mes soldes restants</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div className="balance-card-mini cp">
-                    <span className="balance-card-title">Congés payés</span>
+                    <span className="balance-card-title">Solde Congé payé</span>
                     <span className="balance-card-value">
                       {balance.remaining_balance} <span>jours</span>
                     </span>
                   </div>
                   <div className="balance-card-mini perm">
-                    <span className="balance-card-title">Permissions</span>
+                    <span className="balance-card-title">Solde Permission spéciale</span>
                     <span className="balance-card-value">
                       {balance.remaining_perm} <span>jours</span>
                     </span>
@@ -1839,13 +1934,13 @@ export default function Page() {
 
                 <form onSubmit={handleSubmitLeave} style={{ padding: 0, border: 'none', background: 'none' }}>
                   <div className="form-group">
-                    <label>Type de congé</label>
+                    <label>Type de congé ou d'absence</label>
                     <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
-                      <option value="CP">Congé Payé</option>
-                      <option value="Congé Sans Solde">Congé Sans Solde</option>
-                      <option value="Permission">Permission Spéciale</option>
+                      <option value="Congé payé">Congé payé</option>
+                      <option value="Congé sans solde">Congé sans solde</option>
+                      <option value="Permission spéciale">Permission spéciale</option>
                       <option value="Permission à rattraper">Permission à rattraper</option>
-                      <option value="Maladie">Congé Maladie</option>
+                      <option value="Congé maladie">Congé maladie</option>
                     </select>
                   </div>
 
@@ -1987,7 +2082,9 @@ export default function Page() {
                               )}
                             </td>
                             <td>
-                              <strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong>
+                              <span className={`leave-type-badge ${getLeaveTypeConfig(req.leave_type).cellClass}`}>
+                                {normalizeLeaveType(req.leave_type)}
+                              </span>
                             </td>
                             <td>
                               Du {formatDateStr(req.start_date)}<br />
@@ -2038,7 +2135,7 @@ export default function Page() {
                   <span className="kpi-val">
                     {allMembers.reduce((sum, m) => sum + parseFloat(m.remaining_balance || 0), 0).toFixed(1)}j
                   </span>
-                  <span className="kpi-lbl">Soldes CP Cumulés</span>
+                  <span className="kpi-lbl">Soldes Congés payés cumulés</span>
                 </div>
                 <div className="kpi-card">
                   <span className="kpi-val">0</span>
@@ -2093,10 +2190,26 @@ export default function Page() {
                 </div>
 
                 {/* Legend */}
-                <div className="gantt-legend">
+                <div className="gantt-legend" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem', alignItems: 'center' }}>
                   <div className="gantt-legend-item">
-                    <span className="gantt-legend-box approved"></span>
-                    <span>Approuvé (CP / Perm)</span>
+                    <span className="gantt-legend-box type-conge-paye"></span>
+                    <span>Congé payé</span>
+                  </div>
+                  <div className="gantt-legend-item">
+                    <span className="gantt-legend-box type-permission-speciale"></span>
+                    <span>Permission spéciale</span>
+                  </div>
+                  <div className="gantt-legend-item">
+                    <span className="gantt-legend-box type-conge-sans-solde"></span>
+                    <span>Congé sans solde</span>
+                  </div>
+                  <div className="gantt-legend-item">
+                    <span className="gantt-legend-box type-permission-rattraper"></span>
+                    <span>Permission à rattraper</span>
+                  </div>
+                  <div className="gantt-legend-item">
+                    <span className="gantt-legend-box type-conge-maladie"></span>
+                    <span>Congé maladie</span>
                   </div>
                   <div className="gantt-legend-item">
                     <span className="gantt-legend-box pending"></span>
@@ -2147,8 +2260,8 @@ export default function Page() {
                             </th>
                           );
                         })}
-                        <th className="gantt-col-balance" style={{ backgroundColor: 'var(--background-light)' }}>Solde CP</th>
-                        <th className="gantt-col-balance" style={{ backgroundColor: 'var(--background-light)' }}>Solde Perm.</th>
+                        <th className="gantt-col-balance" style={{ backgroundColor: 'var(--background-light)' }}>Solde Congé payé</th>
+                        <th className="gantt-col-balance" style={{ backgroundColor: 'var(--background-light)' }}>Solde Permission spéciale</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2287,7 +2400,7 @@ export default function Page() {
                                       const fridayReq = employeeReqs.find(req =>
                                         prevDateString >= req.start_date &&
                                         prevDateString <= req.end_date &&
-                                        (req.leave_type.startsWith('CP') || req.leave_type.startsWith('Congés Payés'))
+                                        (req.leave_type.toLowerCase().includes('cp') || req.leave_type.toLowerCase().includes('payé') || req.leave_type.toLowerCase().includes('payes'))
                                       );
                                       if (fridayReq) {
                                         isSaturdayCP = true;
@@ -2317,8 +2430,11 @@ export default function Page() {
                                   } else if (isWeekend && !isSaturdayCP) {
                                     cellClass += ' weekend';
                                   } else if (activeReq) {
+                                    const typeConf = getLeaveTypeConfig(activeReq.leave_type);
+                                    const normalizedLabel = normalizeLeaveType(activeReq.leave_type);
+
                                     if (activeReq.status === 'Approuvé') {
-                                      cellClass += ' status-approved';
+                                      cellClass += ` status-approved ${typeConf.cellClass}`;
                                       cellText = activeReq.business_days < 1 ? activeReq.business_days.toString().replace('.', ',') : '1';
                                     } else {
                                       cellClass += ' status-pending';
@@ -2332,7 +2448,7 @@ export default function Page() {
                                       cellTitle = `[Attention] Superposition dans le service ${svc} !\n`;
                                     }
 
-                                    cellTitle += `${m.employee_first_name} - ${activeReq.leave_type} (${activeReq.status})`;
+                                    cellTitle += `${m.employee_first_name} - ${normalizedLabel} (${activeReq.status})`;
                                   }
 
                                   return (
@@ -2496,27 +2612,34 @@ export default function Page() {
                   </p>
                 </div>
                 {pendingRequests.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleSendEmailReminders}
-                    disabled={sendingReminders}
-                    className="btn-accent"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.85rem',
-                      padding: '0.45rem 0.95rem',
-                      borderRadius: '8px',
-                      cursor: sendingReminders ? 'not-allowed' : 'pointer',
-                      fontWeight: 600,
-                      marginTop: 0
-                    }}
-                    title="Envoyer un email récapitulatif à chaque manager ayant des demandes en attente"
-                  >
-                    <Mail size={16} />
-                    {sendingReminders ? 'Envoi en cours...' : 'Envoyer un rappel par email'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => openReminderModal()}
+                      disabled={sendingReminders}
+                      className="btn-accent"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.85rem',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '8px',
+                        cursor: sendingReminders ? 'not-allowed' : 'pointer',
+                        fontWeight: 700,
+                        marginTop: 0,
+                        boxShadow: '0 2px 6px rgba(224, 105, 0, 0.25)'
+                      }}
+                      title="Ouvrir l'aperçu et envoyer des rappels groupés aux managers"
+                    >
+                      <Mail size={16} />
+                      <span>{sendingReminders ? 'Envoi en cours...' : 'Envoyer un rappel par email'}</span>
+                    </button>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <ShieldCheck size={13} style={{ color: 'var(--brand-orange)' }} />
+                      <span>1 email groupé par manager • {formatRelativeReminderTime()}</span>
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -2534,13 +2657,32 @@ export default function Page() {
                     const currentUserMember = allMembers.find(m => m.employee_email?.toLowerCase() === user?.email?.toLowerCase());
                     const isN1 = employeeMember && currentUserMember && employeeMember.manager_name !== 'Aucun' && employeeMember.manager_name === currentUserMember.employee_first_name;
 
+                    // Find manager profile for targeted reminder
+                    const managerMember = employeeMember?.manager_name && employeeMember.manager_name !== 'Aucun'
+                      ? allMembers.find(m => {
+                          const fn = (m.employee_first_name || '').trim().toLowerCase();
+                          const ln = (m.employee_name || '').trim().toLowerCase();
+                          const query = employeeMember.manager_name.trim().toLowerCase();
+                          return query === fn || query === ln || query === `${fn} ${ln}` || query === `${ln} ${fn}`;
+                        })
+                      : null;
+
                     return (
                       <div key={req.request_id} className="validation-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                           <div>
                             <strong style={{ fontSize: '1.1rem' }}>{employeeMember?.employee_first_name || req.employee_name}</strong>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                              Type: <strong>{req.leave_type}</strong> | Durée: <strong>{formatDuration(req.business_days)}</strong>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span>Type :</span>
+                              <span className={`leave-type-badge ${getLeaveTypeConfig(req.leave_type).cellClass}`}>
+                                {normalizeLeaveType(req.leave_type)}
+                              </span>
+                              <span>| Durée : <strong>{formatDuration(req.business_days)}</strong></span>
+                              {employeeMember?.manager_name && employeeMember.manager_name !== 'Aucun' && (
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                  | Manager : <strong>{employeeMember.manager_name}</strong>
+                                </span>
+                              )}
                             </div>
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
                               Demande soumise le : <strong>{req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}</strong>
@@ -2554,18 +2696,38 @@ export default function Page() {
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                           <input
                             type="text"
                             placeholder="Commentaire de validation..."
-                            style={{ flexGrow: 1 }}
+                            style={{ flex: 1, minWidth: '220px' }}
                             value={hrComments[req.request_id] || ''}
                             onChange={(e) => {
                               const val = e.target.value;
                               setHrComments(prev => ({ ...prev, [req.request_id]: val }));
                             }}
                           />
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            {managerMember?.employee_email && (
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => openReminderModal(managerMember.employee_email)}
+                                style={{
+                                  padding: '0.4rem 0.75rem',
+                                  fontSize: '0.8rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  borderRadius: '6px',
+                                  color: 'var(--brand-orange)',
+                                  borderColor: 'var(--warning-border)'
+                                }}
+                                title={`Relancer uniquement ${employeeMember.manager_name} par email`}
+                              >
+                                <Mail size={13} /> Relancer N+1
+                              </button>
+                            )}
                             <button
                               className="btn-small btn-approve"
                               disabled={!isN1}
@@ -2808,7 +2970,7 @@ export default function Page() {
 
                     <div className="form-row">
                       <div className="form-group">
-                        <label>Solde Initial CP</label>
+                        <label>Solde initial Congé payé</label>
                         <input
                           type="number"
                           value={newMemberCP}
@@ -2817,7 +2979,7 @@ export default function Page() {
                         />
                       </div>
                       <div className="form-group">
-                        <label>Solde Initial Perm.</label>
+                        <label>Solde initial Permission spéciale</label>
                         <input
                           type="number"
                           value={newMemberPerm}
@@ -3254,21 +3416,150 @@ export default function Page() {
         {/* 3.5. TAB CONTENT: POINTAGE                           */}
         {/* ==================================================== */}
         {profileLoaded && activeTab === 'pointage' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Pointeur') && (
-          <div className="pointage-layout" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="pointage-layout" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-            {/* Top Toolbar: Date & Search */}
+            {/* Pointeur Express Mobile Banner & PWA Quick Install */}
+            {balance?.service === 'Pointeur' && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(255, 122, 0, 0.08) 0%, rgba(255, 122, 0, 0.02) 100%)',
+                border: '1px solid var(--warning-border)',
+                borderRadius: '12px',
+                padding: '1rem 1.25rem',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: 'var(--brand-orange)',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Smartphone size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                      Espace Pointeur Express (Mobile & Web)
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      🔒 Interface allégée • Strict minimum requis • Conforme RGPD & CNIL (Art. 5.1.c)
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {isInstallable && (
+                    <button
+                      type="button"
+                      onClick={handleInstallClick}
+                      className="btn-accent"
+                      style={{
+                        padding: '0.45rem 0.9rem',
+                        fontSize: '0.85rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        margin: 0,
+                        width: 'auto',
+                        borderRadius: '8px'
+                      }}
+                    >
+                      <Download size={15} /> Installer sur mon mobile
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowPrivacyModal(true)}
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--border-light)',
+                      borderRadius: '8px',
+                      padding: '0.45rem 0.75rem',
+                      fontSize: '0.8rem',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      margin: 0,
+                      width: 'auto'
+                    }}
+                  >
+                    <ShieldCheck size={14} style={{ color: 'var(--brand-orange)' }} /> Infos RGPD
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Top Toolbar: Date, Service Filter & Search */}
             <div className="panel" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div className="form-group" style={{ marginBottom: 0, minWidth: '180px' }}>
-                <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date de pointage</label>
-                <input
-                  type="date"
-                  value={pointageDate}
-                  onChange={(e) => setPointageDate(e.target.value)}
-                  style={{ margin: 0, padding: '0.5rem' }}
-                />
+              <div className="form-group" style={{ marginBottom: 0, minWidth: '220px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                  <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>Date de pointage</label>
+                  {pointageDate !== getTodayDateString() && (
+                    <button
+                      type="button"
+                      onClick={() => setPointageDate(getTodayDateString())}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--brand-orange)',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: 0,
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Aujourd'hui
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                  <input
+                    type="date"
+                    value={pointageDate}
+                    onChange={(e) => setPointageDate(e.target.value)}
+                    style={{ margin: 0, padding: '0.5rem', flex: 1 }}
+                  />
+                  {pointageDate === getTodayDateString() && (
+                    <span style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: 'var(--success-color)',
+                      background: 'var(--success-bg)',
+                      padding: '0.3rem 0.5rem',
+                      borderRadius: '6px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      Aujourd'hui
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '280px', position: 'relative' }}>
+              <div className="form-group" style={{ marginBottom: 0, minWidth: '200px' }}>
+                <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Service / Département</label>
+                <select
+                  value={pointageServiceFilter}
+                  onChange={(e) => setPointageServiceFilter(e.target.value)}
+                  style={{ margin: 0, padding: '0.5rem', width: '100%', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--panel-white)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                >
+                  {uniqueServices.map(svc => (
+                    <option key={svc} value={svc}>{svc === 'Tous' ? 'Tous les services' : svc}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '240px', position: 'relative' }}>
                 <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Rechercher un collaborateur</label>
                 <input
                   type="text"
@@ -3281,72 +3572,111 @@ export default function Page() {
             </div>
 
             {/* Attendance Analytics & KPIs Dashboard */}
-            {pointageStats && balance?.service !== 'Pointeur' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            {balance?.service !== 'Pointeur' && (() => {
+              const filteredPointage = pointageEmployees.filter(emp => {
+                if (pointageServiceFilter === 'Tous') return true;
+                const svc = (emp.service === 'Directeur' ? 'Direction' : emp.service) || 'Non spécifié';
+                return svc === pointageServiceFilter;
+              });
 
-                {/* Expected card */}
-                <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Présence aujourd'hui</span>
-                    <UserPlus size={18} style={{ color: 'var(--brand-orange)' }} />
+              const totalActive = filteredPointage.length;
+              const presentCount = filteredPointage.filter(e => e.time_log?.clock_in).length;
+              const lateCount = filteredPointage.filter(e => e.time_log && (e.time_log.status === 'En retard' || e.time_log.status === 'Retard & Départ ant.')).length;
+              const punctualCount = Math.max(0, presentCount - lateCount);
+              const clockedOutCount = filteredPointage.filter(e => e.time_log?.clock_out).length;
+              const absentCount = Math.max(0, totalActive - presentCount);
+              const punctualityRate = presentCount > 0 ? Math.round((punctualCount / presentCount) * 100) : (totalActive > 0 ? 100 : 0);
+
+              const rateColor = punctualityRate >= 90 ? 'var(--success-color)' : punctualityRate >= 75 ? 'var(--warning-color)' : 'var(--error-color)';
+              const rateBg = punctualityRate >= 90 ? 'var(--success-bg)' : punctualityRate >= 75 ? 'var(--warning-bg)' : 'var(--error-bg)';
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                  {/* Taux de ponctualité card (HIGHLIGHTED KPI) */}
+                  <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', borderLeft: `4px solid ${rateColor}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Taux de ponctualité</span>
+                      <Timer size={18} style={{ color: rateColor }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                      <div style={{ fontSize: '2rem', fontWeight: 800, color: rateColor }}>
+                        {punctualityRate}%
+                      </div>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        ({punctualCount} à l'heure)
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      Sur <strong>{presentCount}</strong> arrivé{presentCount > 1 ? 's' : ''} {pointageServiceFilter !== 'Tous' ? `(${pointageServiceFilter})` : ''}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                    {pointageStats.today.present} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>/ {pointageStats.today.total} actifs</span>
+
+                  {/* Expected / Present card */}
+                  <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Présence aujourd'hui</span>
+                      <UserPlus size={18} style={{ color: 'var(--brand-orange)' }} />
+                    </div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                      {presentCount} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>/ {totalActive} actifs</span>
+                    </div>
+                    <div style={{ width: '100%', height: '6px', background: 'var(--border-light)', borderRadius: '3px', marginTop: '0.25rem', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${totalActive > 0 ? (presentCount / totalActive) * 100 : 0}%`,
+                        height: '100%',
+                        background: 'var(--brand-orange)',
+                        borderRadius: '3px',
+                        transition: 'width 0.4s ease'
+                      }}></div>
+                    </div>
                   </div>
-                  <div style={{ width: '100%', height: '6px', background: 'var(--border-light)', borderRadius: '3px', marginTop: '0.25rem', overflow: 'hidden' }}>
-                    <div style={{
-                      width: `${pointageStats.today.total > 0 ? (pointageStats.today.present / pointageStats.today.total) * 100 : 0}%`,
-                      height: '100%',
-                      background: 'var(--brand-orange)',
-                      borderRadius: '3px',
-                      transition: 'width 0.4s ease'
-                    }}></div>
+
+                  {/* Late Arrivals card */}
+                  <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Arrivées en retard</span>
+                      <AlertTriangle size={18} style={{ color: 'var(--warning-color)' }} />
+                    </div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f97316' }}>
+                      {lateCount} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>ce jour</span>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      Arrivés à l'heure : <strong style={{ color: 'var(--success-color)' }}>{punctualCount}</strong>
+                    </div>
                   </div>
+
+                  {/* Absents card */}
+                  <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Non pointés</span>
+                      <XCircle size={18} style={{ color: 'var(--error-color)' }} />
+                    </div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
+                      {absentCount} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>collaborateurs</span>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      Départs pointés : <strong>{clockedOutCount}</strong>
+                    </div>
+                  </div>
+
                 </div>
-
-                {/* Late Arrivals card */}
-                <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Arrivées en retard</span>
-                    <AlertTriangle size={18} style={{ color: 'var(--warning-color)' }} />
-                  </div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f97316' }}>
-                    {pointageStats.today.late} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>ce jour</span>
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    Taux d'assiduité : <strong style={{ color: 'var(--success-color)' }}>{pointageStats.today.punctuality_rate}%</strong>
-                  </div>
-                </div>
-
-                {/* Absents card */}
-                <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Non pointés</span>
-                    <XCircle size={18} style={{ color: 'var(--error-color)' }} />
-                  </div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
-                    {pointageStats.today.absent} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>collaborateurs</span>
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    Départs pointés : <strong>{pointageStats.today.clocked_out}</strong>
-                  </div>
-                </div>
-
-              </div>
-            )}
+              );
+            })()}
 
             {/* Mobile sub-tab switcher */}
             {(() => {
               const expectedCount = pointageEmployees.filter(emp => {
                 const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
                 const notClockedIn = !emp.time_log || !emp.time_log.clock_in;
-                return matchesSearch && notClockedIn;
+                return matchesSearch && matchesService && notClockedIn;
               }).length;
 
               const presentCount = pointageEmployees.filter(emp => {
                 const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
+                const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
                 const isClockedIn = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
-                return matchesSearch && isClockedIn;
+                return matchesSearch && matchesService && isClockedIn;
               }).length;
 
               return (
@@ -3880,6 +4210,45 @@ export default function Page() {
             </div>
           </>
         )}
+
+        {/* Footer RGPD & Confidentialité */}
+        <footer style={{
+          marginTop: '3.5rem',
+          padding: '1.5rem 0',
+          borderTop: '1px solid var(--border-light)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1rem',
+          color: 'var(--text-secondary)',
+          fontSize: '0.8rem'
+        }}>
+          <div>
+            © {new Date().getFullYear()} Step Up Digital — Step Hub RH & Pointage
+          </div>
+          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setShowPrivacyModal(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--brand-orange)',
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                textDecoration: 'underline'
+              }}
+            >
+              <ShieldCheck size={14} /> Confidentialité & RGPD / CNIL
+            </button>
+          </div>
+        </footer>
       </div>
 
       {/* ==================================================== */}
@@ -4072,7 +4441,7 @@ export default function Page() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Solde Initial CP</label>
+                  <label>Solde initial Congé payé</label>
                   <input
                     type="number"
                     value={newMemberCP}
@@ -4081,7 +4450,7 @@ export default function Page() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Solde Initial Perm.</label>
+                  <label>Solde initial Permission spéciale</label>
                   <input
                     type="number"
                     value={newMemberPerm}
@@ -4163,20 +4532,18 @@ export default function Page() {
               </div>
 
               <div className="form-group">
-                <label>Type de congé / Permission</label>
+                <label>Type de congé ou d'absence</label>
                 <select
                   value={editLeaveType}
                   onChange={(e) => setEditLeaveType(e.target.value)}
                   disabled={editLeaveLoading}
                   required
                 >
-                  <option value="CP">Congé Payé</option>
-                  <option value="Congés Payés">Congés Payés (Ancien)</option>
-                  <option value="Congé Sans Solde">Congé Sans Solde</option>
-                  <option value="Permission">Permission Spéciale</option>
-                  <option value="Permission Exceptionnelle">Permission Exceptionnelle (Ancien)</option>
+                  <option value="Congé payé">Congé payé</option>
+                  <option value="Congé sans solde">Congé sans solde</option>
+                  <option value="Permission spéciale">Permission spéciale</option>
                   <option value="Permission à rattraper">Permission à rattraper</option>
-                  <option value="Maladie">Congé Maladie</option>
+                  <option value="Congé maladie">Congé maladie</option>
                 </select>
               </div>
 
@@ -4273,6 +4640,293 @@ export default function Page() {
             >
               Compris !
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 6. MODAL: POLITIQUE DE CONFIDENTIALITÉ & RGPD / CNIL */}
+      {/* ==================================================== */}
+      {showPrivacyModal && (
+        <div className="modal-backdrop" onClick={() => setShowPrivacyModal(false)} style={{ zIndex: 120 }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--brand-navy)' }}>
+                <ShieldCheck size={22} style={{ color: 'var(--brand-orange)' }} />
+                Protection des Données & Conformité RGPD / CNIL
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowPrivacyModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.25rem' }}
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+              <div style={{ background: 'var(--info-bg)', border: '1px solid var(--info-border)', borderRadius: '8px', padding: '0.75rem 1rem', color: 'var(--info-color)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Lock size={16} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Cadre légal :</strong> Règlement Général sur la Protection des Données (RGPD - Règlement UE 2016/679) et Recommandations CNIL relatives au contrôle des horaires et du temps de travail.
+                </span>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 0.35rem 0', color: 'var(--brand-orange)', fontWeight: 700, fontSize: '0.95rem' }}>1. Responsable du Traitement</h4>
+                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                  Le traitement de vos données personnelles est mis en œuvre par <strong>Step Up Digital</strong> dans le cadre de la gestion des ressources humaines et de l'organisation interne du travail.
+                </p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 0.35rem 0', color: 'var(--brand-orange)', fontWeight: 700, fontSize: '0.95rem' }}>2. Finalités & Objectifs</h4>
+                <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-secondary)' }}>
+                  <li>Gestion administrative des demandes et soldes de congés payés, permissions et absences.</li>
+                  <li>Enregistrement et vérification des pointages d'arrivée et de départ des collaborateurs.</li>
+                  <li>Planification globale et continuité de service des équipes opérationnelles.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 0.35rem 0', color: 'var(--brand-orange)', fontWeight: 700, fontSize: '0.95rem' }}>3. Base Légale du Traitement</h4>
+                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                  Ce traitement est fondé sur l'<strong>exécution du contrat de travail</strong> (Art. 6.1.b du RGPD) ainsi que sur le <strong>respect des obligations légales incombant à l'employeur</strong> relatives au décompte du temps de travail et des congés (Art. 6.1.c du RGPD).
+                </p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 0.35rem 0', color: 'var(--brand-orange)', fontWeight: 700, fontSize: '0.95rem' }}>4. Principe de Minimisation des Données (Art. 5.1.c RGPD)</h4>
+                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                  Seules les informations strictement nécessaires à la finalité poursuivie sont collectées et transmises :
+                </p>
+                <ul style={{ margin: '0.35rem 0 0 0', paddingLeft: '1.25rem', color: 'var(--text-secondary)' }}>
+                  <li><strong>Service Pointeur :</strong> Interface dédiée et allégée. Ne reçoit que le prénom, le service et le pointage du jour (zéro accès aux soldes de congés, historiques personnels, documents médicaux ou notes internes).</li>
+                  <li><strong>Protection de la vie privée :</strong> Les commentaires RH internes sont strictement masqués pour les collègues non habilités.</li>
+                  <li><strong>Sécurité des échanges :</strong> En-têtes HTTP sécurisés (HSTS, Anti-Clickjacking SAMEORIGIN, protection XSS, chiffrement TLS).</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 0.35rem 0', color: 'var(--brand-orange)', fontWeight: 700, fontSize: '0.95rem' }}>5. Durée de Conservation (Recommandations CNIL)</h4>
+                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                  Conformément aux directives de la CNIL et aux prescriptions légales du Code du travail, les relevés de pointage et de présence sont conservés pendant une durée maximale de <strong>5 ans</strong>, après quoi ils sont purgés ou archivés de manière sécurisée.
+                </p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 0.35rem 0', color: 'var(--brand-orange)', fontWeight: 700, fontSize: '0.95rem' }}>6. Exercice de vos Droits</h4>
+                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                  Conformément aux articles 15 à 22 du RGPD, vous disposez d'un droit d'accès, de rectification, de limitation et d'effacement de vos données personnelles. Vous pouvez exercer ces droits à tout moment en contactant le service RH ou la Direction de Step Up Digital.
+                </p>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ marginTop: '1.5rem' }}>
+              <button
+                type="button"
+                className="btn-accent"
+                onClick={() => setShowPrivacyModal(false)}
+                style={{ width: '100%' }}
+              >
+                J'ai compris
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7. MODAL: CONFIRMATION & PRÉVISUALISATION RAPPEL PAR EMAIL (ANTI-SPAM)     */}
+      {/* ========================================================================= */}
+      {showReminderModal && (
+        <div className="modal-backdrop" onClick={() => setShowReminderModal(false)} style={{ zIndex: 125 }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', maxHeight: '88vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--brand-navy)' }}>
+                <Mail size={22} style={{ color: 'var(--brand-orange)' }} />
+                Rappel des demandes en attente
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowReminderModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.25rem' }}
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.875rem' }}>
+              {/* Anti-Spam & Cooldown Alert */}
+              {getMinutesSinceLastReminder() !== null && getMinutesSinceLastReminder() < 15 && (
+                <div style={{
+                  background: 'var(--warning-bg)',
+                  border: '1px solid var(--warning-border)',
+                  color: 'var(--warning-color)',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem'
+                }}>
+                  <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong>Avertissement Anti-Spam :</strong> Un rappel a déjà été envoyé il y a <strong>{getMinutesSinceLastReminder()} minute{getMinutesSinceLastReminder() > 1 ? 's' : ''}</strong>. Évitez les relances trop rapprochées afin de ne pas encombrer la boîte mail des validateurs.
+                  </div>
+                </div>
+              )}
+
+              {/* Anti-Spam consolidation guarantee badge */}
+              <div style={{
+                background: 'var(--info-bg)',
+                border: '1px solid var(--info-border)',
+                color: 'var(--info-color)',
+                padding: '0.65rem 0.9rem',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <ShieldCheck size={16} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Principe Anti-Spam :</strong> Chaque manager sélectionné reçoit <strong>un seul email groupé</strong> récapitulant l'ensemble de ses demandes en attente.
+                </span>
+              </div>
+
+              {/* Recipients list with individual selection */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>Destinataires ciblés :</span>
+                  {reminderRecipients.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedReminderEmails.length === reminderRecipients.length) {
+                          setSelectedReminderEmails([]);
+                        } else {
+                          setSelectedReminderEmails(reminderRecipients.map(r => r.recipientEmail.toLowerCase()));
+                        }
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--brand-orange)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                    >
+                      {selectedReminderEmails.length === reminderRecipients.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                    </button>
+                  )}
+                </div>
+
+                {reminderLoadingPreview ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                    Chargement des destinataires...
+                  </div>
+                ) : reminderRecipients.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-secondary)', background: 'var(--background-light)', borderRadius: '8px' }}>
+                    Aucun destinataire à relancer.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto' }}>
+                    {reminderRecipients.map((rec) => {
+                      const isSelected = selectedReminderEmails.includes(rec.recipientEmail.toLowerCase());
+                      return (
+                        <div
+                          key={rec.recipientEmail}
+                          onClick={() => {
+                            setSelectedReminderEmails(prev => 
+                              isSelected 
+                                ? prev.filter(e => e !== rec.recipientEmail.toLowerCase())
+                                : [...prev, rec.recipientEmail.toLowerCase()]
+                            );
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '0.75rem',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '8px',
+                            border: `1px solid ${isSelected ? 'var(--brand-orange)' : 'var(--border-light)'}`,
+                            backgroundColor: isSelected ? 'rgba(255, 122, 0, 0.04)' : 'var(--panel-white)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}} // handled by parent onClick
+                            style={{ marginTop: '0.2rem', cursor: 'pointer' }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{rec.recipientName}</span>
+                              <span style={{
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '12px',
+                                background: 'var(--warning-bg)',
+                                color: 'var(--warning-color)'
+                              }}>
+                                {rec.requestsCount} demande{rec.requestsCount > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{rec.recipientEmail}</div>
+                            
+                            {/* Requests preview mini tags */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
+                              {rec.requests.map((rq, idx) => (
+                                <span key={idx} style={{
+                                  fontSize: '0.75rem',
+                                  background: 'var(--background-light)',
+                                  border: '1px solid var(--border-light)',
+                                  padding: '0.15rem 0.45rem',
+                                  borderRadius: '4px',
+                                  color: 'var(--text-primary)'
+                                }}>
+                                  <strong>{rq.employee_name}</strong> ({normalizeLeaveType(rq.leave_type)}, {formatDuration(rq.business_days)})
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowReminderModal(false)}
+                disabled={sendingReminders}
+                style={{ width: 'auto' }}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="btn-accent"
+                onClick={handleConfirmSendEmailReminders}
+                disabled={sendingReminders || selectedReminderEmails.length === 0}
+                style={{
+                  width: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.6rem 1.25rem'
+                }}
+              >
+                <Mail size={16} />
+                {sendingReminders 
+                  ? 'Envoi en cours...' 
+                  : selectedReminderEmails.length === 0 
+                    ? 'Sélectionnez au moins un destinataire' 
+                    : `Confirmer et envoyer (${selectedReminderEmails.length} email${selectedReminderEmails.length > 1 ? 's' : ''})`}
+              </button>
+            </div>
           </div>
         </div>
       )}
