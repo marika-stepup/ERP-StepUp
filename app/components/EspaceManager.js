@@ -9,10 +9,100 @@ import {
   UserCheck,
   Edit,
   Calendar,
-  Globe,
-  Mail,
-  BookOpen
+  PenTool,
+  Palette,
+  Users,
+  BarChart3,
+  Code
 } from 'lucide-react';
+
+export const DELIVERABLE_CATEGORIES = [
+  {
+    id: 'redaction',
+    title: 'Rédaction',
+    categoryKey: 'Rédaction',
+    themeColor: '#D91207',
+    icon: PenTool,
+    activities: [
+      'Billet de blog',
+      'Newsletter',
+      'Stratégie',
+      'Posts',
+      'Correspondance mail',
+      'Relance client',
+      'Compte rendu',
+      'Modération',
+      'Marketing de croissance',
+      'Contrat'
+    ]
+  },
+  {
+    id: 'crea_graphique',
+    title: 'Créa graphique',
+    categoryKey: 'Créa graphique',
+    themeColor: '#178FCB',
+    icon: Palette,
+    activities: [
+      'Création d\'image',
+      'Vidéo',
+      'Maquette',
+      'Logo',
+      'Moodboard'
+    ]
+  },
+  {
+    id: 'reunion',
+    title: 'Réunion',
+    categoryKey: 'Réunion',
+    themeColor: '#338855',
+    icon: Users,
+    activities: [
+      'Réunions internes',
+      'Réunions externes',
+      'Réunion des team leader',
+      'Présentation commerciale',
+      'Brief',
+      'Atelier de stratégie',
+      'Entretien individuel',
+      'KIDS',
+      'Formation',
+      'Meeting marketing de croissance'
+    ]
+  },
+  {
+    id: 'data',
+    title: 'Data',
+    categoryKey: 'Data',
+    themeColor: '#F59E0B',
+    icon: BarChart3,
+    activities: [
+      'Édition des rapports',
+      'Reporting',
+      'Banque',
+      'Factures',
+      'Planification',
+      'Devis',
+      'RH',
+      'Pointage',
+      'Comptabilité'
+    ]
+  },
+  {
+    id: 'tech',
+    title: 'Tech',
+    categoryKey: 'Tech',
+    themeColor: '#6366F1',
+    icon: Code,
+    activities: [
+      'Bricolage',
+      'Développement IA',
+      'Maintenance',
+      'Développement Web',
+      'TMA',
+      'Administration informatique'
+    ]
+  }
+];
 
 export default function EspaceManager({ user, token, allMembers, clients, loading, refreshData }) {
   const [selectedClient, setSelectedClient] = useState(null);
@@ -29,12 +119,6 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
   const [newClientBudget, setNewClientBudget] = useState('20');
   const [newClientStartDate, setNewClientStartDate] = useState('');
   const [newClientEndDate, setNewClientEndDate] = useState('');
-  const [newClientFB, setNewClientFB] = useState('0');
-  const [newClientIG, setNewClientIG] = useState('0');
-  const [newClientLI, setNewClientLI] = useState('0');
-  const [newClientGP, setNewClientGP] = useState('0');
-  const [newClientNL, setNewClientNL] = useState('0');
-  const [newClientBlog, setNewClientBlog] = useState('0');
   const [newClientUnquantifiable, setNewClientUnquantifiable] = useState('');
 
   // Edit Client States
@@ -44,26 +128,13 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
   const [editClientBudget, setEditClientBudget] = useState('20');
   const [editClientStartDate, setEditClientStartDate] = useState('');
   const [editClientEndDate, setEditClientEndDate] = useState('');
-  const [editClientFB, setEditClientFB] = useState('0');
-  const [editClientIG, setEditClientIG] = useState('0');
-  const [editClientLI, setEditClientLI] = useState('0');
-  const [editClientGP, setEditClientGP] = useState('0');
-  const [editClientNL, setEditClientNL] = useState('0');
-  const [editClientBlog, setEditClientBlog] = useState('0');
   const [editClientUnquantifiable, setEditClientUnquantifiable] = useState('');
 
   const [showAddTask, setShowAddTask] = useState(false);
-  const [newTaskCategory, setNewTaskCategory] = useState('');
+  const [newTaskCategory, setNewTaskCategory] = useState('Rédaction');
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskBudget, setNewTaskBudget] = useState('4');
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
-
-  // Manual log state
-  const [manualMemberId, setManualMemberId] = useState('');
-  const [manualTaskId, setManualTaskId] = useState('');
-  const [manualHours, setManualHours] = useState('1');
-  const [manualMinutes, setManualMinutes] = useState('0');
-  const [manualDate, setManualDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   // Modals d'alerte et confirmation personnalisés
   const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '' });
@@ -113,11 +184,13 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
       setTimeLogs([]);
     }
   }, [selectedClient, token]);
+
   const [selectedFilter, setSelectedFilter] = useState('Tous');
 
   useEffect(() => {
     setSelectedFilter('Tous');
   }, [selectedClient?.id]);
+
   // Actions: Client
   const handleAddClient = async (e) => {
     e.preventDefault();
@@ -126,13 +199,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
     let code = '';
     let name = newClientInput.trim();
 
-    // Try to match prefix code like "SD-000 - STEP UP" or "SD-000 STEP UP"
     const match = newClientInput.match(/^([a-zA-Z0-9]+-\d+)\s*[-:]?\s*(.*)$/) || newClientInput.match(/^([a-zA-Z0-9]+)\s*[-:]\s*(.*)$/);
     if (match) {
       code = match[1].trim().toUpperCase();
       name = match[2].trim();
     } else {
-      // Fallback unique code generation
       code = name.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/).map(w => w[0]).join('').toUpperCase();
       if (code.length < 3) {
         code = name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase();
@@ -156,12 +227,6 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
           total_budget_hours: parseFloat(newClientBudget) || 0,
           start_date: newClientStartDate || null,
           end_date: newClientEndDate || null,
-          posts_facebook: parseInt(newClientFB) || 0,
-          posts_instagram: parseInt(newClientIG) || 0,
-          posts_linkedin: parseInt(newClientLI) || 0,
-          posts_google: parseInt(newClientGP) || 0,
-          newsletter_count: parseInt(newClientNL) || 0,
-          blog_count: parseInt(newClientBlog) || 0,
           unquantifiable_tasks: newClientUnquantifiable || null
         })
       });
@@ -171,12 +236,6 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
         setNewClientInput('');
         setNewClientStartDate('');
         setNewClientEndDate('');
-        setNewClientFB('0');
-        setNewClientIG('0');
-        setNewClientLI('0');
-        setNewClientGP('0');
-        setNewClientNL('0');
-        setNewClientBlog('0');
         setNewClientUnquantifiable('');
         setNewClientBudget('20');
         setShowAddClient(false);
@@ -199,12 +258,6 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
     setEditClientBudget(String(client.total_budget_hours || 0));
     setEditClientStartDate(client.start_date || '');
     setEditClientEndDate(client.end_date || '');
-    setEditClientFB(String(client.posts_facebook || 0));
-    setEditClientIG(String(client.posts_instagram || 0));
-    setEditClientLI(String(client.posts_linkedin || 0));
-    setEditClientGP(String(client.posts_google || 0));
-    setEditClientNL(String(client.newsletter_count || 0));
-    setEditClientBlog(String(client.blog_count || 0));
     setEditClientUnquantifiable(client.unquantifiable_tasks || '');
     setShowEditClient(true);
   };
@@ -216,13 +269,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
     let code = '';
     let name = editClientInput.trim();
 
-    // Try to match prefix code like "SD-000 - STEP UP" or "SD-000 STEP UP"
     const match = editClientInput.match(/^([a-zA-Z0-9]+-\d+)\s*[-:]?\s*(.*)$/) || editClientInput.match(/^([a-zA-Z0-9]+)\s*[-:]\s*(.*)$/);
     if (match) {
       code = match[1].trim().toUpperCase();
       name = match[2].trim();
     } else {
-      // Fallback unique code generation
       code = name.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/).map(w => w[0]).join('').toUpperCase();
       if (code.length < 3) {
         code = name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase();
@@ -247,12 +298,6 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
           total_budget_hours: parseFloat(editClientBudget) || 0,
           start_date: editClientStartDate || null,
           end_date: editClientEndDate || null,
-          posts_facebook: parseInt(editClientFB) || 0,
-          posts_instagram: parseInt(editClientIG) || 0,
-          posts_linkedin: parseInt(editClientLI) || 0,
-          posts_google: parseInt(editClientGP) || 0,
-          newsletter_count: parseInt(editClientNL) || 0,
-          blog_count: parseInt(editClientBlog) || 0,
           unquantifiable_tasks: editClientUnquantifiable || null
         })
       });
@@ -320,26 +365,53 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
         },
         body: JSON.stringify({ status: newStatus })
       });
+
       if (res.ok) {
         await refreshData();
+      } else {
+        const errData = await res.json();
+        showAlert('Erreur', errData.error || 'Erreur lors de la mise à jour du statut.');
       }
     } catch (err) {
       console.error('Error updating task status:', err);
     }
   };
 
+  const handleUpdateTaskDueDate = async (taskId, newDueDate) => {
+    try {
+      const res = await fetch(`/api/production/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ due_date: newDueDate || null })
+      });
+
+      if (res.ok) {
+        await refreshData();
+      }
+    } catch (err) {
+      console.error('Error updating task due date:', err);
+    }
+  };
+
   const handleDeleteTask = async (taskId) => {
     showConfirm(
-      "Supprimer la tâche",
-      "Voulez-vous vraiment supprimer cette tâche ? Tous les logs associés seront supprimés.",
+      'Supprimer la tâche',
+      'Êtes-vous sûr de vouloir supprimer cette tâche ? Tous les enregistrements de temps associés seront également supprimés.',
       async () => {
         try {
           const res = await fetch(`/api/production/tasks/${taskId}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` }
           });
+
           if (res.ok) {
             await refreshData();
+          } else {
+            const errData = await res.json();
+            showAlert('Erreur', errData.error || 'Erreur lors de la suppression de la tâche.');
           }
         } catch (err) {
           console.error('Error deleting task:', err);
@@ -348,70 +420,23 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
     );
   };
 
-  // Actions: Manual Entry
-  const handleAddManualLog = async (e) => {
-    e.preventDefault();
-    if (!manualTaskId || !manualMemberId || !token) return;
-
-    const totalSeconds = (parseInt(manualHours) || 0) * 3600 + (parseInt(manualMinutes) || 0) * 60;
-    if (totalSeconds <= 0) {
-      showAlert('Durée non valide', 'Veuillez spécifier une durée valide.');
-      return;
-    }
-
-    const member = allMembers.find(m => m.employee_id === manualMemberId);
-    if (!member) return;
-
-    try {
-      const res = await fetch('/api/production/time-logs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          task_id: manualTaskId,
-          employee_id: member.employee_id,
-          employee_name: `${member.employee_first_name} ${member.employee_name}`,
-          duration_seconds: totalSeconds,
-          log_type: 'production',
-          logged_at: new Date(manualDate).toISOString(),
-          start_time: new Date(manualDate).toISOString(),
-          end_time: new Date(manualDate).toISOString()
-        })
-      });
-
-      if (res.ok) {
-        setManualHours('1');
-        setManualMinutes('0');
-        await refreshData();
-        if (selectedClient) {
-          await fetchLogs(selectedClient.id);
-        }
-      } else {
-        const errData = await res.json();
-        showAlert('Erreur', errData.error || 'Erreur lors de la création du log manuel.');
-      }
-    } catch (err) {
-      console.error('Error adding manual log:', err);
-    }
-  };
-
   const handleDeleteLog = async (logId) => {
     showConfirm(
-      "Supprimer l'enregistrement",
-      "Voulez-vous vraiment supprimer cet enregistrement de temps ?",
+      'Supprimer l\'enregistrement',
+      'Êtes-vous sûr de vouloir supprimer cet enregistrement de temps ?',
       async () => {
         try {
           const res = await fetch(`/api/production/time-logs/${logId}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` }
           });
+
           if (res.ok) {
+            setTimeLogs(prev => prev.filter(l => l.id !== logId));
             await refreshData();
-            if (selectedClient) {
-              await fetchLogs(selectedClient.id);
-            }
+          } else {
+            const errData = await res.json();
+            showAlert('Erreur', errData.error || 'Erreur lors de la suppression du log.');
           }
         } catch (err) {
           console.error('Error deleting log:', err);
@@ -429,80 +454,37 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
     return `${minutes} min`;
   };
 
-  const getCategoryType = (category) => {
-    const cat = category.toLowerCase();
-    if (cat.includes('linkedin')) return 'LinkedIn';
-    if (cat.includes('facebook') || cat.startsWith('fb')) return 'Facebook';
-    if (cat.includes('instagram') || cat.startsWith('insta') || cat.startsWith('ig')) return 'Instagram';
-    if (cat.includes('google')) return 'Google Posts';
-    if (cat.includes('newsletter')) return 'Newsletter';
-    if (cat.includes('bb') || cat.includes('blog')) return 'Billet Blog';
-    return category; // fallback
-  };
-
-  // Group tasks by category
-  const getGroupedTasks = () => {
-    if (!selectedClient) return {};
-    const grouped = {};
-    (selectedClient.tasks || []).forEach(task => {
-      if (!grouped[task.category]) {
-        grouped[task.category] = [];
-      }
-      grouped[task.category].push(task);
-    });
-    return grouped;
-  };
-
-  // Get collaborator summaries
+  // Group logs by collaborator to calculate total time spent per person
   const getCollaboratorSummaries = () => {
-    const summary = {};
+    const summaryMap = {};
     timeLogs.forEach(log => {
       if (log.log_type === 'production') {
-        if (!summary[log.employee_id]) {
-          summary[log.employee_id] = { name: log.employee_name, duration: 0 };
+        const empName = log.employee_name || 'Inconnu';
+        if (!summaryMap[empName]) {
+          summaryMap[empName] = 0;
         }
-        summary[log.employee_id].duration += log.duration_seconds;
+        summaryMap[empName] += log.duration_seconds;
       }
     });
-    return Object.values(summary);
+
+    return Object.entries(summaryMap).map(([name, duration]) => ({
+      name,
+      duration
+    })).sort((a, b) => b.duration - a.duration);
   };
 
-  const groupedTasks = getGroupedTasks();
   const collaboratorSummaries = getCollaboratorSummaries();
 
-  // Get distinct filter types for the client's existing tasks
-  const availableFilterTypes = [
-    'Tous',
-    ...new Set(Object.keys(groupedTasks).map(getCategoryType))
-  ];
-
-  // Filter grouped tasks based on selection
-  const filteredGroupedTasks = {};
-  Object.entries(groupedTasks).forEach(([category, tasks]) => {
-    if (selectedFilter === 'Tous' || getCategoryType(category) === selectedFilter) {
-      filteredGroupedTasks[category] = tasks;
-    }
-  });
-
   return (
-    <div className="espace-production">
+    <div className="espace-manager">
       {/* HEADER CONTROLS */}
       <div className="prod-header" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <h1 className="prod-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Briefcase size={24} style={{ color: 'var(--brand-orange)' }} />
-                Gestion Client :
-              </h1>
-              <button 
-                className="btn btn-outline" 
-                onClick={() => setShowAddClient(true)}
-                style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', height: 'fit-content' }}
-              >
-                <Plus size={14} /> Nouveau Client
-              </button>
-            </div>
+            <h1 className="prod-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Briefcase size={24} style={{ color: 'var(--brand-orange)' }} />
+              Pilotage Client :
+            </h1>
             <select 
               className="client-selector"
               value={selectedClient?.id || ''}
@@ -518,23 +500,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             </select>
           </div>
 
-          {selectedClient && (
-            <div className="contract-progression">
-              <div className="progression-text">
-                <span>Progression globale ({selectedClient.contract_period}) :</span>
-                <strong>{selectedClient.progression_percent}% consommé</strong>
-              </div>
-              <div className="progress-bar-container">
-                <div 
-                  className="progress-bar-fill orange"
-                  style={{ width: `${Math.min(selectedClient.progression_percent, 100)}%` }}
-                ></div>
-              </div>
-              <div className="progression-hours">
-                {selectedClient.total_spent_hours}h passées / {selectedClient.total_budget_hours}h budgétées
-              </div>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button className="btn btn-primary" onClick={() => setShowAddClient(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <PlusCircle size={16} /> Nouveau Client
+            </button>
+          </div>
         </div>
 
         {selectedClient && (
@@ -553,6 +523,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <span>Fin : <strong>{new Date(selectedClient.end_date).toLocaleDateString('fr-FR')}</strong></span>
                   </div>
                 )}
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Progression globale : <strong>{selectedClient.total_spent_hours}h / {selectedClient.total_budget_hours}h ({selectedClient.progression_percent}%)</strong>
+                </div>
               </div>
               
               <button 
@@ -564,71 +537,53 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               </button>
             </div>
 
-            {/* Deliverables grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#1877f2', display: 'flex' }}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ display: 'inline-block' }}>
-                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Facebook</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_facebook || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
+            {/* 5 Deliverables header summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+              {DELIVERABLE_CATEGORIES.map(card => {
+                const IconComp = card.icon;
+                const catTasks = (selectedClient.tasks || []).filter(
+                  t => t.category?.toLowerCase() === card.categoryKey.toLowerCase() ||
+                       t.name?.toLowerCase() === card.title.toLowerCase() ||
+                       t.category?.toLowerCase() === card.id.toLowerCase()
+                );
+                let spentSeconds = 0;
+                let budgetHours = 0;
+                catTasks.forEach(t => {
+                  spentSeconds += (t.time_spent_seconds || 0);
+                  budgetHours += (t.budget_hours || 0);
+                });
 
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#e1306c', display: 'flex' }}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block' }}>
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Instagram</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_instagram || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
-
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#0a66c2', display: 'flex' }}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block' }}>
-                    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-                    <rect x="2" y="9" width="4" height="12" />
-                    <circle cx="4" cy="4" r="2" />
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>LinkedIn</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_linkedin || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
-
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#4285f4', display: 'flex' }}><Globe size={18} /></div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Google Posts</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_google || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
-
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#ea4335', display: 'flex' }}><Mail size={18} /></div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Newsletter</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.newsletter_count || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
-
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#fbbc05', display: 'flex' }}><BookOpen size={18} /></div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Billet Blog</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.blog_count || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
+                return (
+                  <div 
+                    key={card.id} 
+                    className="deliverable-mini-card" 
+                    style={{ 
+                      padding: '0.6rem 0.8rem', 
+                      borderRadius: '8px', 
+                      border: '1px solid var(--border-light)', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.6rem', 
+                      background: 'var(--panel-white)' 
+                    }}
+                  >
+                    <div style={{ color: card.themeColor, display: 'flex' }}>
+                      <IconComp size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{card.title}</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: '700' }}>
+                        {formatSecondsToHMText(spentSeconds)}
+                        {budgetHours > 0 && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 'normal', color: 'var(--text-secondary)', marginLeft: '0.25rem' }}>
+                            / {budgetHours}h
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Unquantifiable tasks */}
@@ -655,7 +610,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
           
-          {/* MIDDLE SECTION: LIVRABLES / TÂCHES (Full Width) */}
+          {/* LIVRABLES / TÂCHES */}
           <div className="panel deliverables-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -677,118 +632,143 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                 <Plus size={14} /> Nouvelle Tâche
               </button>
             </div>
-            <p className="panel-subtitle">Administrez et mettez à jour les tâches du client.</p>
+            <p className="panel-subtitle">Administrez et mettez à jour les livrables du client organisés selon les 5 catégories.</p>
 
-            {Object.keys(groupedTasks).length === 0 ? (
-              <p className="no-data-text" style={{ textAlign: 'center', padding: '2rem' }}>Aucune tâche configurée pour ce client.</p>
-            ) : (
-              <>
-                {/* Category Filter Badges */}
-                {availableFilterTypes.length > 2 && (
-                  <div className="filter-tabs" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-light)' }}>
-                    {availableFilterTypes.map(type => (
-                      <button
-                        key={type}
-                        onClick={() => setSelectedFilter(type)}
-                        style={{
-                          padding: '0.35rem 0.85rem',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          borderRadius: '16px',
-                          border: '1px solid ' + (selectedFilter === type ? 'var(--brand-orange)' : 'var(--border-light)'),
-                          background: selectedFilter === type ? 'var(--brand-orange)' : 'var(--panel-white)',
-                          color: selectedFilter === type ? 'white' : 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                )}
+            <div className="deliverables-5-container" style={{ marginTop: '1.25rem' }}>
+              {DELIVERABLE_CATEGORIES.map(card => {
+                const IconComp = card.icon;
+                const catTasks = (selectedClient.tasks || []).filter(
+                  t => t.category?.toLowerCase() === card.categoryKey.toLowerCase() ||
+                       t.name?.toLowerCase() === card.title.toLowerCase() ||
+                       t.category?.toLowerCase() === card.id.toLowerCase()
+                );
 
-                <div className="deliverable-categories">
-                  {Object.keys(filteredGroupedTasks).length === 0 ? (
-                    <p className="no-data-text" style={{ textAlign: 'center', padding: '1.5rem', width: '100%' }}>Aucune tâche ne correspond à ce filtre.</p>
-                  ) : (
-                    Object.entries(filteredGroupedTasks).map(([category, tasks]) => (
-                      <div key={category} className="category-group">
-                        <h3 className="category-title">{category}</h3>
-                        <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
-                          {tasks.map(task => {
-                            const budgetSec = task.budget_hours * 3600;
-                            const spentSec = task.time_spent_seconds || 0;
-                            const isCompleted = task.status === 'Fait';
-                            const progressPercent = budgetSec > 0 ? Math.round((spentSec / budgetSec) * 100) : 0;
+                let catSpentSec = 0;
+                let catBudgetHours = 0;
+                catTasks.forEach(t => {
+                  catSpentSec += (t.time_spent_seconds || 0);
+                  catBudgetHours += (t.budget_hours || 0);
+                });
 
-                            return (
-                              <div key={task.id} className={`task-item-card ${isCompleted ? 'completed' : ''}`}>
-                                <div className="task-item-header">
-                                  <div className="task-item-details">
-                                    <h4 className="task-item-name">{task.name}</h4>
-                                    <span className="task-item-budget" style={{ display: 'block' }}>
-                                      {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
-                                    </span>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'nowrap' }}>
-                                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>Échéance :</span>
-                                      <input 
-                                        type="date"
-                                        value={task.due_date ? task.due_date.split('T')[0] : ''}
-                                        onChange={(e) => handleUpdateTaskDueDate(task.id, e.target.value)}
-                                        style={{
-                                          fontSize: '0.7rem',
-                                          padding: '0.1rem 0.25rem',
-                                          borderRadius: '4px',
-                                          border: '1px solid var(--border-light)',
-                                          backgroundColor: 'var(--panel-white)',
-                                          color: 'var(--text-primary)',
-                                          cursor: 'pointer',
-                                          width: '115px',
-                                          flexShrink: 0
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div className="task-item-actions">
-                                    <select 
-                                      className="task-status-selector"
-                                      value={task.status} 
-                                      onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
-                                    >
-                                      <option value="Non démarré">À faire</option>
-                                      <option value="En cours">En cours</option>
-                                      <option value="Fait">Fait</option>
-                                    </select>
-
-                                    <button className="btn-icon-delete" onClick={() => handleDeleteTask(task.id)} title="Supprimer la tâche">
-                                      <Trash2 size={12} />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                <div className="task-item-progress">
-                                  <div className="progress-bar-container">
-                                    <div 
-                                      className={`progress-bar-fill ${isCompleted ? 'green' : 'blue'}`}
-                                      style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                                    ></div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
+                return (
+                  <div 
+                    key={card.id}
+                    className="deliverable-card-item"
+                    style={{ borderLeft: `4px solid ${card.themeColor}` }}
+                  >
+                    <div className="deliverable-card-header">
+                      <div className="deliverable-card-title-group">
+                        <div 
+                          className="deliverable-card-icon-badge"
+                          style={{ backgroundColor: `${card.themeColor}15`, color: card.themeColor }}
+                        >
+                          <IconComp size={20} />
+                        </div>
+                        <div>
+                          <h3 className="deliverable-card-title">{card.title}</h3>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                            {formatSecondsToHMText(catSpentSec)}
+                            {catBudgetHours > 0 ? ` / ${catBudgetHours}h budgétées` : ' passées au total'}
+                          </span>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
+
+                      <button 
+                        className="btn btn-outline btn-sm"
+                        onClick={() => {
+                          setNewTaskCategory(card.categoryKey);
+                          setShowAddTask(true);
+                        }}
+                        style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                      >
+                        <Plus size={12} /> Ajouter une tâche
+                      </button>
+                    </div>
+
+                    {/* Activities Tags */}
+                    <div className="deliverable-activities-tags">
+                      {card.activities.map(act => (
+                        <span key={act} className="activity-pill">
+                          {act}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Sub-tasks List if any */}
+                    {catTasks.length > 0 && (
+                      <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                        {catTasks.map(task => {
+                          const budgetSec = task.budget_hours * 3600;
+                          const spentSec = task.time_spent_seconds || 0;
+                          const isCompleted = task.status === 'Fait';
+                          const progressPercent = budgetSec > 0 ? Math.round((spentSec / budgetSec) * 100) : 0;
+
+                          return (
+                            <div key={task.id} className={`task-item-card ${isCompleted ? 'completed' : ''}`}>
+                              <div className="task-item-header">
+                                <div className="task-item-details">
+                                  <h4 className="task-item-name">{task.name}</h4>
+                                  <span className="task-item-budget" style={{ display: 'block' }}>
+                                    {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
+                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'nowrap' }}>
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>Échéance :</span>
+                                    <input 
+                                      type="date"
+                                      value={task.due_date ? task.due_date.split('T')[0] : ''}
+                                      onChange={(e) => handleUpdateTaskDueDate(task.id, e.target.value)}
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        padding: '0.1rem 0.25rem',
+                                        borderRadius: '4px',
+                                        border: '1px solid var(--border-light)',
+                                        backgroundColor: 'var(--panel-white)',
+                                        color: 'var(--text-primary)',
+                                        cursor: 'pointer',
+                                        width: '115px',
+                                        flexShrink: 0
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="task-item-actions">
+                                  <select 
+                                    className="task-status-selector"
+                                    value={task.status} 
+                                    onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
+                                  >
+                                    <option value="Non démarré">À faire</option>
+                                    <option value="En cours">En cours</option>
+                                    <option value="Fait">Fait</option>
+                                  </select>
+
+                                  <button className="btn-icon-delete" onClick={() => handleDeleteTask(task.id)} title="Supprimer la tâche">
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="task-item-progress">
+                                <div className="progress-bar-container">
+                                  <div 
+                                    className={`progress-bar-fill ${isCompleted ? 'green' : 'blue'}`}
+                                    style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* TEMPS TOTAL PAR COLLABORATEUR (Full Width) */}
+          {/* TEMPS TOTAL PAR COLLABORATEUR */}
           <div className="panel collaborators-summary-card">
             <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <UserCheck size={18} style={{ color: 'var(--brand-orange)' }} />
@@ -812,7 +792,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             )}
           </div>
 
-          {/* BOTTOM SECTION: HISTORIQUE DES ENREGISTREMENTS (Full Width) */}
+          {/* HISTORIQUE DES ENREGISTREMENTS */}
           <div className="panel history-log-card">
             <h2 className="panel-title">HISTORIQUE DES ENREGISTREMENTS</h2>
             
@@ -826,7 +806,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                       <tr>
                         <th>Date</th>
                         <th>Collaborateur</th>
-                        <th>Tâche</th>
+                        <th>Tâche / Livrable</th>
                         <th>Durée</th>
                         <th>Type</th>
                         <th></th>
@@ -919,38 +899,8 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                 </div>
               </div>
 
-              <div style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>
-                <h3 className="form-sub-title" style={{ fontSize: '0.95rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.3rem', color: 'var(--brand-orange)' }}>Délivrables par mois</h3>
-                <div className="form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem', marginTop: '0.5rem' }}>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Facebook Posts</label>
-                    <input type="number" min="0" value={newClientFB} onChange={(e) => setNewClientFB(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Instagram Posts</label>
-                    <input type="number" min="0" value={newClientIG} onChange={(e) => setNewClientIG(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>LinkedIn Posts</label>
-                    <input type="number" min="0" value={newClientLI} onChange={(e) => setNewClientLI(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Google Posts</label>
-                    <input type="number" min="0" value={newClientGP} onChange={(e) => setNewClientGP(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Newsletters</label>
-                    <input type="number" min="0" value={newClientNL} onChange={(e) => setNewClientNL(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Billets Blog</label>
-                    <input type="number" min="0" value={newClientBlog} onChange={(e) => setNewClientBlog(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                <label>Tâches inquantifiables (ex: modération, rédaction web...)</label>
+              <div className="form-group" style={{ marginTop: '1rem' }}>
+                <label>Tâches inquantifiables et notes</label>
                 <textarea 
                   value={newClientUnquantifiable} 
                   onChange={(e) => setNewClientUnquantifiable(e.target.value)} 
@@ -1026,38 +976,8 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                 </div>
               </div>
 
-              <div style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>
-                <h3 className="form-sub-title" style={{ fontSize: '0.95rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.3rem', color: 'var(--brand-orange)' }}>Délivrables par mois</h3>
-                <div className="form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem', marginTop: '0.5rem' }}>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Facebook Posts</label>
-                    <input type="number" min="0" value={editClientFB} onChange={(e) => setEditClientFB(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Instagram Posts</label>
-                    <input type="number" min="0" value={editClientIG} onChange={(e) => setEditClientIG(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>LinkedIn Posts</label>
-                    <input type="number" min="0" value={editClientLI} onChange={(e) => setEditClientLI(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Google Posts</label>
-                    <input type="number" min="0" value={editClientGP} onChange={(e) => setEditClientGP(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Newsletters</label>
-                    <input type="number" min="0" value={editClientNL} onChange={(e) => setEditClientNL(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.8rem' }}>Billets Blog</label>
-                    <input type="number" min="0" value={editClientBlog} onChange={(e) => setEditClientBlog(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                <label>Tâches inquantifiables (ex: modération, rédaction web...)</label>
+              <div className="form-group" style={{ marginTop: '1rem' }}>
+                <label>Tâches inquantifiables et notes</label>
                 <textarea 
                   value={editClientUnquantifiable} 
                   onChange={(e) => setEditClientUnquantifiable(e.target.value)} 
@@ -1082,20 +1002,17 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             <h2 className="modal-title">Nouvelle Tâche de Production</h2>
             <form onSubmit={handleAddTask}>
               <div className="form-group">
-                <label>Catégorie / Groupe</label>
-                <input 
-                  type="text" 
+                <label>Catégorie de livrable</label>
+                <select 
                   value={newTaskCategory} 
                   onChange={(e) => setNewTaskCategory(e.target.value)} 
-                  placeholder="ex: Social Media (12 Posts) ou Rédaction Web" 
-                  list="categories-list"
                   required 
-                />
-                <datalist id="categories-list">
-                  {Object.keys(groupedTasks).map(cat => (
-                    <option key={cat} value={cat} />
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}
+                >
+                  {DELIVERABLE_CATEGORIES.map(cat => (
+                    <option key={cat.id} value={cat.categoryKey}>{cat.title}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
               <div className="form-group">
                 <label>Nom du livrable / de la tâche</label>
@@ -1103,7 +1020,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                   type="text" 
                   value={newTaskName} 
                   onChange={(e) => setNewTaskName(e.target.value)} 
-                  placeholder="ex: Post #1 (FB/IG/LI) - Créa Visuel" 
+                  placeholder="ex: Rédaction newsletter de lancement" 
                   required 
                 />
               </div>

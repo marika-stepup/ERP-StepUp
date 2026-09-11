@@ -146,12 +146,6 @@ export async function POST(req) {
     return NextResponse.json({ log: newLog }, { status: 201 });
   } catch (error) {
     console.error('Error creating production time log:', error);
-    if (error.code === '23505') {
-      return NextResponse.json(
-        { error: 'task_locked', message: "Action impossible : Cette tâche vient d'être prise par un autre collaborateur." },
-        { status: 409 }
-      );
-    }
     return NextResponse.json(
       { error: 'Erreur interne du serveur lors de la création du log de temps.' },
       { status: 500 }

@@ -6,29 +6,107 @@ import {
   Briefcase, 
   CheckCircle, 
   AlertCircle,
-  Lock,
   Calendar,
-  Globe,
-  Mail,
-  BookOpen
+  PenTool,
+  Palette,
+  Users,
+  BarChart3,
+  Code
 } from 'lucide-react';
 import { supabaseClient } from '../../lib/supabaseClient';
 
-const getInitials = (name) => {
-  if (!name) return '';
-  const parts = name.split(/[\s-]+/).filter(Boolean);
-  if (parts.length === 0) return '';
-  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-};
+export const DELIVERABLE_CARDS = [
+  {
+    id: 'redaction',
+    title: 'Rédaction',
+    categoryKey: 'Rédaction',
+    themeColor: '#D91207',
+    icon: PenTool,
+    activities: [
+      'Billet de blog',
+      'Newsletter',
+      'Stratégie',
+      'Posts',
+      'Correspondance mail',
+      'Relance client',
+      'Compte rendu',
+      'Modération',
+      'Marketing de croissance',
+      'Contrat'
+    ]
+  },
+  {
+    id: 'crea_graphique',
+    title: 'Créa graphique',
+    categoryKey: 'Créa graphique',
+    themeColor: '#178FCB',
+    icon: Palette,
+    activities: [
+      'Création d\'image',
+      'Vidéo',
+      'Maquette',
+      'Logo',
+      'Moodboard'
+    ]
+  },
+  {
+    id: 'reunion',
+    title: 'Réunion',
+    categoryKey: 'Réunion',
+    themeColor: '#338855',
+    icon: Users,
+    activities: [
+      'Réunions internes',
+      'Réunions externes',
+      'Réunion des team leader',
+      'Présentation commerciale',
+      'Brief',
+      'Atelier de stratégie',
+      'Entretien individuel',
+      'KIDS',
+      'Formation',
+      'Meeting marketing de croissance'
+    ]
+  },
+  {
+    id: 'data',
+    title: 'Data',
+    categoryKey: 'Data',
+    themeColor: '#F59E0B',
+    icon: BarChart3,
+    activities: [
+      'Édition des rapports',
+      'Reporting',
+      'Banque',
+      'Factures',
+      'Planification',
+      'Devis',
+      'RH',
+      'Pointage',
+      'Comptabilité'
+    ]
+  },
+  {
+    id: 'tech',
+    title: 'Tech',
+    categoryKey: 'Tech',
+    themeColor: '#6366F1',
+    icon: Code,
+    activities: [
+      'Bricolage',
+      'Développement IA',
+      'Maintenance',
+      'Développement Web',
+      'TMA',
+      'Administration informatique'
+    ]
+  }
+];
 
 export default function EspaceProduction({ user, token, clients, loading, refreshData, employeeName }) {
   const [selectedClient, setSelectedClient] = useState(null);
 
-  // Real-time locks: task_id -> { log_id, employee_id, employee_name, start_time }
-  const [activeLocks, setActiveLocks] = useState({});
-
-  // Active tracking state
+  // Active tracking state for the current logged-in user
   const [activeTask, setActiveTask] = useState(null); 
   const [activeLogId, setActiveLogId] = useState(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -74,46 +152,31 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       setSelectedClient(null);
     }
   }, [clients]);
-  const [selectedFilter, setSelectedFilter] = useState('Tous');
 
-  useEffect(() => {
-    setSelectedFilter('Tous');
-  }, [selectedClient?.id]);
-  // Fetch active locks & re-hydrate running chrono
-  const fetchActiveLocks = async () => {
+  // Re-hydrate running chrono for the active user
+  const fetchMyActiveLogs = async () => {
+    if (!user) return;
     try {
       const { data, error } = await supabaseClient
         .from('production_time_logs')
         .select('id, task_id, employee_id, employee_name, start_time, log_type')
+        .eq('employee_id', user.id)
         .is('end_time', null);
 
       if (error) throw error;
 
-      const locks = {};
       let myActiveProdLog = null;
       let myActiveInterLog = null;
 
       (data || []).forEach(log => {
-        locks[log.task_id] = {
-          log_id: log.id,
-          employee_id: log.employee_id,
-          employee_name: log.employee_name,
-          start_time: log.start_time,
-          log_type: log.log_type
-        };
-
-        if (log.employee_id === user?.id) {
-          if (log.log_type === 'production') {
-            myActiveProdLog = log;
-          } else if (log.log_type.startsWith('interruption:')) {
-            myActiveInterLog = log;
-          }
+        if (log.log_type === 'production') {
+          myActiveProdLog = log;
+        } else if (log.log_type.startsWith('interruption:')) {
+          myActiveInterLog = log;
         }
       });
 
-      setActiveLocks(locks);
-
-      // Re-hydrate active timer state using the pre-fetched clients prop (no database fetch required!)
+      // Re-hydrate active timer state using the pre-fetched clients prop
       if (clients && clients.length > 0) {
         if (myActiveProdLog && !timerRunning) {
           let matchedTask = null;
@@ -126,13 +189,11 @@ export default function EspaceProduction({ user, token, clients, loading, refres
             setActiveTask(matchedTask);
             setActiveLogId(myActiveProdLog.id);
             
-            // Calculate elapsed seconds since start_time
             const elapsed = Math.floor((Date.now() - new Date(myActiveProdLog.start_time).getTime()) / 1000);
             setTimerSeconds(elapsed > 0 ? elapsed : 0);
             startTimeRef.current = new Date(myActiveProdLog.start_time).getTime();
             setTimerRunning(true);
 
-            // Re-hydrate interruption if present
             if (myActiveInterLog) {
               const type = myActiveInterLog.log_type.split(':')[1];
               setActiveInterruption(type);
@@ -152,90 +213,17 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               interruptionStartTimeRef.current = new Date(myActiveInterLog.start_time).getTime();
             }
           }
-        } else if (myActiveInterLog && !activeInterruption) {
-          // Re-hydrate active interruption when no production task is active
-          let matchedInterTaskClient = null;
-          clients.forEach(c => {
-            const t = (c.tasks || []).find(task => task.id === myActiveInterLog.task_id);
-            if (t) matchedInterTaskClient = c;
-          });
-
-          if (matchedInterTaskClient) {
-            const type = myActiveInterLog.log_type.split(':')[1];
-            setActiveInterruption(type);
-            setInterruptionLogId(myActiveInterLog.id);
-            setActiveInterruptionClientId(matchedInterTaskClient.id);
-            const elapsedInter = Math.floor((Date.now() - new Date(myActiveInterLog.start_time).getTime()) / 1000);
-            setInterruptionSeconds(elapsedInter > 0 ? elapsedInter : 0);
-            interruptionStartTimeRef.current = new Date(myActiveInterLog.start_time).getTime();
-          }
         }
       }
     } catch (err) {
-      console.error('Error fetching active locks:', err);
+      console.error('Error fetching active time logs:', err);
     }
   };
 
-  // Supabase Realtime Subscription for lock synchronization
   useEffect(() => {
     if (!user) return;
-
-    fetchActiveLocks();
-
-    const channel = supabaseClient
-      .channel('production_locks_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'production_time_logs'
-        },
-        (payload) => {
-          console.log('[Realtime Lock] Changed log:', payload);
-          if (payload.eventType === 'INSERT') {
-            if (payload.new.end_time === null) {
-              setActiveLocks(prev => ({
-                ...prev,
-                [payload.new.task_id]: {
-                  log_id: payload.new.id,
-                  employee_id: payload.new.employee_id,
-                  employee_name: payload.new.employee_name,
-                  start_time: payload.new.start_time,
-                  log_type: payload.new.log_type
-                }
-              }));
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            if (payload.new.end_time !== null) {
-              setActiveLocks(prev => {
-                const copy = { ...prev };
-                delete copy[payload.new.task_id];
-                return copy;
-              });
-            } else {
-              setActiveLocks(prev => ({
-                ...prev,
-                [payload.new.task_id]: {
-                  log_id: payload.new.id,
-                  employee_id: payload.new.employee_id,
-                  employee_name: payload.new.employee_name,
-                  start_time: payload.new.start_time,
-                  log_type: payload.new.log_type
-                }
-              }));
-            }
-          } else if (payload.eventType === 'DELETE') {
-            fetchActiveLocks();
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabaseClient.removeChannel(channel);
-    };
-  }, [user, clients]); // Trigger lock hydration when clients list is available
+    fetchMyActiveLogs();
+  }, [user, clients]);
 
   // Timer interval updates
   useEffect(() => {
@@ -259,14 +247,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
   }, [timerRunning, activeInterruption]);
 
   const handleStartTimer = async (task) => {
-    // 1. Client-side anti-collision guard (optimistic check)
-    const lock = activeLocks[task.id];
-    if (lock && lock.employee_id !== user.id) {
-      showAlert("Tâche verrouillée", `🔒 Action impossible : Cette tâche est actuellement en cours par ${lock.employee_name}.`);
-      return;
-    }
-
-    // 2. Prepare previous state for rollback in case of race condition failure
     const prevActiveTask = activeTask;
     const prevActiveLogId = activeLogId;
     const prevTimerSeconds = timerSeconds;
@@ -277,7 +257,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       await handleStopTimer();
     }
 
-    // 3. Optimistic UI update
+    // Optimistic UI update
     setActiveTask(task);
     setTimerSeconds(0);
     setInterruptionSeconds(0);
@@ -307,7 +287,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error === 'task_locked' ? 'task_locked' : 'failed_to_start');
+        throw new Error(data.error || 'failed_to_start');
       }
 
       const data = await res.json();
@@ -316,7 +296,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     } catch (err) {
       console.error('Error starting production timer:', err);
       
-      // 4. Rollback Optimistic UI state immediately
       setActiveTask(prevActiveTask);
       setActiveLogId(prevActiveLogId);
       setTimerSeconds(prevTimerSeconds);
@@ -325,11 +304,56 @@ export default function EspaceProduction({ user, token, clients, loading, refres
         startTimeRef.current = Date.now() - prevTimerSeconds * 1000;
       }
 
-      if (err.message === 'task_locked') {
-        showAlert("Action impossible", "Cette tâche vient d'être prise par un autre collaborateur.");
-      } else {
-        showAlert("Erreur", "Erreur lors du démarrage du chronomètre. Veuillez réessayer.");
+      showAlert("Erreur", "Erreur lors du démarrage du chronomètre. Veuillez réessayer.");
+    }
+  };
+
+  const handleStartDeliverable = async (card) => {
+    if (!selectedClient) return;
+
+    // 1. Chercher si une tâche existe déjà pour ce livrable
+    let targetTask = (selectedClient.tasks || []).find(
+      t => t.category?.toLowerCase() === card.categoryKey.toLowerCase() || 
+           t.name?.toLowerCase() === card.title.toLowerCase() ||
+           t.category?.toLowerCase() === card.id.toLowerCase()
+    );
+
+    // 2. Si elle n'existe pas encore en base, la créer à la volée
+    if (!targetTask) {
+      try {
+        const res = await fetch('/api/production/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            client_id: selectedClient.id,
+            category: card.categoryKey,
+            name: card.title,
+            budget_hours: 0,
+            status: 'Non démarré'
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          targetTask = data.task;
+          await refreshData();
+        } else {
+          const errData = await res.json();
+          showAlert("Erreur", errData.error || "Impossible d'initialiser le livrable.");
+          return;
+        }
+      } catch (err) {
+        console.error('Error creating deliverable task on demand:', err);
+        showAlert("Erreur", "Erreur lors de la création du livrable.");
+        return;
       }
+    }
+
+    if (targetTask) {
+      handleStartTimer(targetTask);
     }
   };
 
@@ -341,7 +365,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     const currentLogId = activeLogId;
     const currentInterLogId = interruptionLogId;
     const interSeconds = interruptionSeconds;
-    const currentInterruption = activeInterruption;
 
     setTimerRunning(false);
     setActiveTask(null);
@@ -353,7 +376,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     setInterruptionSeconds(0);
 
     try {
-      // 1. Stop active interruption log if it was running
       if (currentInterLogId) {
         await fetch(`/api/production/time-logs/${currentInterLogId}`, {
           method: 'PATCH',
@@ -368,7 +390,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
         });
       }
 
-      // 2. Stop main production time log
       if (currentLogId) {
         await fetch(`/api/production/time-logs/${currentLogId}`, {
           method: 'PATCH',
@@ -383,7 +404,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
         });
       }
 
-      // Refresh parent's clients shared state
       await refreshData();
     } catch (err) {
       console.error('Error stopping timer:', err);
@@ -394,16 +414,13 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     if (!activeTask) return;
 
     showConfirm(
-      "Compléter la tâche",
-      "Êtes-vous sûr de vouloir marquer cette tâche comme terminée ? Cela arrêtera également le chronomètre.",
+      "Compléter le livrable",
+      "Êtes-vous sûr de vouloir marquer ce livrable comme terminé ? Cela arrêtera également le chronomètre.",
       async () => {
         const taskId = activeTask.id;
-        
-        // Stop the timer first to save any logged seconds
         await handleStopTimer();
 
         try {
-          // Mark task as completed (status = 'Fait')
           const res = await fetch(`/api/production/tasks/${taskId}`, {
             method: 'PATCH',
             headers: {
@@ -414,7 +431,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
           });
 
           if (res.ok) {
-            // Refresh data again to display the task as completed
             await refreshData();
           } else {
             const errData = await res.json();
@@ -457,18 +473,20 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               duration_seconds: interSeconds
             })
           });
+          await refreshData();
         }
       } catch (err) {
-        console.error('Error stopping interruption:', err);
+        console.error('Error ending interruption:', err);
       }
+    } else {
+      handleStartInterruption(type);
     }
   };
 
-  const handleStartInterruption = async (type, targetClientId) => {
+  const handleStartInterruption = async (type, targetClientId = null) => {
     const now = new Date().toISOString();
 
-    // 1. Stop current active interruption if any
-    if (activeInterruption && interruptionLogId && interruptionSeconds > 0) {
+    if (activeInterruption && interruptionLogId) {
       try {
         await fetch(`/api/production/time-logs/${interruptionLogId}`, {
           method: 'PATCH',
@@ -486,18 +504,15 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       }
     }
 
-    // 2. Resolve client ID before stopping the active task timer
     let resolvedClientId = targetClientId;
     if (!resolvedClientId && activeTask) {
       resolvedClientId = activeTask.client_id;
     }
 
-    // 3. Stop the active task timer if one is running, to avoid overlaps!
     if (activeTask && timerRunning) {
       await handleStopTimer();
     }
 
-    // 4. Determine target task ID (based on chosen client)
     let targetTaskId = null;
     if (resolvedClientId) {
       const clientObj = clients.find(c => c.id === resolvedClientId);
@@ -511,7 +526,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       return;
     }
 
-    // 3. Start the new interruption
     try {
       const res = await fetch('/api/production/time-logs', {
         method: 'POST',
@@ -545,14 +559,11 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
   const handleInterruptionClick = (type) => {
     if (activeInterruption === type) {
-      // Toggle off
       handleToggleInterruption(type);
     } else if (type === 'pause') {
-      // Pause is independent and always allowed! We attribute it to the active task's client or selected client.
       const clientId = activeTask ? activeTask.client_id : (selectedClient?.id || clients[0]?.id || '');
       handleStartInterruption('pause', clientId);
     } else {
-      // Open modal to choose client (Slack, Point Interne, Appel Impromptu)
       setInterruptionTypeToStart(type);
       setSelectedInterruptionClientId(activeTask?.client_id || selectedClient?.id || clients[0]?.id || '');
       setInterruptionModalOpen(true);
@@ -575,46 +586,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     return `${minutes} min`;
   };
 
-  const getCategoryType = (category) => {
-    const cat = category.toLowerCase();
-    if (cat.includes('linkedin')) return 'LinkedIn';
-    if (cat.includes('facebook') || cat.startsWith('fb')) return 'Facebook';
-    if (cat.includes('instagram') || cat.startsWith('insta') || cat.startsWith('ig')) return 'Instagram';
-    if (cat.includes('google')) return 'Google Posts';
-    if (cat.includes('newsletter')) return 'Newsletter';
-    if (cat.includes('bb') || cat.includes('blog')) return 'Billet Blog';
-    return category; // fallback
-  };
-
-  const getGroupedTasks = () => {
-    if (!selectedClient) return {};
-    const grouped = {};
-    (selectedClient.tasks || []).forEach(task => {
-      if (!grouped[task.category]) {
-        grouped[task.category] = [];
-      }
-      grouped[task.category].push(task);
-    });
-    return grouped;
-  };
-
-  const groupedTasks = getGroupedTasks();
-
-  // Get distinct filter types for the client's existing tasks
-  const availableFilterTypes = [
-    'Tous',
-    ...new Set(Object.keys(groupedTasks).map(getCategoryType))
-  ];
-
-  // Filter grouped tasks based on selection
-  const filteredGroupedTasks = {};
-  Object.entries(groupedTasks).forEach(([category, tasks]) => {
-    if (selectedFilter === 'Tous' || getCategoryType(category) === selectedFilter) {
-      filteredGroupedTasks[category] = tasks;
-    }
-  });
-
-  // Resolve client names for active timers/interruptions
   const activeTaskClientObj = activeTask ? clients.find(c => c.id === activeTask.client_id) : null;
   const activeTaskClientName = activeTaskClientObj ? activeTaskClientObj.name : '';
 
@@ -685,71 +656,53 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               </div>
             </div>
 
-            {/* Deliverables grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#1877f2', display: 'flex' }}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ display: 'inline-block' }}>
-                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Facebook</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_facebook || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
+            {/* 5 Deliverables header summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+              {DELIVERABLE_CARDS.map(card => {
+                const IconComp = card.icon;
+                const catTasks = (selectedClient.tasks || []).filter(
+                  t => t.category?.toLowerCase() === card.categoryKey.toLowerCase() ||
+                       t.name?.toLowerCase() === card.title.toLowerCase() ||
+                       t.category?.toLowerCase() === card.id.toLowerCase()
+                );
+                let spentSeconds = 0;
+                let budgetHours = 0;
+                catTasks.forEach(t => {
+                  spentSeconds += (t.time_spent_seconds || 0);
+                  budgetHours += (t.budget_hours || 0);
+                });
 
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#e1306c', display: 'flex' }}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block' }}>
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Instagram</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_instagram || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
-
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#0a66c2', display: 'flex' }}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block' }}>
-                    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-                    <rect x="2" y="9" width="4" height="12" />
-                    <circle cx="4" cy="4" r="2" />
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>LinkedIn</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_linkedin || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
-
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#4285f4', display: 'flex' }}><Globe size={18} /></div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Google Posts</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.posts_google || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
-
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#ea4335', display: 'flex' }}><Mail size={18} /></div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Newsletter</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.newsletter_count || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
-
-              <div className="deliverable-mini-card" style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--panel-white)' }}>
-                <div style={{ color: '#fbbc05', display: 'flex' }}><BookOpen size={18} /></div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Billet Blog</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700' }}>{selectedClient.blog_count || 0} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>/mois</span></div>
-                </div>
-              </div>
+                return (
+                  <div 
+                    key={card.id} 
+                    className="deliverable-mini-card" 
+                    style={{ 
+                      padding: '0.6rem 0.8rem', 
+                      borderRadius: '8px', 
+                      border: '1px solid var(--border-light)', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.6rem', 
+                      background: 'var(--panel-white)' 
+                    }}
+                  >
+                    <div style={{ color: card.themeColor, display: 'flex' }}>
+                      <IconComp size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{card.title}</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: '700' }}>
+                        {formatSecondsToHMText(spentSeconds)}
+                        {budgetHours > 0 && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 'normal', color: 'var(--text-secondary)', marginLeft: '0.25rem' }}>
+                            / {budgetHours}h
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Unquantifiable tasks */}
@@ -769,149 +722,188 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       ) : !selectedClient ? (
         <div className="empty-state panel" style={{ padding: '3rem', textAlign: 'center', marginTop: '1rem' }}>
           <AlertCircle size={48} style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }} />
-          <h3>Aucun client disponible</h3>
-          <p style={{ color: 'var(--text-secondary)' }}>Veuillez configurer un client dans l'Espace manager.</p>
+          <h3>Aucun client sélectionné</h3>
+          <p style={{ color: 'var(--text-secondary)' }}>Veuillez sélectionner un client dans le menu ci-dessus.</p>
         </div>
       ) : (
         <div className="prod-grid">
-          {/* LEFT COLUMN: TIMER & INTERRUPTIONS */}
+          
+          {/* LEFT COLUMN: ACTIVE TRACKING & INTERRUPTIONS */}
           <div className="prod-left-column">
             
-            {/* ACTIVE TIMER CARD */}
-            <div className="panel prod-timer-card">
-              <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Clock size={18} style={{ color: 'var(--brand-orange)' }} />
-                TÂCHE EN COURS
-              </h2>
-              
-              {activeTask ? (
-                <div className="timer-content">
-                  {activeTaskClientName && (
-                    <div className="client-badge" style={{
-                      display: 'inline-block',
-                      padding: '0.2rem 0.6rem',
-                      borderRadius: '12px',
-                      backgroundColor: 'rgba(234, 88, 12, 0.12)',
-                      color: 'var(--brand-orange)',
-                      fontSize: '0.75rem',
-                      fontWeight: '700',
-                      marginBottom: '0.5rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      {activeTaskClientName}
-                    </div>
-                  )}
-                  <h3 className="timer-task-name" style={{ marginTop: '0.25rem' }}>{activeTask.name}</h3>
-                  <p className="timer-task-meta">
-                    Budget vendu : {activeTask.budget_hours}h00 {activeTask.due_date && `| Échéance : ${new Date(activeTask.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`}
-                  </p>
-                  
-                  {activeInterruption ? (
-                    <div className="interruption-banner">
-                      <span>Interruption en cours : <strong>{
-                        activeInterruption === 'slack' ? 'Slack / Mails' :
-                        activeInterruption === 'meeting' ? 'Point Interne' :
-                        activeInterruption === 'pause' ? 'Pause' : 'Appel Impromptu'
-                      }</strong></span>
-                      <span className="interruption-timer-val">+{formatSecondsToHMS(interruptionSeconds)}</span>
-                    </div>
-                  ) : null}
+            {/* ACTIVE CHRONO CARD */}
+            <div className={`panel prod-active-card ${timerRunning ? 'running' : ''}`} style={{ padding: '1.75rem 1.5rem', textAlign: 'center' }}>
+              {timerRunning && activeTask ? (
+                <div className="active-timer-display" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  {/* 1. Header: Clock Icon + TÂCHE EN COURS */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', color: '#0f172a', fontWeight: '800', fontSize: '1rem', letterSpacing: '0.5px' }}>
+                    <Clock size={19} style={{ color: '#ea580c' }} />
+                    <span>TÂCHE EN COURS</span>
+                  </div>
 
-                  <div className="timer-display">
+                  {/* 2. Task Name */}
+                  <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', margin: '0.9rem 0 0.25rem 0', textAlign: 'center', lineHeight: '1.3' }}>
+                    {activeTask.name}
+                  </h3>
+
+                  {/* 3. Subtitle / Due date if available (WITHOUT BUDGET ALLOUÉ) */}
+                  <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500', marginBottom: '0.5rem' }}>
+                    {activeTask.due_date ? (
+                      <span>Échéance : {new Date(activeTask.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</span>
+                    ) : (
+                      <span>{activeTaskClientName ? `${activeTaskClientName} • ` : ''}{activeTask.category}</span>
+                    )}
+                  </div>
+
+                  {/* 4. Large Digital Timer Display */}
+                  <div style={{ 
+                    fontSize: '3.4rem', 
+                    fontWeight: '800', 
+                    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", 
+                    color: '#2563eb', 
+                    letterSpacing: '1px', 
+                    lineHeight: '1', 
+                    margin: '1.1rem 0 0.9rem 0' 
+                  }}>
                     {formatSecondsToHMS(timerSeconds)}
                   </div>
-                  
-                  {/* Task Progress Bar */}
-                  <div className="task-progress-bar-container" style={{ margin: '1rem 0', width: '100%', maxWidth: '360px' }}>
-                    {(() => {
-                      const totalSecondsOnTask = (activeTask.time_spent_seconds || 0) + timerSeconds;
-                      const budgetSec = activeTask.budget_hours * 3600;
-                      const percent = budgetSec > 0 ? Math.min((totalSecondsOnTask / budgetSec) * 100, 100) : 0;
-                      return (
-                        <div className="progress-bar-container">
-                          <div className="progress-bar-fill blue" style={{ width: `${percent}%` }}></div>
-                        </div>
-                      );
-                    })()}
+
+                  {/* 5. Progress track indicator */}
+                  <div style={{ width: '100%', maxWidth: '340px', height: '6px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden', margin: '0.2rem auto 1.5rem auto' }}>
+                    <div style={{ width: '35%', height: '100%', background: '#2563eb', borderRadius: '9999px' }}></div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: '360px', justifyContent: 'center' }}>
-                    <button className="btn-stop-timer" onClick={handleStopTimer} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Square size={14} fill="white" style={{ marginRight: '0.5rem' }} /> STOP
+                  {activeInterruption && (
+                    <div className="active-interruption-banner" style={{ marginBottom: '1.25rem', padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '340px' }}>
+                      <span style={{ fontSize: '0.85rem', color: '#d97706', fontWeight: '600' }}>
+                        Pause ({activeInterruption}) : {formatSecondsToHMS(interruptionSeconds)}
+                      </span>
+                      <button 
+                        onClick={() => handleToggleInterruption(activeInterruption)}
+                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#d97706', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}
+                      >
+                        Reprendre
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 6. Two Action Buttons: Red STOP & Green TERMINÉ */}
+                  <div style={{ display: 'flex', gap: '0.85rem', width: '100%', maxWidth: '340px', justifyContent: 'center' }}>
+                    <button 
+                      onClick={handleStopTimer}
+                      style={{ 
+                        flex: 1, 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '0.5rem', 
+                        padding: '0.7rem 1.25rem', 
+                        background: '#ef4444', 
+                        color: '#ffffff', 
+                        fontWeight: '700', 
+                        fontSize: '0.95rem', 
+                        borderRadius: '8px', 
+                        border: 'none', 
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#dc2626'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                    >
+                      <Square size={13} fill="white" /> STOP
                     </button>
                     <button 
-                      className="btn-complete-timer" 
                       onClick={handleCompleteTask}
-                      style={{
-                        flex: 1,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '0.5rem 1rem',
-                        fontSize: '0.9rem',
-                        fontWeight: '700',
-                        backgroundColor: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
+                      style={{ 
+                        flex: 1, 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '0.5rem', 
+                        padding: '0.7rem 1.25rem', 
+                        background: '#10b981', 
+                        color: '#ffffff', 
+                        fontWeight: '700', 
+                        fontSize: '0.95rem', 
+                        borderRadius: '8px', 
+                        border: 'none', 
                         cursor: 'pointer',
-                        transition: 'background-color 0.2s ease',
+                        boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)',
+                        transition: 'all 0.15s ease'
                       }}
-                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#059669'}
-                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#059669'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = '#10b981'; e.currentTarget.style.transform = 'translateY(0)'; }}
                     >
-                      <CheckCircle size={14} style={{ marginRight: '0.5rem' }} /> TERMINÉ
+                      <CheckCircle size={16} color="white" /> TERMINÉ
                     </button>
                   </div>
                 </div>
               ) : activeInterruption ? (
-                <div className="timer-content">
-                  {activeInterruptionClientName && (
-                    <div className="client-badge" style={{
-                      display: 'inline-block',
-                      padding: '0.2rem 0.6rem',
-                      borderRadius: '12px',
-                      backgroundColor: 'rgba(234, 88, 12, 0.12)',
-                      color: 'var(--brand-orange)',
-                      fontSize: '0.75rem',
-                      fontWeight: '700',
-                      marginBottom: '0.5rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      {activeInterruptionClientName}
-                    </div>
-                  )}
-                  <h3 className="timer-task-name" style={{ color: 'var(--brand-orange)', marginTop: '0.25rem' }}>
-                    {
-                      activeInterruption === 'pause' ? 'Pause' :
-                      `Interruption : ${
-                        activeInterruption === 'slack' ? 'Slack / Mails' :
-                        activeInterruption === 'meeting' ? 'Point Interne' : 'Appel Impromptu'
-                      }`
-                    }
+                <div className="active-timer-display" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', color: '#ea580c', fontWeight: '800', fontSize: '1rem', letterSpacing: '0.5px' }}>
+                    <Clock size={19} style={{ color: '#ea580c' }} />
+                    <span>INTERRUPTION EN COURS</span>
+                  </div>
+
+                  <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', margin: '0.9rem 0 0.25rem 0', textAlign: 'center', textTransform: 'capitalize' }}>
+                    {activeInterruption === 'slack' ? 'Slack / Mails' :
+                     activeInterruption === 'meeting' ? 'Point Interne' :
+                     activeInterruption === 'pause' ? 'Pause' : 'Appel Impromptu'}
                   </h3>
-                  <p className="timer-task-meta">Aucune tâche client en cours de suivi.</p>
-                  
-                  <div className="timer-display">
-                    {formatSecondsToHMS(interruptionSeconds)}
+
+                  <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500', marginBottom: '0.5rem' }}>
+                    {activeInterruptionClientName ? `Client : ${activeInterruptionClientName}` : 'Met le chrono en pause'}
                   </div>
                   
-                  <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: '360px', justifyContent: 'center', marginTop: '1.5rem' }}>
+                  <div style={{ 
+                    fontSize: '3.4rem', 
+                    fontWeight: '800', 
+                    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", 
+                    color: '#f97316', 
+                    letterSpacing: '1px', 
+                    lineHeight: '1', 
+                    margin: '1.1rem 0 0.9rem 0' 
+                  }}>
+                    {formatSecondsToHMS(interruptionSeconds)}
+                  </div>
+
+                  <div style={{ width: '100%', maxWidth: '340px', height: '6px', background: '#fed7aa', borderRadius: '9999px', overflow: 'hidden', margin: '0.2rem auto 1.5rem auto' }}>
+                    <div style={{ width: '50%', height: '100%', background: '#f97316', borderRadius: '9999px' }}></div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: '340px', justifyContent: 'center' }}>
                     <button 
-                      className="btn-stop-timer" 
                       onClick={() => handleToggleInterruption(activeInterruption)} 
-                      style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      style={{ 
+                        flex: 1, 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '0.5rem', 
+                        padding: '0.7rem 1.25rem', 
+                        background: '#ef4444', 
+                        color: '#ffffff', 
+                        fontWeight: '700', 
+                        fontSize: '0.95rem', 
+                        borderRadius: '8px', 
+                        border: 'none', 
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)' 
+                      }}
                     >
-                      <Square size={14} fill="white" style={{ marginRight: '0.5rem' }} /> STOP
+                      <Square size={13} fill="white" /> STOP
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="no-active-timer">
-                  <p>Aucune tâche en cours de suivi.</p>
-                  <span>Lancez le chrono directement depuis la liste des tâches à droite.</span>
+                <div className="no-active-timer" style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', color: '#64748b', fontWeight: '800', fontSize: '1rem', letterSpacing: '0.5px', marginBottom: '0.75rem' }}>
+                    <Clock size={19} style={{ color: '#94a3b8' }} />
+                    <span>CHRONOMÈTRE</span>
+                  </div>
+                  <p style={{ color: '#0f172a', fontWeight: '600', margin: '0 0 0.35rem 0' }}>Aucune tâche en cours de suivi.</p>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Lancez le chrono directement depuis la liste des livrables à droite.</span>
                 </div>
               )}
             </div>
@@ -957,146 +949,143 @@ export default function EspaceProduction({ user, token, clients, loading, refres
             {/* LIVRABLES CARD */}
             <div className="panel deliverables-card">
               <h2 className="panel-title" style={{ marginBottom: '0.5rem' }}>LIVRABLES DU MOIS</h2>
-              <p className="panel-subtitle">Lancez le chrono directement depuis la tâche.</p>
+              <p className="panel-subtitle">Lancez le chronomètre directement depuis le livrable concerné.</p>
 
-              {Object.keys(groupedTasks).length === 0 ? (
-                <p className="no-data-text" style={{ textAlign: 'center', padding: '2rem' }}>Aucune tâche configurée pour ce client.</p>
-              ) : (
-                <>
-                  {/* Category Filter Badges */}
-                  {availableFilterTypes.length > 2 && (
-                    <div className="filter-tabs" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-light)' }}>
-                      {availableFilterTypes.map(type => (
-                        <button
-                          key={type}
-                          onClick={() => setSelectedFilter(type)}
-                          style={{
-                            padding: '0.35rem 0.85rem',
-                            fontSize: '0.75rem',
-                            fontWeight: '600',
-                            borderRadius: '16px',
-                            border: '1px solid ' + (selectedFilter === type ? 'var(--brand-orange)' : 'var(--border-light)'),
-                            background: selectedFilter === type ? 'var(--brand-orange)' : 'var(--panel-white)',
-                            color: selectedFilter === type ? 'white' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              <div className="deliverables-5-container" style={{ marginTop: '1.25rem' }}>
+                {DELIVERABLE_CARDS.map(card => {
+                  const IconComp = card.icon;
+                  
+                  // Trouver les tâches associées à ce livrable
+                  const catTasks = (selectedClient?.tasks || []).filter(
+                    t => t.category?.toLowerCase() === card.categoryKey.toLowerCase() ||
+                         t.name?.toLowerCase() === card.title.toLowerCase() ||
+                         t.category?.toLowerCase() === card.id.toLowerCase()
+                  );
+                  
+                  const primaryTask = catTasks.length > 0 ? catTasks[0] : null;
 
-                  <div className="deliverable-categories">
-                    {Object.keys(filteredGroupedTasks).length === 0 ? (
-                      <p className="no-data-text" style={{ textAlign: 'center', padding: '1.5rem', width: '100%' }}>Aucune tâche ne correspond à ce filtre.</p>
-                    ) : (
-                      Object.entries(filteredGroupedTasks).map(([category, tasks]) => (
-                    <div key={category} className="category-group">
-                      <h3 className="category-title">{category}</h3>
-                      <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
-                        {tasks.map(task => {
-                          const budgetSec = task.budget_hours * 3600;
-                          const spentSec = task.time_spent_seconds || 0;
-                          const isCompleted = task.status === 'Fait';
-                          const isActive = activeTask?.id === task.id;
-                          
-                          const lock = activeLocks[task.id];
-                          const isLockedByOther = lock && lock.employee_id !== user?.id;
-                          
-                          let progressPercent = budgetSec > 0 ? (spentSec / budgetSec) * 100 : 0;
-                          progressPercent = Math.round(progressPercent);
+                  let totalSpentSec = 0;
+                  let totalBudgetHours = 0;
+                  catTasks.forEach(t => {
+                    totalSpentSec += (t.time_spent_seconds || 0);
+                    totalBudgetHours += (t.budget_hours || 0);
+                  });
 
-                          return (
-                            <div key={task.id} className={`task-item-card ${isCompleted ? 'completed' : isActive ? 'active' : ''}`}>
-                              <div className="task-item-header">
-                                <div className="task-item-details">
-                                  <h4 className="task-item-name">{task.name}</h4>
-                                  <span className="task-item-budget" style={{ display: 'block' }}>
-                                    {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
-                                  </span>
-                                  {task.due_date && (
-                                    <span className="task-item-budget" style={{ display: 'block', marginTop: '0.1rem' }}>
-                                      Échéance: {new Date(task.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                                    </span>
-                                  )}
-                                </div>
+                  const isCompleted = primaryTask && primaryTask.status === 'Fait';
+                  const isActive = activeTask && (
+                    activeTask.id === primaryTask?.id ||
+                    activeTask.category?.toLowerCase() === card.categoryKey.toLowerCase() ||
+                    activeTask.name?.toLowerCase() === card.title.toLowerCase()
+                  );
 
-                                <div className="task-item-actions">
-                                  {isCompleted ? (
-                                    <div className="status-badge fait">
-                                      <CheckCircle size={12} /> Fait
-                                    </div>
-                                  ) : isLockedByOther ? (
-                                    <div 
-                                      className="status-badge en-cours" 
-                                      title={lock.employee_name}
-                                      style={{ 
-                                        background: 'var(--alert-red-bg, #fee2e2)', 
-                                        color: 'var(--alert-red, #ef4444)', 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        gap: '0.3rem', 
-                                        fontSize: '0.75rem', 
-                                        fontWeight: 'bold', 
-                                        padding: '0.2rem 0.5rem', 
-                                        borderRadius: '4px',
-                                        cursor: 'help'
-                                      }}
-                                    >
-                                      <Lock size={10} /> {getInitials(lock.employee_name)}
-                                    </div>
-                                  ) : isActive ? (
-                                    <div className="status-badge en-cours">
-                                      En cours
-                                    </div>
-                                  ) : (
-                                    <button 
-                                      onClick={() => handleStartTimer(task)}
-                                      title="Lancer le chronomètre"
-                                      disabled={timerRunning && activeTask?.id === task.id}
-                                      style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        boxShadow: 'none',
-                                        padding: 0,
-                                        margin: 0,
-                                        cursor: 'pointer',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: '32px',
-                                        height: '32px',
-                                        outline: 'none'
-                                      }}
-                                    >
-                                      <svg viewBox="0 0 24 24" width="24" height="24" fill="#10b981" style={{ display: 'inline-block', fill: '#10b981' }}>
-                                        <path d="M8 5v14l11-7z" />
-                                      </svg>
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
+                  const totalBudgetSec = totalBudgetHours * 3600;
+                  const progressPercent = totalBudgetSec > 0 ? Math.min(Math.round((totalSpentSec / totalBudgetSec) * 100), 100) : 0;
 
-                              <div className="task-item-progress">
-                                <div className="progress-bar-container">
-                                  <div 
-                                    className={`progress-bar-fill ${isCompleted ? 'green' : isActive ? 'blue' : 'grey'}`}
-                                    style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                                  ></div>
-                                </div>
-                              </div>
+                  return (
+                    <div 
+                      key={card.id} 
+                      className={`deliverable-card-item ${isCompleted ? 'completed' : isActive ? 'active' : ''}`}
+                      style={{
+                        borderLeft: `4px solid ${card.themeColor}`
+                      }}
+                    >
+                      <div className="deliverable-card-header">
+                        <div className="deliverable-card-title-group">
+                          <div 
+                            className="deliverable-card-icon-badge"
+                            style={{ 
+                              backgroundColor: `${card.themeColor}15`,
+                              color: card.themeColor
+                            }}
+                          >
+                            <IconComp size={20} />
+                          </div>
+                          <div>
+                            <h3 className="deliverable-card-title">
+                              {card.title}
+                            </h3>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                              {formatSecondsToHMText(totalSpentSec)}
+                              {totalBudgetHours > 0 ? ` / ${totalBudgetHours}h budgétées` : ' passées'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="deliverable-card-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {isCompleted ? (
+                            <div className="status-badge fait">
+                              <CheckCircle size={12} /> Fait
                             </div>
-                          );
-                        })}
+                          ) : isActive ? (
+                            <div 
+                              className="status-badge en-cours"
+                              style={{
+                                background: 'rgba(234, 88, 12, 0.15)',
+                                color: 'var(--brand-orange)',
+                                fontWeight: '700',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                padding: '0.25rem 0.65rem',
+                                borderRadius: '6px'
+                              }}
+                            >
+                              <span className="dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--brand-orange)', display: 'inline-block' }}></span>
+                              En cours
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => handleStartDeliverable(card)}
+                              title={`Lancer le chronomètre sur ${card.title}`}
+                              disabled={timerRunning && !isActive}
+                              style={{
+                                background: 'var(--panel-white)',
+                                border: '1px solid var(--border-light)',
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
+                                padding: '0.35rem 0.85rem',
+                                borderRadius: '20px',
+                                cursor: (timerRunning && !isActive) ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                color: '#10b981',
+                                fontWeight: '600',
+                                fontSize: '0.8rem',
+                                transition: 'all 0.15s ease',
+                                opacity: (timerRunning && !isActive) ? 0.5 : 1
+                              }}
+                            >
+                              <Play size={13} fill="#10b981" />
+                              Démarrer
+                            </button>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Activities Tags */}
+                      <div className="deliverable-activities-tags">
+                        {card.activities.map(act => (
+                          <span key={act} className="activity-pill">
+                            {act}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Progress bar if budget exists */}
+                      {totalBudgetHours > 0 && (
+                        <div style={{ marginTop: '0.25rem' }}>
+                          <div className="progress-bar-container" style={{ height: '5px' }}>
+                            <div 
+                              className={`progress-bar-fill ${isCompleted ? 'green' : isActive ? 'orange' : 'blue'}`}
+                              style={{ width: `${progressPercent}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                      ))
-                    )}
-                  </div>
-                </>
-              )}
+                  );
+                })}
+              </div>
             </div>
 
           </div>

@@ -2296,3 +2296,133 @@ body.dark .status-badge.en-cours {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   5 DELIVERABLES CARDS SYSTEM (LIVRABLES DU MOIS)
+   ========================================================================== */
+.deliverables-5-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.deliverable-card-item {
+  background: var(--panel-white);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.deliverable-card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px -2px rgba(0, 0, 0, 0.07);
+  border-color: var(--border-color);
+}
+
+.deliverable-card-item.active {
+  border-color: var(--brand-orange);
+  background: rgba(234, 88, 12, 0.03);
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2), 0 8px 16px -4px rgba(234, 88, 12, 0.15);
+  animation: pulseCard 2s infinite ease-in-out;
+}
+
+.deliverable-card-item.completed {
+  background: rgba(51, 136, 85, 0.04);
+  border-color: rgba(51, 136, 85, 0.3);
+}
+
+@keyframes pulseCard {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2), 0 4px 10px rgba(234, 88, 12, 0.1); }
+  50% { box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.35), 0 8px 18px rgba(234, 88, 12, 0.2); }
+}
+
+.deliverable-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.deliverable-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.deliverable-card-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.deliverable-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.deliverable-activities-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.activity-pill {
+  font-size: 0.73rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--background-light);
+  border: 1px solid var(--border-light);
+  padding: 0.18rem 0.55rem;
+  border-radius: 12px;
+  line-height: 1.3;
+  transition: background-color 0.15s ease;
+}
+
+.activity-pill:hover {
+  background: var(--panel-white);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.deliverable-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border-light);
+  margin-top: 0.25rem;
+}
+
+.deliverable-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.deliverable-time-badge {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.deliverable-budget-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
