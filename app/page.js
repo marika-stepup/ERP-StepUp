@@ -6,6 +6,7 @@ import { splitFullName, isMadagascarHoliday, calculateBusinessDays, normalizeLea
 import { SyncQueueManager } from '../lib/syncQueue';
 import EspaceProduction from './components/EspaceProduction';
 import EspaceManager from './components/EspaceManager';
+import StatistiquesRH from './components/StatistiquesRH';
 import {
   Clock,
   Download,
@@ -1239,16 +1240,6 @@ export default function Page() {
         setPointageEmployees(logsData.employees || []);
         lastLoadedDateRef.current = pointageDate;
       }
-
-      if (balance?.service !== 'Pointeur') {
-        const statsRes = await fetch('/api/time-logs/stats', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          setPointageStats(statsData);
-        }
-      }
     } catch (err) {
       console.error('Error fetching pointage data:', err);
     } finally {
@@ -1861,6 +1852,12 @@ export default function Page() {
                     onClick={() => setActiveTab('globalDashboard')}
                   >
                     Tableau de bord global
+                  </button>
+                  <button
+                    className={`tab-button ${activeTab === 'statistiques' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('statistiques')}
+                  >
+                    Statistiques
                   </button>
                   {(balance?.service === 'Direction' || balance?.service === 'Directeur') && (
                     <>
@@ -2572,6 +2569,19 @@ export default function Page() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ==================================================== */}
+        {/* 2.5. TAB CONTENT: STATISTIQUES RH                    */}
+        {/* ==================================================== */}
+        {profileLoaded && activeTab === 'statistiques' && balance?.service !== 'Pointeur' && (
+          <StatistiquesRH
+            user={user}
+            token={token}
+            allMembers={allMembers}
+            pendingRequests={pendingRequests}
+            uniqueServices={uniqueServices}
+          />
         )}
 
         {/* ==================================================== */}
@@ -3570,99 +3580,6 @@ export default function Page() {
                 />
               </div>
             </div>
-
-            {/* Attendance Analytics & KPIs Dashboard */}
-            {balance?.service !== 'Pointeur' && (() => {
-              const filteredPointage = pointageEmployees.filter(emp => {
-                if (pointageServiceFilter === 'Tous') return true;
-                const svc = (emp.service === 'Directeur' ? 'Direction' : emp.service) || 'Non spécifié';
-                return svc === pointageServiceFilter;
-              });
-
-              const totalActive = filteredPointage.length;
-              const presentCount = filteredPointage.filter(e => e.time_log?.clock_in).length;
-              const lateCount = filteredPointage.filter(e => e.time_log && (e.time_log.status === 'En retard' || e.time_log.status === 'Retard & Départ ant.')).length;
-              const punctualCount = Math.max(0, presentCount - lateCount);
-              const clockedOutCount = filteredPointage.filter(e => e.time_log?.clock_out).length;
-              const absentCount = Math.max(0, totalActive - presentCount);
-              const punctualityRate = presentCount > 0 ? Math.round((punctualCount / presentCount) * 100) : (totalActive > 0 ? 100 : 0);
-
-              const rateColor = punctualityRate >= 90 ? 'var(--success-color)' : punctualityRate >= 75 ? 'var(--warning-color)' : 'var(--error-color)';
-              const rateBg = punctualityRate >= 90 ? 'var(--success-bg)' : punctualityRate >= 75 ? 'var(--warning-bg)' : 'var(--error-bg)';
-
-              return (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                  {/* Taux de ponctualité card (HIGHLIGHTED KPI) */}
-                  <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', borderLeft: `4px solid ${rateColor}` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Taux de ponctualité</span>
-                      <Timer size={18} style={{ color: rateColor }} />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                      <div style={{ fontSize: '2rem', fontWeight: 800, color: rateColor }}>
-                        {punctualityRate}%
-                      </div>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                        ({punctualCount} à l'heure)
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      Sur <strong>{presentCount}</strong> arrivé{presentCount > 1 ? 's' : ''} {pointageServiceFilter !== 'Tous' ? `(${pointageServiceFilter})` : ''}
-                    </div>
-                  </div>
-
-                  {/* Expected / Present card */}
-                  <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Présence aujourd'hui</span>
-                      <UserPlus size={18} style={{ color: 'var(--brand-orange)' }} />
-                    </div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                      {presentCount} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>/ {totalActive} actifs</span>
-                    </div>
-                    <div style={{ width: '100%', height: '6px', background: 'var(--border-light)', borderRadius: '3px', marginTop: '0.25rem', overflow: 'hidden' }}>
-                      <div style={{
-                        width: `${totalActive > 0 ? (presentCount / totalActive) * 100 : 0}%`,
-                        height: '100%',
-                        background: 'var(--brand-orange)',
-                        borderRadius: '3px',
-                        transition: 'width 0.4s ease'
-                      }}></div>
-                    </div>
-                  </div>
-
-                  {/* Late Arrivals card */}
-                  <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Arrivées en retard</span>
-                      <AlertTriangle size={18} style={{ color: 'var(--warning-color)' }} />
-                    </div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f97316' }}>
-                      {lateCount} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>ce jour</span>
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      Arrivés à l'heure : <strong style={{ color: 'var(--success-color)' }}>{punctualCount}</strong>
-                    </div>
-                  </div>
-
-                  {/* Absents card */}
-                  <div className="panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Non pointés</span>
-                      <XCircle size={18} style={{ color: 'var(--error-color)' }} />
-                    </div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
-                      {absentCount} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)' }}>collaborateurs</span>
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      Départs pointés : <strong>{clockedOutCount}</strong>
-                    </div>
-                  </div>
-
-                </div>
-              );
-            })()}
-
             {/* Mobile sub-tab switcher */}
             {(() => {
               const expectedCount = pointageEmployees.filter(emp => {
@@ -4078,112 +3995,6 @@ export default function Page() {
               </div>
 
             </div>
-
-            {/* SVG Attendance History & Charts */}
-            {pointageStats && pointageStats.chartData && pointageStats.chartData.length > 0 && balance?.service !== 'Pointeur' && (
-              <div className="panel" style={{ marginTop: '1rem' }}>
-                <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><History size={18} style={{ color: 'var(--brand-orange)' }} /> Assiduité de l'équipe (7 derniers jours)</h2>
-                <p className="panel-subtitle">Historique des présences quotidiennes triées par ponctualité.</p>
-
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '1.5rem', alignItems: 'center' }}>
-
-                  {/* stacked Bar Chart SVG */}
-                  <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <svg viewBox="0 0 500 220" style={{ width: '100%', height: 'auto', background: 'none' }}>
-                      {/* Grid Lines */}
-                      <line x1="40" y1="20" x2="480" y2="20" stroke="var(--border-light)" strokeDasharray="4" />
-                      <line x1="40" y1="70" x2="480" y2="70" stroke="var(--border-light)" strokeDasharray="4" />
-                      <line x1="40" y1="120" x2="480" y2="120" stroke="var(--border-light)" strokeDasharray="4" />
-                      <line x1="40" y1="170" x2="480" y2="170" stroke="var(--border-light)" />
-
-                      {/* Y Labels */}
-                      <text x="20" y="24" fontSize="10" fill="var(--text-secondary)" textAnchor="end">100%</text>
-                      <text x="20" y="74" fontSize="10" fill="var(--text-secondary)" textAnchor="end">50%</text>
-                      <text x="20" y="124" fontSize="10" fill="var(--text-secondary)" textAnchor="end">25%</text>
-                      <text x="20" y="174" fontSize="10" fill="var(--text-secondary)" textAnchor="end">0%</text>
-
-                      {/* Bars */}
-                      {pointageStats.chartData.map((d, index) => {
-                        const x = 55 + index * 60;
-                        const total = d.present + d.absent || 1;
-
-                        const presentHeight = (d.present / total) * 150;
-                        const lateHeight = (d.late / total) * 150;
-                        const punctualHeight = Math.max(0, presentHeight - lateHeight);
-                        const absentHeight = (d.absent / total) * 150;
-
-                        const yAbsent = 170 - absentHeight;
-                        const yLate = yAbsent - lateHeight;
-                        const yPunctual = yLate - punctualHeight;
-
-                        return (
-                          <g key={d.date} style={{ cursor: 'pointer' }}>
-                            {/* Punctual segment (Green) */}
-                            {punctualHeight > 0 && (
-                              <rect x={x} y={yPunctual} width="22" height={punctualHeight} fill="#166534" rx="2" />
-                            )}
-                            {/* Late segment (Orange) */}
-                            {lateHeight > 0 && (
-                              <rect x={x} y={yLate} width="22" height={lateHeight} fill="var(--brand-orange)" rx="2" />
-                            )}
-                            {/* Absent segment (Gray) */}
-                            {absentHeight > 0 && (
-                              <rect x={x} y={yAbsent} width="22" height={absentHeight} fill="var(--border-light)" rx="2" />
-                            )}
-
-                            {/* Date Label */}
-                            <text x={x + 11} y="192" fontSize="10" fill="var(--text-secondary)" textAnchor="middle" fontWeight="500">{d.label}</text>
-                          </g>
-                        );
-                      })}
-                    </svg>
-
-                    {/* Legend */}
-                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem', fontSize: '0.85rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#166534' }}></span>
-                        <span>Présent (À l'heure)</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--brand-orange)' }}></span>
-                        <span>En retard</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--border-light)' }}></span>
-                        <span>Absent / Non pointé</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Radial Progress Ring SVG */}
-                  <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ position: 'relative', width: '140px', height: '140px' }}>
-                      <svg width="100%" height="100%" viewBox="0 0 40 40">
-                        {/* Background circle */}
-                        <circle cx="20" cy="20" r="15.91549430918954" fill="none" stroke="var(--border-light)" strokeWidth="3" />
-                        {/* Progress ring */}
-                        <circle cx="20" cy="20" r="15.91549430918954" fill="none" stroke="var(--success-color)" strokeWidth="3.5"
-                          strokeDasharray={`${pointageStats.today.punctuality_rate} ${100 - pointageStats.today.punctuality_rate}`}
-                          strokeDashoffset="25"
-                          strokeLinecap="round"
-                          style={{ transition: 'stroke-dasharray 0.5s ease-out' }}
-                        />
-                      </svg>
-                      {/* Percent indicator */}
-                      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--brand-navy)' }}>{pointageStats.today.punctuality_rate}%</span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>À l'heure</span>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '200px', fontWeight: 500 }}>
-                      Taux de ponctualité global aujourd'hui
-                    </span>
-                  </div>
-
-                </div>
-              </div>
-            )}
-
           </div>
         )}
         {profileLoaded && (balance?.service === 'Direction' || balance?.service === 'Directeur') && (

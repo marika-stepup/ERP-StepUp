@@ -90,7 +90,7 @@ async function testEmail() {
               <p style="margin: 5px 0 0 0; color: #64748b; font-size: 13px;">Portail Ressources Humaines & Congés</p>
             </div>
             <div style="padding: 25px; color: #334155; line-height: 1.6;">
-              <div style="display: inline-block; background-color: #dcfce7; color: #166534; padding: 5px 12px; border-radius: 15px; font-weight: bold; font-size: 12px; margin-bottom: 15px;">
+              <div style="display: inline-block; background-color: #dcfce7; color: #338855; padding: 5px 12px; border-radius: 15px; font-weight: bold; font-size: 12px; margin-bottom: 15px;">
                 ✅ CONFIGURATION VALIDE
               </div>
               <p>Bonjour,</p>
