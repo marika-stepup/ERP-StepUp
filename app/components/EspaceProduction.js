@@ -1,17 +1,19 @@
 import { useEffect, useState, useRef } from 'react';
-import { 
-  Play, 
-  Square, 
-  Clock, 
-  Briefcase, 
-  CheckCircle, 
+import {
+  Play,
+  Square,
+  Clock,
+  Briefcase,
+  CheckCircle,
   AlertCircle,
   Calendar,
   PenTool,
   Palette,
   Users,
   BarChart3,
-  Code
+  Code,
+  Repeat,
+  UserCheck
 } from 'lucide-react';
 import { supabaseClient } from '../../lib/supabaseClient';
 
@@ -103,15 +105,66 @@ export const DELIVERABLE_CARDS = [
   }
 ];
 
+export const isStandardDeliverableTask = (task, card) => {
+  if (!task || !card) return false;
+  // Une tâche assignée est TOUJOURS une tâche spécifique, JAMAIS un livrable standard générique
+  if (task.assigned_to || task.assigned_to_name) return false;
+
+  const tName = (task.name || '').toLowerCase().trim();
+  const tCat = (task.category || '').toLowerCase().trim();
+  const cardTitle = (card.title || '').toLowerCase().trim();
+  const cardKey = (card.categoryKey || '').toLowerCase().trim();
+  const cardId = (card.id || '').toLowerCase().trim();
+
+  // 1. Correspondance directe avec le titre ou la clé du livrable
+  if (tName === cardTitle || tName === cardKey || tName === cardId) {
+    return true;
+  }
+
+  // 2. La catégorie correspond et le nom de tâche est standard / générique
+  if (tCat === cardKey || tCat === cardId) {
+    if (!tName || tName === cardTitle || tName === cardKey || tName === cardId) {
+      return true;
+    }
+  }
+
+  // 3. Variations courantes (Créa, Tech, etc.)
+  if (cardId === 'crea_graphique') {
+    const isCreaCat = ['crea', 'créa', 'créa graphique', 'crea graphique', 'création graphique', 'creation graphique'].includes(tCat);
+    const isCreaName = ['créa graphique', 'création graphique', 'crea graphique', 'crea_graphique', 'créa', 'crea'].includes(tName);
+    if (isCreaName || (isCreaCat && (!tName || isCreaName))) {
+      return true;
+    }
+  }
+
+  if (cardId === 'redaction') {
+    const isRedCat = ['redaction', 'rédaction'].includes(tCat);
+    const isRedName = ['redaction', 'rédaction'].includes(tName);
+    if (isRedName || (isRedCat && (!tName || isRedName))) {
+      return true;
+    }
+  }
+
+  if (cardId === 'reunion') {
+    const isReuCat = ['reunion', 'réunion', 'reunions & gestion', 'réunions & gestion'].includes(tCat);
+    const isReuName = ['reunion', 'réunion', 'reunions & gestion', 'réunions & gestion'].includes(tName);
+    if (isReuName || (isReuCat && (!tName || isReuName))) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 export default function EspaceProduction({ user, token, clients, loading, refreshData, employeeName }) {
   const [selectedClient, setSelectedClient] = useState(null);
 
   // Active tracking state for the current logged-in user
-  const [activeTask, setActiveTask] = useState(null); 
+  const [activeTask, setActiveTask] = useState(null);
   const [activeLogId, setActiveLogId] = useState(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
-  
+
   // Interruptions
   const [activeInterruption, setActiveInterruption] = useState(null); // 'slack', 'meeting', 'pause', 'call'
   const [interruptionLogId, setInterruptionLogId] = useState(null);
@@ -188,7 +241,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
           if (matchedTask) {
             setActiveTask(matchedTask);
             setActiveLogId(myActiveProdLog.id);
-            
+
             const elapsed = Math.floor((Date.now() - new Date(myActiveProdLog.start_time).getTime()) / 1000);
             setTimerSeconds(elapsed > 0 ? elapsed : 0);
             startTimeRef.current = new Date(myActiveProdLog.start_time).getTime();
@@ -198,7 +251,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               const type = myActiveInterLog.log_type.split(':')[1];
               setActiveInterruption(type);
               setInterruptionLogId(myActiveInterLog.id);
-              
+
               let matchedInterTaskClient = null;
               clients.forEach(c => {
                 const t = (c.tasks || []).find(task => task.id === myActiveInterLog.task_id);
@@ -295,7 +348,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
     } catch (err) {
       console.error('Error starting production timer:', err);
-      
+
       setActiveTask(prevActiveTask);
       setActiveLogId(prevActiveLogId);
       setTimerSeconds(prevTimerSeconds);
@@ -311,14 +364,10 @@ export default function EspaceProduction({ user, token, clients, loading, refres
   const handleStartDeliverable = async (card) => {
     if (!selectedClient) return;
 
-    // 1. Chercher si une tâche existe déjà pour ce livrable
-    let targetTask = (selectedClient.tasks || []).find(
-      t => t.category?.toLowerCase() === card.categoryKey.toLowerCase() || 
-           t.name?.toLowerCase() === card.title.toLowerCase() ||
-           t.category?.toLowerCase() === card.id.toLowerCase()
-    );
+    // 1. Chercher UNIQUEMENT une tâche standard / générique (non assignée) pour ce livrable
+    let targetTask = (selectedClient.tasks || []).find(t => isStandardDeliverableTask(t, card));
 
-    // 2. Si elle n'existe pas encore en base, la créer à la volée
+    // 2. Si elle n'existe pas encore en base, la créer à la volée (non assignée)
     if (!targetTask) {
       try {
         const res = await fetch('/api/production/tasks', {
@@ -592,6 +641,22 @@ export default function EspaceProduction({ user, token, clients, loading, refres
   const activeInterruptionClientObj = activeInterruptionClientId ? clients.find(c => c.id === activeInterruptionClientId) : null;
   const activeInterruptionClientName = activeInterruptionClientObj ? activeInterruptionClientObj.name : '';
 
+  // Filtrer les tâches spécifiquement assignées à l'utilisateur courant pour le client actif
+  const assignedTasks = (selectedClient?.tasks || []).filter(task => {
+    if (task.assigned_to || task.assigned_to_name) {
+      const isAssignedToMe =
+        task.assigned_to === user?.id ||
+        task.assigned_to === user?.email ||
+        (task.assigned_to_name && employeeName && task.assigned_to_name.trim().toLowerCase() === employeeName.trim().toLowerCase());
+      return isAssignedToMe;
+    }
+
+    // Si la tâche n'a pas de assigned_to spécifié, vérifier si c'est une tâche standard de livrable
+    const isStandardDeliverable = DELIVERABLE_CARDS.some(c => isStandardDeliverableTask(task, c));
+
+    return !isStandardDeliverable;
+  });
+
   return (
     <div className="espace-production">
       {/* HEADER CONTROLS */}
@@ -602,7 +667,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               <Briefcase size={24} style={{ color: 'var(--brand-orange)' }} />
               Espace Client :
             </h1>
-            <select 
+            <select
               className="client-selector"
               value={selectedClient?.id || ''}
               onChange={(e) => {
@@ -625,13 +690,13 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                 <strong>{selectedClient.progression_percent}% consommé</strong>
               </div>
               <div className="progress-bar-container">
-                <div 
+                <div
                   className="progress-bar-fill orange"
                   style={{ width: `${Math.min(selectedClient.progression_percent, 100)}%` }}
                 ></div>
               </div>
               <div className="progression-hours">
-                {selectedClient.total_spent_hours}h passées / {selectedClient.total_budget_hours}h budgétées
+                {selectedClient.total_spent_hours}h passées
               </div>
             </div>
           )}
@@ -662,8 +727,8 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                 const IconComp = card.icon;
                 const catTasks = (selectedClient.tasks || []).filter(
                   t => t.category?.toLowerCase() === card.categoryKey.toLowerCase() ||
-                       t.name?.toLowerCase() === card.title.toLowerCase() ||
-                       t.category?.toLowerCase() === card.id.toLowerCase()
+                    t.name?.toLowerCase() === card.title.toLowerCase() ||
+                    t.category?.toLowerCase() === card.id.toLowerCase()
                 );
                 let spentSeconds = 0;
                 let budgetHours = 0;
@@ -673,17 +738,17 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                 });
 
                 return (
-                  <div 
-                    key={card.id} 
-                    className="deliverable-mini-card" 
-                    style={{ 
-                      padding: '0.6rem 0.8rem', 
-                      borderRadius: '8px', 
-                      border: '1px solid var(--border-light)', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.6rem', 
-                      background: 'var(--panel-white)' 
+                  <div
+                    key={card.id}
+                    className="deliverable-mini-card"
+                    style={{
+                      padding: '0.6rem 0.8rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      background: 'var(--panel-white)'
                     }}
                   >
                     <div style={{ color: card.themeColor, display: 'flex' }}>
@@ -693,11 +758,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{card.title}</div>
                       <div style={{ fontSize: '0.95rem', fontWeight: '700' }}>
                         {formatSecondsToHMText(spentSeconds)}
-                        {budgetHours > 0 && (
-                          <span style={{ fontSize: '0.7rem', fontWeight: 'normal', color: 'var(--text-secondary)', marginLeft: '0.25rem' }}>
-                            / {budgetHours}h
-                          </span>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -727,10 +787,10 @@ export default function EspaceProduction({ user, token, clients, loading, refres
         </div>
       ) : (
         <div className="prod-grid">
-          
+
           {/* LEFT COLUMN: ACTIVE TRACKING & INTERRUPTIONS */}
           <div className="prod-left-column">
-            
+
             {/* ACTIVE CHRONO CARD */}
             <div className={`panel prod-active-card ${timerRunning ? 'running' : ''}`} style={{ padding: '1.75rem 1.5rem', textAlign: 'center' }}>
               {timerRunning && activeTask ? (
@@ -746,25 +806,32 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                     {activeTask.name}
                   </h3>
 
-                  {/* 3. Subtitle / Due date if available (WITHOUT BUDGET ALLOUÉ) */}
-                  <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500', marginBottom: '0.5rem' }}>
-                    {activeTask.due_date ? (
-                      <span>Échéance : {new Date(activeTask.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</span>
-                    ) : (
-                      <span>{activeTaskClientName ? `${activeTaskClientName} • ` : ''}{activeTask.category}</span>
+                  {/* 3. Subtitle: Client Name Badge + Due date (WITHOUT BUDGET ALLOUÉ) */}
+                  <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                    <span style={{
+                      color: '#178FCB',
+                      fontWeight: '800',
+                      background: 'rgba(23, 143, 203, 0.08)',
+                      padding: '0.15rem 0.55rem',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(23, 143, 203, 0.2)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}>
+                      <Briefcase size={12} />
+                      {activeTaskClientName || selectedClient?.name}
+                    </span>
+                    {activeTask.due_date && (
+                      <>
+                        <span style={{ color: '#94a3b8' }}>•</span>
+                        <span>Échéance : {new Date(activeTask.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</span>
+                      </>
                     )}
                   </div>
 
-                  {/* 4. Large Digital Timer Display */}
-                  <div style={{ 
-                    fontSize: '3.4rem', 
-                    fontWeight: '800', 
-                    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", 
-                    color: '#2563eb', 
-                    letterSpacing: '1px', 
-                    lineHeight: '1', 
-                    margin: '1.1rem 0 0.9rem 0' 
-                  }}>
+                  {/* 4. Large Digital Timer Display in Orbitron Font */}
+                  <div className="chrono-digits blue">
                     {formatSecondsToHMS(timerSeconds)}
                   </div>
 
@@ -778,7 +845,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                       <span style={{ fontSize: '0.85rem', color: '#d97706', fontWeight: '600' }}>
                         Pause ({activeInterruption}) : {formatSecondsToHMS(interruptionSeconds)}
                       </span>
-                      <button 
+                      <button
                         onClick={() => handleToggleInterruption(activeInterruption)}
                         style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#d97706', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}
                       >
@@ -789,21 +856,21 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
                   {/* 6. Two Action Buttons: Red STOP & Green TERMINÉ */}
                   <div style={{ display: 'flex', gap: '0.85rem', width: '100%', maxWidth: '340px', justifyContent: 'center' }}>
-                    <button 
+                    <button
                       onClick={handleStopTimer}
-                      style={{ 
-                        flex: 1, 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        gap: '0.5rem', 
-                        padding: '0.7rem 1.25rem', 
-                        background: '#ef4444', 
-                        color: '#ffffff', 
-                        fontWeight: '700', 
-                        fontSize: '0.95rem', 
-                        borderRadius: '8px', 
-                        border: 'none', 
+                      style={{
+                        flex: 1,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        padding: '0.7rem 1.25rem',
+                        background: '#ef4444',
+                        color: '#ffffff',
+                        fontWeight: '700',
+                        fontSize: '0.95rem',
+                        borderRadius: '8px',
+                        border: 'none',
                         cursor: 'pointer',
                         boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)',
                         transition: 'all 0.15s ease'
@@ -813,21 +880,21 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                     >
                       <Square size={13} fill="white" /> STOP
                     </button>
-                    <button 
+                    <button
                       onClick={handleCompleteTask}
-                      style={{ 
-                        flex: 1, 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        gap: '0.5rem', 
-                        padding: '0.7rem 1.25rem', 
-                        background: '#10b981', 
-                        color: '#ffffff', 
-                        fontWeight: '700', 
-                        fontSize: '0.95rem', 
-                        borderRadius: '8px', 
-                        border: 'none', 
+                      style={{
+                        flex: 1,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        padding: '0.7rem 1.25rem',
+                        background: '#10b981',
+                        color: '#ffffff',
+                        fontWeight: '700',
+                        fontSize: '0.95rem',
+                        borderRadius: '8px',
+                        border: 'none',
                         cursor: 'pointer',
                         boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)',
                         transition: 'all 0.15s ease'
@@ -848,48 +915,40 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
                   <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', margin: '0.9rem 0 0.25rem 0', textAlign: 'center', textTransform: 'capitalize' }}>
                     {activeInterruption === 'slack' ? 'Slack / Mails' :
-                     activeInterruption === 'meeting' ? 'Point Interne' :
-                     activeInterruption === 'pause' ? 'Pause' : 'Appel Impromptu'}
+                      activeInterruption === 'meeting' ? 'Point Interne' :
+                        activeInterruption === 'pause' ? 'Pause' : 'Appel Impromptu'}
                   </h3>
 
                   <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500', marginBottom: '0.5rem' }}>
                     {activeInterruptionClientName ? `Client : ${activeInterruptionClientName}` : 'Met le chrono en pause'}
                   </div>
-                  
-                  <div style={{ 
-                    fontSize: '3.4rem', 
-                    fontWeight: '800', 
-                    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", 
-                    color: '#f97316', 
-                    letterSpacing: '1px', 
-                    lineHeight: '1', 
-                    margin: '1.1rem 0 0.9rem 0' 
-                  }}>
+
+                  <div className="chrono-digits orange">
                     {formatSecondsToHMS(interruptionSeconds)}
                   </div>
 
                   <div style={{ width: '100%', maxWidth: '340px', height: '6px', background: '#fed7aa', borderRadius: '9999px', overflow: 'hidden', margin: '0.2rem auto 1.5rem auto' }}>
                     <div style={{ width: '50%', height: '100%', background: '#f97316', borderRadius: '9999px' }}></div>
                   </div>
-                  
+
                   <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: '340px', justifyContent: 'center' }}>
-                    <button 
-                      onClick={() => handleToggleInterruption(activeInterruption)} 
-                      style={{ 
-                        flex: 1, 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        gap: '0.5rem', 
-                        padding: '0.7rem 1.25rem', 
-                        background: '#ef4444', 
-                        color: '#ffffff', 
-                        fontWeight: '700', 
-                        fontSize: '0.95rem', 
-                        borderRadius: '8px', 
-                        border: 'none', 
+                    <button
+                      onClick={() => handleToggleInterruption(activeInterruption)}
+                      style={{
+                        flex: 1,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        padding: '0.7rem 1.25rem',
+                        background: '#ef4444',
+                        color: '#ffffff',
+                        fontWeight: '700',
+                        fontSize: '0.95rem',
+                        borderRadius: '8px',
+                        border: 'none',
                         cursor: 'pointer',
-                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)' 
+                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)'
                       }}
                     >
                       <Square size={13} fill="white" /> STOP
@@ -908,31 +967,218 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               )}
             </div>
 
+            {/* ASSIGNED TASKS CARD (TÂCHES ASSIGNÉES) */}
+            <div className="panel prod-assigned-tasks-card" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.05rem', letterSpacing: '0.3px' }}>
+                  <UserCheck size={18} style={{ color: 'var(--brand-orange)' }} />
+                  TÂCHES ASSIGNÉES
+                </h2>
+                {assignedTasks.length > 0 && (
+                  <span style={{
+                    background: 'rgba(249, 115, 22, 0.12)',
+                    color: 'var(--brand-orange)',
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700'
+                  }}>
+                    {assignedTasks.length} {assignedTasks.length > 1 ? 'tâches' : 'tâche'}
+                  </span>
+                )}
+              </div>
+              <p className="panel-subtitle" style={{ margin: '0 0 1.1rem 0', fontSize: '0.8rem' }}>
+                Tâches spécifiques qui vous sont assignées pour ce client.
+              </p>
+
+              {assignedTasks.length === 0 ? (
+                <div style={{
+                  padding: '1.5rem 1rem',
+                  textAlign: 'center',
+                  background: 'var(--background-light)',
+                  borderRadius: '8px',
+                  border: '1px dashed var(--border-light)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.85rem'
+                }}>
+                  <CheckCircle size={22} style={{ color: '#94a3b8', margin: '0 auto 0.4rem auto', display: 'block', opacity: 0.7 }} />
+                  <span>Aucune tâche assignée pour ce client.</span>
+                </div>
+              ) : (
+                <div className="assigned-tasks-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {assignedTasks.map(task => {
+                    const budgetSec = (task.budget_hours || 0) * 3600;
+                    const spentSec = task.time_spent_seconds || 0;
+                    const isTaskCompleted = task.status === 'Fait';
+                    const isTaskRunning = activeTask && activeTask.id === task.id && timerRunning;
+                    const taskProgress = budgetSec > 0 ? Math.min(Math.round((spentSec / budgetSec) * 100), 100) : 0;
+
+                    const cardMatch = DELIVERABLE_CARDS.find(c =>
+                      c.categoryKey.toLowerCase() === task.category?.toLowerCase() ||
+                      c.id.toLowerCase() === task.category?.toLowerCase() ||
+                      c.title.toLowerCase() === task.category?.toLowerCase()
+                    );
+                    const catColor = cardMatch?.themeColor || '#178FCB';
+                    const catTitle = cardMatch?.title || task.category || 'Production';
+
+                    return (
+                      <div
+                        key={task.id}
+                        className={`assigned-task-item ${isTaskCompleted ? 'completed' : isTaskRunning ? 'running' : ''}`}
+                        style={{
+                          padding: '0.85rem 1rem',
+                          borderRadius: '8px',
+                          border: isTaskRunning ? '1.5px solid var(--brand-orange)' : '1px solid var(--border-light)',
+                          background: isTaskRunning ? 'rgba(249, 115, 22, 0.03)' : 'var(--panel-white)',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.3rem' }}>
+                              <span style={{
+                                fontSize: '0.68rem',
+                                fontWeight: '700',
+                                color: catColor,
+                                background: `${catColor}15`,
+                                padding: '0.1rem 0.45rem',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase'
+                              }}>
+                                {catTitle}
+                              </span>
+                              <h4 style={{
+                                fontSize: '0.95rem',
+                                fontWeight: '800',
+                                color: isTaskCompleted ? '#338855' : '#0f172a',
+                                margin: 0,
+                                textDecoration: isTaskCompleted ? 'line-through' : 'none',
+                                lineHeight: '1.3'
+                              }}>
+                                {task.name}
+                              </h4>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                              <span style={{ fontWeight: '600' }}>
+                                {formatSecondsToHMText(spentSec)} passées
+                              </span>
+
+                              {task.due_date && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <Calendar size={12} style={{ color: 'var(--text-secondary)' }} />
+                                  <span>Échéance : <strong>{new Date(task.due_date).toLocaleDateString('fr-FR')}</strong></span>
+                                </div>
+                              )}
+
+                              {task.is_recurring && (
+                                <span style={{ fontSize: '0.68rem', background: 'rgba(23, 143, 203, 0.1)', color: '#178FCB', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                  <Repeat size={10} /> Récurrente
+                                </span>
+                              )}
+
+                              <span style={{ fontSize: '0.68rem', background: 'rgba(100, 116, 139, 0.1)', color: '#475569', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
+                                Assigné à moi
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ flexShrink: 0 }}>
+                            {isTaskCompleted ? (
+                              <div className="status-badge fait" style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}>
+                                <CheckCircle size={12} /> Fait
+                              </div>
+                            ) : isTaskRunning ? (
+                              <div
+                                className="status-badge en-cours"
+                                style={{
+                                  background: 'rgba(234, 88, 12, 0.15)',
+                                  color: 'var(--brand-orange)',
+                                  fontWeight: '700',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  padding: '0.3rem 0.8rem',
+                                  borderRadius: '20px',
+                                  fontSize: '0.78rem'
+                                }}
+                              >
+                                <span className="dot" style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--brand-orange)', display: 'inline-block' }}></span>
+                                En cours
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleStartTimer(task)}
+                                title={`Lancer le chronomètre sur ${task.name}`}
+                                style={{
+                                  background: 'var(--panel-white)',
+                                  border: '1px solid var(--border-light)',
+                                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
+                                  padding: '0.3rem 0.85rem',
+                                  borderRadius: '20px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                  color: '#10b981',
+                                  fontWeight: '700',
+                                  fontSize: '0.78rem',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Play size={12} fill="#10b981" />
+                                Démarrer
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {task.budget_hours > 0 && (
+                          <div className="progress-bar-container" style={{ height: '4px', marginTop: '0.55rem', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+                            <div
+                              className={`progress-bar-fill ${isTaskCompleted ? 'green' : isTaskRunning ? 'orange' : 'blue'}`}
+                              style={{
+                                width: `${taskProgress}%`,
+                                height: '100%',
+                                background: isTaskCompleted ? '#338855' : isTaskRunning ? '#ff7a00' : '#2563eb',
+                                borderRadius: '9999px'
+                              }}
+                            ></div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* INTERRUPTIONS CARD */}
             <div className="panel prod-interruptions-card">
               <h2 className="panel-title">INTERRUPTIONS <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>(Met le chrono client en pause)</span></h2>
               <p className="panel-subtitle">Ne perdez plus de temps à justifier les coupures. Un clic suffit.</p>
-              
+
               <div className="interruptions-grid">
-                <button 
+                <button
                   className={`btn-interrupt slack ${activeInterruption === 'slack' ? 'active' : ''}`}
                   onClick={() => handleInterruptionClick('slack')}
                 >
                   <span className="dot"></span> Slack / Mails
                 </button>
-                <button 
+                <button
                   className={`btn-interrupt meeting ${activeInterruption === 'meeting' ? 'active' : ''}`}
                   onClick={() => handleInterruptionClick('meeting')}
                 >
                   <span className="dot"></span> Point Interne
                 </button>
-                <button 
+                <button
                   className={`btn-interrupt pause-type ${activeInterruption === 'pause' ? 'active' : ''}`}
                   onClick={() => handleInterruptionClick('pause')}
                 >
                   <span className="dot"></span> Pause
                 </button>
-                <button 
+                <button
                   className={`btn-interrupt call ${activeInterruption === 'call' ? 'active' : ''}`}
                   onClick={() => handleInterruptionClick('call')}
                 >
@@ -945,55 +1191,72 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
           {/* RIGHT COLUMN: DELIVERABLES */}
           <div className="prod-right-column">
-            
+
             {/* LIVRABLES CARD */}
             <div className="panel deliverables-card">
-              <h2 className="panel-title" style={{ marginBottom: '0.5rem' }}>LIVRABLES DU MOIS</h2>
-              <p className="panel-subtitle">Lancez le chronomètre directement depuis le livrable concerné.</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <div>
+                  <h2 className="panel-title" style={{ margin: 0 }}>MISSIONS ACTIVES</h2>
+                  <p className="panel-subtitle" style={{ margin: '0.2rem 0 0 0' }}>Sélectionnez votre pôle d'intervention et démarrez votre session de travail.</p>
+                </div>
+                {selectedClient && (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      background: 'rgba(234, 88, 12, 0.08)',
+                      border: '1.5px solid rgba(234, 88, 12, 0.28)',
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <Briefcase size={15} style={{ color: '#178FCB' }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Client actif :</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: '800', color: '#178FCB' }}>
+                      {selectedClient.code ? `${selectedClient.code} - ` : ''}{selectedClient.name}
+                    </span>
+                  </div>
+                )}
+              </div>
 
               <div className="deliverables-5-container" style={{ marginTop: '1.25rem' }}>
                 {DELIVERABLE_CARDS.map(card => {
                   const IconComp = card.icon;
-                  
-                  // Trouver les tâches associées à ce livrable
-                  const catTasks = (selectedClient?.tasks || []).filter(
-                    t => t.category?.toLowerCase() === card.categoryKey.toLowerCase() ||
-                         t.name?.toLowerCase() === card.title.toLowerCase() ||
-                         t.category?.toLowerCase() === card.id.toLowerCase()
-                  );
-                  
-                  const primaryTask = catTasks.length > 0 ? catTasks[0] : null;
+
+                  // Trouver les tâches standard / génériques (non assignées) associées à ce livrable
+                  const genericTasks = (selectedClient?.tasks || []).filter(t => isStandardDeliverableTask(t, card));
 
                   let totalSpentSec = 0;
                   let totalBudgetHours = 0;
-                  catTasks.forEach(t => {
+                  genericTasks.forEach(t => {
                     totalSpentSec += (t.time_spent_seconds || 0);
                     totalBudgetHours += (t.budget_hours || 0);
                   });
 
-                  const isCompleted = primaryTask && primaryTask.status === 'Fait';
-                  const isActive = activeTask && (
-                    activeTask.id === primaryTask?.id ||
-                    activeTask.category?.toLowerCase() === card.categoryKey.toLowerCase() ||
-                    activeTask.name?.toLowerCase() === card.title.toLowerCase()
+                  const areAllTasksCompleted = genericTasks.length > 0 && genericTasks.every(t => t.status === 'Fait');
+                  const isCategoryActive = Boolean(
+                    activeTask &&
+                    timerRunning &&
+                    isStandardDeliverableTask(activeTask, card)
                   );
 
                   const totalBudgetSec = totalBudgetHours * 3600;
                   const progressPercent = totalBudgetSec > 0 ? Math.min(Math.round((totalSpentSec / totalBudgetSec) * 100), 100) : 0;
 
                   return (
-                    <div 
-                      key={card.id} 
-                      className={`deliverable-card-item ${isCompleted ? 'completed' : isActive ? 'active' : ''}`}
+                    <div
+                      key={card.id}
+                      className={`deliverable-card-item ${areAllTasksCompleted ? 'completed' : isCategoryActive ? 'active' : ''}`}
                       style={{
                         borderLeft: `4px solid ${card.themeColor}`
                       }}
                     >
                       <div className="deliverable-card-header">
                         <div className="deliverable-card-title-group">
-                          <div 
+                          <div
                             className="deliverable-card-icon-badge"
-                            style={{ 
+                            style={{
                               backgroundColor: `${card.themeColor}15`,
                               color: card.themeColor
                             }}
@@ -1001,23 +1264,26 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                             <IconComp size={20} />
                           </div>
                           <div>
-                            <h3 className="deliverable-card-title">
-                              {card.title}
-                            </h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <h3 className="deliverable-card-title">
+                                {card.title}
+                              </h3>
+                              {selectedClient && (
+                                <span className="deliverable-client-tag">
+                                  <Briefcase size={10} />
+                                  {selectedClient.code ? `${selectedClient.code} • ` : ''}{selectedClient.name}
+                                </span>
+                              )}
+                            </div>
                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                              {formatSecondsToHMText(totalSpentSec)}
-                              {totalBudgetHours > 0 ? ` / ${totalBudgetHours}h budgétées` : ' passées'}
+                              {formatSecondsToHMText(totalSpentSec)} passées
                             </span>
                           </div>
                         </div>
 
                         <div className="deliverable-card-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {isCompleted ? (
-                            <div className="status-badge fait">
-                              <CheckCircle size={12} /> Fait
-                            </div>
-                          ) : isActive ? (
-                            <div 
+                          {isCategoryActive ? (
+                            <div
                               className="status-badge en-cours"
                               style={{
                                 background: 'rgba(234, 88, 12, 0.15)',
@@ -1026,33 +1292,32 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.4rem',
-                                padding: '0.25rem 0.65rem',
-                                borderRadius: '6px'
+                                padding: '0.35rem 0.85rem',
+                                borderRadius: '20px',
+                                fontSize: '0.82rem'
                               }}
                             >
                               <span className="dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--brand-orange)', display: 'inline-block' }}></span>
                               En cours
                             </div>
                           ) : (
-                            <button 
+                            <button
                               onClick={() => handleStartDeliverable(card)}
-                              title={`Lancer le chronomètre sur ${card.title}`}
-                              disabled={timerRunning && !isActive}
+                              title={`Lancer le chronomètre sur ${card.title} (${selectedClient?.name || ''})`}
                               style={{
                                 background: 'var(--panel-white)',
                                 border: '1px solid var(--border-light)',
                                 boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
-                                padding: '0.35rem 0.85rem',
+                                padding: '0.35rem 0.95rem',
                                 borderRadius: '20px',
-                                cursor: (timerRunning && !isActive) ? 'not-allowed' : 'pointer',
+                                cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.4rem',
+                                gap: '0.45rem',
                                 color: '#10b981',
-                                fontWeight: '600',
-                                fontSize: '0.8rem',
-                                transition: 'all 0.15s ease',
-                                opacity: (timerRunning && !isActive) ? 0.5 : 1
+                                fontWeight: '700',
+                                fontSize: '0.82rem',
+                                transition: 'all 0.15s ease'
                               }}
                             >
                               <Play size={13} fill="#10b981" />
@@ -1071,12 +1336,12 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                         ))}
                       </div>
 
-                      {/* Progress bar if budget exists */}
+                      {/* Progress bar for category if budget exists */}
                       {totalBudgetHours > 0 && (
-                        <div style={{ marginTop: '0.25rem' }}>
+                        <div style={{ marginTop: '0.4rem' }}>
                           <div className="progress-bar-container" style={{ height: '5px' }}>
-                            <div 
-                              className={`progress-bar-fill ${isCompleted ? 'green' : isActive ? 'orange' : 'blue'}`}
+                            <div
+                              className={`progress-bar-fill ${areAllTasksCompleted ? 'green' : isCategoryActive ? 'orange' : 'blue'}`}
                               style={{ width: `${progressPercent}%` }}
                             ></div>
                           </div>
@@ -1102,14 +1367,14 @@ export default function EspaceProduction({ user, token, clients, loading, refres
             <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
               À quel client souhaitez-vous attribuer ce temps de <strong>{
                 interruptionTypeToStart === 'slack' ? 'Slack / Mails' :
-                interruptionTypeToStart === 'meeting' ? 'Point Interne' : 'Appel Impromptu'
+                  interruptionTypeToStart === 'meeting' ? 'Point Interne' : 'Appel Impromptu'
               }</strong> ?
             </p>
-            
+
             <div className="form-group" style={{ marginBottom: '1.5rem' }}>
               <label style={{ fontWeight: '600' }}>Client concerné</label>
-              <select 
-                value={selectedInterruptionClientId} 
+              <select
+                value={selectedInterruptionClientId}
                 onChange={(e) => setSelectedInterruptionClientId(e.target.value)}
                 style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}
               >
@@ -1122,9 +1387,9 @@ export default function EspaceProduction({ user, token, clients, loading, refres
             </div>
 
             <div className="modal-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-              <button 
-                type="button" 
-                className="btn btn-outline" 
+              <button
+                type="button"
+                className="btn btn-outline"
                 style={{ minWidth: '100px' }}
                 onClick={() => {
                   setInterruptionModalOpen(false);
@@ -1133,9 +1398,9 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               >
                 Annuler
               </button>
-              <button 
-                type="button" 
-                className="btn btn-primary" 
+              <button
+                type="button"
+                className="btn btn-primary"
                 style={{ minWidth: '120px' }}
                 onClick={() => {
                   setInterruptionModalOpen(false);
@@ -1161,9 +1426,9 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               {alertModal.message}
             </p>
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button 
-                type="button" 
-                className="btn btn-primary" 
+              <button
+                type="button"
+                className="btn btn-primary"
                 style={{ minWidth: '100px' }}
                 onClick={() => setAlertModal({ show: false, title: '', message: '' })}
               >
@@ -1185,17 +1450,17 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               {confirmModal.message}
             </p>
             <div className="modal-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-              <button 
-                type="button" 
-                className="btn btn-outline" 
+              <button
+                type="button"
+                className="btn btn-outline"
                 style={{ minWidth: '100px' }}
                 onClick={() => setConfirmModal({ show: false, title: '', message: '', onConfirm: null })}
               >
                 Annuler
               </button>
-              <button 
-                type="button" 
-                className="btn btn-primary" 
+              <button
+                type="button"
+                className="btn btn-primary"
                 style={{ minWidth: '100px' }}
                 onClick={() => {
                   if (confirmModal.onConfirm) confirmModal.onConfirm();

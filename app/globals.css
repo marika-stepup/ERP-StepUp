@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 :root {
   --background-light: #f8fafc;
@@ -2425,4 +2425,40 @@ body.dark .status-badge.en-cours {
 .deliverable-budget-text {
   font-size: 0.75rem;
   color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   CHRONO DIGITAL DISPLAY (ORBITRON FONT)
+   ========================================================================== */
+.chrono-digits {
+  font-family: 'Orbitron', monospace, sans-serif !important;
+  font-weight: 800;
+  font-size: 3.4rem;
+  letter-spacing: 2px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  margin: 1.1rem 0 0.9rem 0;
+  user-select: none;
+}
+
+.chrono-digits.blue {
+  color: #2563eb;
+}
+
+.chrono-digits.orange {
+  color: #f97316;
+}
+
+.deliverable-client-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #178FCB;
+  background: rgba(23, 143, 203, 0.08);
+  border: 1px solid rgba(23, 143, 203, 0.22);
+  padding: 0.12rem 0.5rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }

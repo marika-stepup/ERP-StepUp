@@ -29,7 +29,7 @@ export async function PATCH(req, { params }) {
 
   try {
     const body = await req.json();
-    const { category, name, budget_hours, status, due_date } = body;
+    const { category, name, budget_hours, status, due_date, assigned_to, assigned_to_name, is_recurring, recurring_frequency } = body;
 
     const supabase = getSupabaseAdmin();
 
@@ -39,6 +39,10 @@ export async function PATCH(req, { params }) {
     if (budget_hours !== undefined) updates.budget_hours = Number(budget_hours) || 0;
     if (status !== undefined) updates.status = status;
     if (due_date !== undefined) updates.due_date = due_date || null;
+    if (assigned_to !== undefined) updates.assigned_to = assigned_to || null;
+    if (assigned_to_name !== undefined) updates.assigned_to_name = assigned_to_name || null;
+    if (is_recurring !== undefined) updates.is_recurring = !!is_recurring;
+    if (recurring_frequency !== undefined) updates.recurring_frequency = recurring_frequency || 'monthly';
 
     const { data: updatedTask, error } = await supabase
       .from('production_tasks')
