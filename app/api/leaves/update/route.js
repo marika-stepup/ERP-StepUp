@@ -43,7 +43,7 @@ export async function POST(req) {
       }
 
       if (durationInHours < 8) {
-        businessDays = durationInHours / 8;
+        businessDays = Math.max(0.5, durationInHours / 8);
         leave_type = `${leave_type} (${start_time} - ${end_time})`;
       } else {
         try {

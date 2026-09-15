@@ -2430,12 +2430,15 @@ export default function Page() {
                                     const typeConf = getLeaveTypeConfig(activeReq.leave_type);
                                     const normalizedLabel = normalizeLeaveType(activeReq.leave_type);
 
+                                    const effectiveDays = Math.max(0.5, Number(activeReq.business_days || 0));
+                                    const dayCellText = effectiveDays < 1 ? effectiveDays.toString().replace('.', ',') : '1';
+
                                     if (activeReq.status === 'Approuvé') {
                                       cellClass += ` status-approved ${typeConf.cellClass}`;
-                                      cellText = activeReq.business_days < 1 ? activeReq.business_days.toString().replace('.', ',') : '1';
+                                      cellText = dayCellText;
                                     } else {
                                       cellClass += ' status-pending';
-                                      cellText = activeReq.business_days < 1 ? activeReq.business_days.toString().replace('.', ',') : '1';
+                                      cellText = dayCellText;
                                     }
 
                                     // Check if service conflict/overlap exists on this day
