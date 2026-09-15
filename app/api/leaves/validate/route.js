@@ -134,13 +134,6 @@ export async function POST(req) {
         const takenVal = isPermission ? Number(requesterProfile.taken_perm || 0) : Number(requesterProfile.taken_days || 0);
         const remainingVal = isPermission ? Number(requesterProfile.remaining_perm || 0) : Number(requesterProfile.remaining_balance || 0);
 
-        if (remainingVal < businessDays) {
-          return NextResponse.json(
-            { error: `Impossible d'approuver la demande. L'employé dispose de seulement ${remainingVal} jours restants, demandés ${businessDays} jours.` },
-            { status: 400 }
-          );
-        }
-
         const newTaken = takenVal + businessDays;
         const newRemaining = initialVal - newTaken;
 

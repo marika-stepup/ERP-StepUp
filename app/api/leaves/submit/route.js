@@ -58,7 +58,7 @@ export async function POST(req) {
         leave_type = `${leave_type} (${start_time} - ${end_time})`;
       } else {
         try {
-          businessDays = calculateBusinessDays(start_date, end_date);
+          businessDays = calculateBusinessDays(start_date, end_date, leave_type);
         } catch (dateErr) {
           return NextResponse.json({ error: dateErr.message }, { status: 400 });
         }
@@ -68,7 +68,7 @@ export async function POST(req) {
       }
     } else {
       try {
-        businessDays = calculateBusinessDays(start_date, end_date);
+        businessDays = calculateBusinessDays(start_date, end_date, leave_type);
       } catch (dateErr) {
         return NextResponse.json({ error: dateErr.message }, { status: 400 });
       }
@@ -101,24 +101,12 @@ export async function POST(req) {
       );
     }
 
-    // Check balance depending on leave type (Permission vs normal CP/RTT)
+    // Check balance depending on leave type:
+    // Les utilisateurs qui n'ont pas de solde de congé peuvent poser des congés (solde négatif autorisé).
     const isPermission = leave_type.toLowerCase().includes('perm');
     const isNoDeduct = leave_type.toLowerCase().includes('sans solde') || 
                        leave_type.toLowerCase().includes('rattraper') || 
                        leave_type.toLowerCase().includes('maladie');
-    
-    if (!isNoDeduct) {
-      const remainingBalance = isPermission 
-        ? Number(balance.remaining_perm || 0)
-        : Number(balance.remaining_balance || 0);
-
-      if (remainingBalance < businessDays) {
-        return NextResponse.json(
-          { error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingBalance} j.` },
-          { status: 400 }
-        );
-      }
-    }
 
     // 4. Check for duplicate / overlapping requests
     const { data: employeeRequests, error: requestsError } = await supabase

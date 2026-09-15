@@ -47,7 +47,7 @@ export async function POST(req) {
         leave_type = `${leave_type} (${start_time} - ${end_time})`;
       } else {
         try {
-          businessDays = calculateBusinessDays(start_date, end_date);
+          businessDays = calculateBusinessDays(start_date, end_date, leave_type);
         } catch (dateErr) {
           return NextResponse.json({ error: dateErr.message }, { status: 400 });
         }
@@ -57,7 +57,7 @@ export async function POST(req) {
       }
     } else {
       try {
-        businessDays = calculateBusinessDays(start_date, end_date);
+        businessDays = calculateBusinessDays(start_date, end_date, leave_type);
       } catch (dateErr) {
         return NextResponse.json({ error: dateErr.message }, { status: 400 });
       }
@@ -151,14 +151,6 @@ export async function POST(req) {
 
     if (!isNoDeduct) {
       const isPermission = leave_type.toLowerCase().includes('perm');
-      const remainingVal = isPermission ? tempPermRemaining : tempCPRemaining;
-
-      if (remainingVal < businessDays) {
-        return NextResponse.json(
-          { error: `Solde insuffisant. Demandé : ${businessDays} j, Disponible : ${remainingVal} j.` },
-          { status: 400 }
-        );
-      }
 
       if (requestStatus === 'Approuvé') {
         if (isPermission) {

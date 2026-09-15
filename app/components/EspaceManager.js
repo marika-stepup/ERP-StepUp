@@ -1804,7 +1804,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                   };
 
                   const selectableMembers = (allMembers || [])
-                    .filter(m => (m.service || '').trim().toLowerCase() !== 'pointeur')
+                    .filter(m => {
+                      const svc = (m.service || '').trim().toLowerCase();
+                      return svc !== 'logistique' && svc !== 'pointeur';
+                    })
                     .sort((a, b) => {
                       const nameA = getFirstName(a);
                       const nameB = getFirstName(b);
@@ -1974,7 +1977,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                   };
 
                   const selectableMembers = (allMembers || [])
-                    .filter(m => (m.service || '').trim().toLowerCase() !== 'pointeur')
+                    .filter(m => {
+                      const svc = (m.service || '').trim().toLowerCase();
+                      return svc !== 'logistique' && svc !== 'pointeur';
+                    })
                     .sort((a, b) => {
                       const nameA = getFirstName(a);
                       const nameB = getFirstName(b);

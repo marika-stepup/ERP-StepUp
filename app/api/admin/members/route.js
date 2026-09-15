@@ -12,15 +12,16 @@ export async function GET(req) {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Data Minimization (GDPR Art. 5.1.c): The Pointeur role only manages clock-ins and does not need member balances
+    // Data Minimization (GDPR Art. 5.1.c): The Logistique role only manages clock-ins and does not need member balances
     if (auth.user.role === 'employee') {
       const { data: memberProfile } = await supabase
         .from('leave_balances')
         .select('service')
         .eq('employee_id', auth.user.id)
         .single();
-      if (memberProfile?.service === 'Pointeur') {
-        return NextResponse.json({ error: 'Accès restreint pour le profil Pointeur.' }, { status: 403 });
+      const serviceName = (memberProfile?.service || '').toLowerCase().trim();
+      if (serviceName === 'logistique' || serviceName === 'pointeur') {
+        return NextResponse.json({ error: 'Accès restreint pour le profil Logistique.' }, { status: 403 });
       }
     }
 

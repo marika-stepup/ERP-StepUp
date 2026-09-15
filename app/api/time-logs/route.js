@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../lib/supabaseAuth';
 
 export async function GET(req) {
-  // 1. Authenticate user as 'hr', 'manager', 'director' or 'employee' with 'Pointeur' service
+  // 1. Authenticate user as 'hr', 'manager', 'director' or 'employee' with 'Logistique' service
   const auth = await verifyRole(req, ['hr', 'manager', 'director', 'employee']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
@@ -15,8 +15,9 @@ export async function GET(req) {
       .select('service')
       .eq('employee_id', auth.user.id)
       .single();
-    if (!memberProfile || memberProfile.service !== 'Pointeur') {
-      return NextResponse.json({ error: 'Accès interdit. Service Pointeur requis.' }, { status: 403 });
+    const serviceName = (memberProfile?.service || '').toLowerCase().trim();
+    if (!memberProfile || (serviceName !== 'logistique' && serviceName !== 'pointeur')) {
+      return NextResponse.json({ error: 'Accès interdit. Service Logistique requis.' }, { status: 403 });
     }
   }
 

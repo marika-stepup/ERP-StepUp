@@ -11,7 +11,7 @@ export async function GET(req) {
   const supabase = getSupabaseAdmin();
   const isPrivileged = ['hr', 'manager', 'director'].includes(auth.user.role);
 
-  // Check if caller is Pointeur (Pointers have no legitimate purpose to access full leave history)
+  // Check if caller is Logistique (Logistics role has no legitimate purpose to access full leave history)
   if (auth.user.role === 'employee') {
     const { data: userProfile } = await supabase
       .from('leave_balances')
@@ -19,8 +19,9 @@ export async function GET(req) {
       .eq('employee_id', auth.user.id)
       .maybeSingle();
 
-    if (userProfile?.service === 'Pointeur') {
-      return NextResponse.json({ error: 'Accès interdit pour le service Pointeur (principe de minimisation RGPD).' }, { status: 403 });
+    const serviceName = (userProfile?.service || '').toLowerCase().trim();
+    if (serviceName === 'logistique' || serviceName === 'pointeur') {
+      return NextResponse.json({ error: 'Accès interdit pour le service Logistique (principe de minimisation RGPD).' }, { status: 403 });
     }
   }
 

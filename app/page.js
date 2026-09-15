@@ -458,7 +458,7 @@ export default function Page() {
     'Marketing de croissance',
     'Community management',
     'Commercial',
-    'Pointeur'
+    'Logistique'
   ];
 
   const uniqueServices = ['Tous', ...new Set([
@@ -513,7 +513,7 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    if (balance && balance.service === 'Pointeur') {
+    if (balance && (balance.service === 'Logistique' || balance.service === 'Pointeur')) {
       setActiveTab('pointage');
     }
   }, [balance]);
@@ -636,7 +636,7 @@ export default function Page() {
       // Calculate total business days of the request using current calculation rules
       let totalDays = 0;
       try {
-        totalDays = calculateBusinessDays(req.start_date, req.end_date);
+        totalDays = calculateBusinessDays(req.start_date, req.end_date, req.leave_type);
       } catch (e) { }
 
       if (totalDays > 0) {
@@ -654,7 +654,7 @@ export default function Page() {
             const overlapStart = req.start_date > nextDayStr ? req.start_date : nextDayStr;
             let afterDays = 0;
             try {
-              afterDays = calculateBusinessDays(overlapStart, req.end_date);
+              afterDays = calculateBusinessDays(overlapStart, req.end_date, req.leave_type);
             } catch (e) { }
 
             const fraction = afterDays / totalDays;
@@ -671,7 +671,7 @@ export default function Page() {
             const overlapEnd = req.end_date < targetEndStr ? req.end_date : targetEndStr;
             let beforeDays = 0;
             try {
-              beforeDays = calculateBusinessDays(req.start_date, overlapEnd);
+              beforeDays = calculateBusinessDays(req.start_date, overlapEnd, req.leave_type);
             } catch (e) { }
 
             const fraction = beforeDays / totalDays;
@@ -726,8 +726,8 @@ export default function Page() {
         currentService = balanceData.service;
       }
 
-      // Skip heavy lists loading for the timekeeper (Pointeur) role
-      if (currentService !== 'Pointeur') {
+      // Skip heavy lists loading for the logistics / timekeeper (Logistique) role
+      if (currentService !== 'Logistique' && currentService !== 'Pointeur') {
         // 2b. Fetch personal requests
         const myRequestsRes = await fetch('/api/leaves/my-requests', {
           headers: { Authorization: `Bearer ${token}` }
@@ -808,7 +808,7 @@ export default function Page() {
         'Marketing de croissance',
         'Community management',
         'Commercial',
-        'Pointeur'
+        'Logistique'
       ];
 
       const defaultSorted = [...allMembers].sort((a, b) => {
@@ -1839,7 +1839,7 @@ export default function Page() {
         <div className="nav-tabs">
           {profileLoaded ? (
             <>
-              {balance?.service !== 'Pointeur' && (
+              {balance?.service !== 'Logistique' && balance?.service !== 'Pointeur' && (
                 <>
                   <button
                     className={`tab-button ${activeTab === 'mySpace' ? 'active' : ''}`}
@@ -1877,9 +1877,9 @@ export default function Page() {
                   )}
                 </>
               )}
-              {(userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Pointeur') && (
+              {(userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Logistique' || balance?.service === 'Pointeur') && (
                 <>
-                  {balance?.service !== 'Pointeur' && (
+                  {balance?.service !== 'Logistique' && balance?.service !== 'Pointeur' && (
                     <button
                       className={`tab-button ${activeTab === 'adminRH' ? 'active' : ''}`}
                       onClick={() => setActiveTab('adminRH')}
@@ -1904,7 +1904,7 @@ export default function Page() {
         {/* ==================================================== */}
         {/* 1. TAB CONTENT: MON ESPACE                          */}
         {/* ==================================================== */}
-        {profileLoaded && activeTab === 'mySpace' && balance?.service !== 'Pointeur' && (
+        {profileLoaded && activeTab === 'mySpace' && balance?.service !== 'Logistique' && balance?.service !== 'Pointeur' && (
           <div className="split-layout">
             {/* Sidebar with Balance & Request Form */}
             <div className="sidebar">
@@ -2119,7 +2119,7 @@ export default function Page() {
         {/* ==================================================== */}
         {/* 2. TAB CONTENT: GLOBAL DASHBOARD                     */}
         {/* ==================================================== */}
-        {profileLoaded && activeTab === 'globalDashboard' && balance?.service !== 'Pointeur' && (
+        {profileLoaded && activeTab === 'globalDashboard' && balance?.service !== 'Logistique' && balance?.service !== 'Pointeur' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {/* KPIs grids */}
             {(userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
@@ -2574,7 +2574,7 @@ export default function Page() {
         {/* ==================================================== */}
         {/* 2.5. TAB CONTENT: STATISTIQUES RH                    */}
         {/* ==================================================== */}
-        {profileLoaded && activeTab === 'statistiques' && balance?.service !== 'Pointeur' && (
+        {profileLoaded && activeTab === 'statistiques' && balance?.service !== 'Logistique' && balance?.service !== 'Pointeur' && (
           <StatistiquesRH
             user={user}
             token={token}
@@ -2587,7 +2587,7 @@ export default function Page() {
         {/* ==================================================== */}
         {/* 3. TAB CONTENT: ADMINISTRATION RH                    */}
         {/* ==================================================== */}
-        {profileLoaded && activeTab === 'adminRH' && balance?.service !== 'Pointeur' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
+        {profileLoaded && activeTab === 'adminRH' && balance?.service !== 'Logistique' && balance?.service !== 'Pointeur' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
             {/* Validation Panel */}
@@ -2828,7 +2828,7 @@ export default function Page() {
                         <option value="Marketing de croissance">Marketing de croissance</option>
                         <option value="Community management">Community management</option>
                         <option value="Commercial">Commercial</option>
-                        <option value="Pointeur">Pointeur</option>
+                        <option value="Logistique">Logistique</option>
                       </select>
                     </div>
 
@@ -3425,11 +3425,11 @@ export default function Page() {
         {/* ==================================================== */}
         {/* 3.5. TAB CONTENT: POINTAGE                           */}
         {/* ==================================================== */}
-        {profileLoaded && activeTab === 'pointage' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Pointeur') && (
+        {profileLoaded && activeTab === 'pointage' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Logistique' || balance?.service === 'Pointeur') && (
           <div className="pointage-layout" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-            {/* Pointeur Express Mobile Banner & PWA Quick Install */}
-            {balance?.service === 'Pointeur' && (
+            {/* Logistique Express Mobile Banner & PWA Quick Install */}
+            {(balance?.service === 'Logistique' || balance?.service === 'Pointeur') && (
               <div style={{
                 background: 'linear-gradient(135deg, rgba(255, 122, 0, 0.08) 0%, rgba(255, 122, 0, 0.02) 100%)',
                 border: '1px solid var(--warning-border)',
@@ -3457,7 +3457,7 @@ export default function Page() {
                   </div>
                   <div>
                     <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
-                      Espace Pointeur Express (Mobile & Web)
+                      Espace Logistique Express (Mobile & Web)
                     </h3>
                     <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                       🔒 Interface allégée • Strict minimum requis • Conforme RGPD & CNIL (Art. 5.1.c)
@@ -4134,7 +4134,7 @@ export default function Page() {
                   <option value="Marketing de croissance">Marketing de croissance</option>
                   <option value="Community management">Community management</option>
                   <option value="Commercial">Commercial</option>
-                  <option value="Pointeur">Pointeur</option>
+                  <option value="Logistique">Logistique</option>
                 </select>
               </div>
 
@@ -4512,7 +4512,7 @@ export default function Page() {
                   Seules les informations strictement nécessaires à la finalité poursuivie sont collectées et transmises :
                 </p>
                 <ul style={{ margin: '0.35rem 0 0 0', paddingLeft: '1.25rem', color: 'var(--text-secondary)' }}>
-                  <li><strong>Service Pointeur :</strong> Interface dédiée et allégée. Ne reçoit que le prénom, le service et le pointage du jour (zéro accès aux soldes de congés, historiques personnels, documents médicaux ou notes internes).</li>
+                  <li><strong>Service Logistique :</strong> Interface dédiée et allégée. Ne reçoit que le prénom, le service et le pointage du jour (zéro accès aux soldes de congés, historiques personnels, documents médicaux ou notes internes).</li>
                   <li><strong>Protection de la vie privée :</strong> Les commentaires RH internes sont strictement masqués pour les collègues non habilités.</li>
                   <li><strong>Sécurité des échanges :</strong> En-têtes HTTP sécurisés (HSTS, Anti-Clickjacking SAMEORIGIN, protection XSS, chiffrement TLS).</li>
                 </ul>
