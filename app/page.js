@@ -1853,12 +1853,14 @@ export default function Page() {
                   >
                     Tableau de bord global
                   </button>
-                  <button
-                    className={`tab-button ${activeTab === 'statistiques' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('statistiques')}
-                  >
-                    Statistiques
-                  </button>
+                  {(userRole === 'hr' || userRole === 'admin') && (
+                    <button
+                      className={`tab-button ${activeTab === 'statistiques' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('statistiques')}
+                    >
+                      Statistiques
+                    </button>
+                  )}
                   {(balance?.service === 'Direction' || balance?.service === 'Directeur') && (
                     <>
                       <button
@@ -2577,7 +2579,7 @@ export default function Page() {
         {/* ==================================================== */}
         {/* 2.5. TAB CONTENT: STATISTIQUES RH                    */}
         {/* ==================================================== */}
-        {profileLoaded && activeTab === 'statistiques' && balance?.service !== 'Logistique' && balance?.service !== 'Pointeur' && (
+        {profileLoaded && activeTab === 'statistiques' && balance?.service !== 'Logistique' && balance?.service !== 'Pointeur' && (userRole === 'hr' || userRole === 'admin') && (
           <StatistiquesRH
             user={user}
             token={token}

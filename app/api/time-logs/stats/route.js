@@ -10,8 +10,8 @@ const getLocalTodayStr = () => {
 };
 
 export async function GET(req) {
-  // 1. Authenticate user as 'hr', 'manager' or 'director'
-  const auth = await verifyRole(req, ['hr', 'manager', 'director', 'employee']);
+  // 1. Authenticate user as 'hr' or 'admin' (Administrateur)
+  const auth = await verifyRole(req, ['hr', 'admin']);
   if (auth.error) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
