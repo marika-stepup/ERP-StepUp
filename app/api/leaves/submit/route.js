@@ -176,40 +176,46 @@ export async function POST(req) {
       console.log(`[SubmitRoute] 📧 Début de l'envoi des notifications pour la demande ${requestId} (${fullName}, ${leaveType})`);
       console.log(`[SubmitRoute] Manager: "${managerName}" -> Email: ${managerEmail || 'Non trouvé (envoi direct aux RH)'}`);
 
+      const emailPromises = [];
+
       // A. Notification au manager ou aux RH
       if (managerEmail) {
-        const resMgr = await sendNewLeaveNotificationToManager({
-          managerEmail,
-          managerName,
-          employeeName: fullName,
-          employeeService: balance.service,
-          leaveType,
-          startDate: start_date,
-          endDate: end_date,
-          businessDays,
-          createdDate: nowStr,
-          requestId
-        });
-        console.log(`[SubmitRoute] Résultat notification manager (${managerEmail}):`, resMgr);
+        emailPromises.push(
+          sendNewLeaveNotificationToManager({
+            managerEmail,
+            managerName,
+            employeeName: fullName,
+            employeeService: balance.service,
+            leaveType,
+            startDate: start_date,
+            endDate: end_date,
+            businessDays,
+            createdDate: nowStr,
+            requestId
+          }).then(res => console.log(`[SubmitRoute] ✅ Notification manager (${managerEmail}):`, res))
+            .catch(err => console.error(`[SubmitRoute] ❌ Notification manager (${managerEmail}) échouée:`, err))
+        );
       } else {
         // Envoi à tous les RH/Directeurs si aucun manager spécifique
         const hrUsers = (allMembers || []).filter(m => ['hr', 'director'].includes(m.role));
         console.log(`[SubmitRoute] Envoi aux profils RH/Directeurs (${hrUsers.length} destinataires potentiels)...`);
         for (const hr of hrUsers) {
           if (hr.employee_email) {
-            const resHr = await sendNewLeaveNotificationToManager({
-              managerEmail: hr.employee_email,
-              managerName: `${hr.employee_first_name || ''} ${hr.employee_name || ''}`.trim() || 'Responsable RH',
-              employeeName: fullName,
-              employeeService: balance.service,
-              leaveType,
-              startDate: start_date,
-              endDate: end_date,
-              businessDays,
-              createdDate: nowStr,
-              requestId
-            });
-            console.log(`[SubmitRoute] Résultat notification RH (${hr.employee_email}):`, resHr);
+            emailPromises.push(
+              sendNewLeaveNotificationToManager({
+                managerEmail: hr.employee_email,
+                managerName: `${hr.employee_first_name || ''} ${hr.employee_name || ''}`.trim() || 'Responsable RH',
+                employeeName: fullName,
+                employeeService: balance.service,
+                leaveType,
+                startDate: start_date,
+                endDate: end_date,
+                businessDays,
+                createdDate: nowStr,
+                requestId
+              }).then(res => console.log(`[SubmitRoute] ✅ Notification RH (${hr.employee_email}):`, res))
+                .catch(err => console.error(`[SubmitRoute] ❌ Notification RH (${hr.employee_email}) échouée:`, err))
+            );
           }
         }
       }
@@ -217,21 +223,25 @@ export async function POST(req) {
       // B. Confirmation par email à l'employé demandeur
       const employeeEmail = balance.employee_email || employee.email;
       if (employeeEmail) {
-        const resEmp = await sendLeaveSubmissionConfirmationToEmployee({
-          employeeEmail,
-          employeeName: fullName,
-          leaveType,
-          startDate: start_date,
-          endDate: end_date,
-          businessDays,
-          managerName: managerName || 'Responsable RH'
-        });
-        console.log(`[SubmitRoute] Résultat confirmation employé (${employeeEmail}):`, resEmp);
+        emailPromises.push(
+          sendLeaveSubmissionConfirmationToEmployee({
+            employeeEmail,
+            employeeName: fullName,
+            leaveType,
+            startDate: start_date,
+            endDate: end_date,
+            businessDays,
+            managerName: managerName || 'Responsable RH'
+          }).then(res => console.log(`[SubmitRoute] ✅ Confirmation employé (${employeeEmail}):`, res))
+            .catch(err => console.error(`[SubmitRoute] ❌ Confirmation employé (${employeeEmail}) échouée:`, err))
+        );
       } else {
         console.warn(`[SubmitRoute] Aucun email trouvé pour l'employé ${fullName}`);
       }
+
+      await Promise.allSettled(emailPromises);
     } catch (emailErr) {
-      console.error('[SubmitRoute] Erreur lors de l\'envoi des notifications par email :', emailErr);
+      console.error('[SubmitRoute] Erreur globale lors de l\'envoi des notifications par email :', emailErr);
       // Ne pas bloquer la soumission si l'envoi d'email échoue
     }
 
