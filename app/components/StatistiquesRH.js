@@ -22,6 +22,7 @@ import {
   Sparkles,
   PieChart,
   UserCheck,
+  UserX,
   Building2,
   ArrowRight
 } from 'lucide-react';
@@ -45,6 +46,7 @@ export default function StatistiquesRH({
   user,
   token,
   allMembers = [],
+  allRequests = [],
   pendingRequests = [],
   uniqueServices = ['Tous']
 }) {
@@ -166,6 +168,18 @@ export default function StatistiquesRH({
       .reduce((sum, m) => sum + parseFloat(m.remaining_perm || 0), 0)
       .toFixed(1);
   }, [allMembers]);
+
+  // Salariés absents aujourd'hui (congés approuvés couvrant la date courante)
+  const todayAbsentCount = useMemo(() => {
+    if (!allRequests || allRequests.length === 0) return 0;
+    const absentees = new Set();
+    allRequests.forEach(req => {
+      if (req.status === 'Approuvé' && todayStr >= req.start_date && todayStr <= req.end_date) {
+        absentees.add(req.employee_id);
+      }
+    });
+    return absentees.size;
+  }, [allRequests, todayStr]);
 
   // Handle Sort
   const handleSort = (field) => {
@@ -459,6 +473,20 @@ export default function StatistiquesRH({
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
               Permissions cumulées
+            </span>
+          </div>
+
+          {/* Salariés Absents ce jour */}
+          <div className="kpi-card" style={{ borderLeft: '4px solid #8b5cf6' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <span className="kpi-lbl">Salariés Absents ce jour</span>
+              <UserX size={20} style={{ color: '#8b5cf6' }} />
+            </div>
+            <span className="kpi-val" style={{ color: '#8b5cf6' }}>
+              {todayAbsentCount}
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              En congé / absence aujourd'hui
             </span>
           </div>
 

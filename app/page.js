@@ -2123,32 +2123,6 @@ export default function Page() {
         {/* ==================================================== */}
         {profileLoaded && activeTab === 'globalDashboard' && balance?.service !== 'Logistique' && balance?.service !== 'Pointeur' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* KPIs grids */}
-            {(userRole === 'hr' || userRole === 'manager' || userRole === 'director') && (
-              <div className="kpi-grid">
-                <div className="kpi-card">
-                  <span className="kpi-val">{allMembers.length || 2}</span>
-                  <span className="kpi-lbl">Total Collaborateurs</span>
-                </div>
-                <div className="kpi-card">
-                  <span className="kpi-val">
-                    {allMembers.reduce((sum, m) => sum + parseFloat(m.remaining_balance || 0), 0).toFixed(1)}j
-                  </span>
-                  <span className="kpi-lbl">Soldes Congés payés cumulés</span>
-                </div>
-                <div className="kpi-card">
-                  <span className="kpi-val">0</span>
-                  <span className="kpi-lbl">Salariés Absents ce jour</span>
-                </div>
-                <div className="kpi-card">
-                  <span className="kpi-val">{pendingRequests.length}</span>
-                  <span className="kpi-lbl">Demandes en attente</span>
-                </div>
-              </div>
-            )}
-
-
-
             {/* Calendrier des départs & Superpositions en format Gantt */}
             <div className="panel">
               <h2 className="panel-title">Calendrier des départs et superpositions</h2>
@@ -2584,6 +2558,7 @@ export default function Page() {
             user={user}
             token={token}
             allMembers={allMembers}
+            allRequests={allRequests}
             pendingRequests={pendingRequests}
             uniqueServices={uniqueServices}
           />
