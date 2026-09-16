@@ -13,7 +13,8 @@ import {
   BarChart3,
   Code,
   Repeat,
-  UserCheck
+  UserCheck,
+  Building2
 } from 'lucide-react';
 import { supabaseClient } from '../../lib/supabaseClient';
 
@@ -641,8 +642,17 @@ export default function EspaceProduction({ user, token, clients, loading, refres
   const activeInterruptionClientObj = activeInterruptionClientId ? clients.find(c => c.id === activeInterruptionClientId) : null;
   const activeInterruptionClientName = activeInterruptionClientObj ? activeInterruptionClientObj.name : '';
 
-  // Filtrer les tâches spécifiquement assignées à l'utilisateur courant pour le client actif
-  const assignedTasks = (selectedClient?.tasks || []).filter(task => {
+  // Filtrer TOUTES les tâches spécifiquement assignées à l'utilisateur courant (tous clients confondus)
+  const allClientsTasks = (clients || []).flatMap(client =>
+    (client.tasks || []).map(task => ({
+      ...task,
+      client_id: task.client_id || client.id,
+      client_name: client.name || 'Client',
+      client_code: client.code || ''
+    }))
+  );
+
+  const assignedTasks = allClientsTasks.filter(task => {
     if (task.assigned_to || task.assigned_to_name) {
       const isAssignedToMe =
         task.assigned_to === user?.id ||
@@ -651,7 +661,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       return isAssignedToMe;
     }
 
-    // Si la tâche n'a pas de assigned_to spécifié, vérifier si c'est une tâche standard de livrable
+    // Si la tâche n'a pas de assigned_to spécifié, vérifier si c'est une tâche spécifique / non-standard
     const isStandardDeliverable = DELIVERABLE_CARDS.some(c => isStandardDeliverableTask(task, c));
 
     return !isStandardDeliverable;
@@ -996,7 +1006,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                 )}
               </div>
               <p className="panel-subtitle" style={{ margin: '0 0 1.1rem 0', fontSize: '0.8rem' }}>
-                Tâches spécifiques qui vous sont assignées pour ce client.
+                Toutes les tâches qui vous sont assignées (tous clients confondus).
               </p>
 
               {assignedTasks.length === 0 ? (
@@ -1010,7 +1020,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                   fontSize: '0.85rem'
                 }}>
                   <CheckCircle size={22} style={{ color: '#94a3b8', margin: '0 auto 0.4rem auto', display: 'block', opacity: 0.7 }} />
-                  <span>Aucune tâche assignée pour ce client.</span>
+                  <span>Aucune tâche assignée actuellement.</span>
                 </div>
               ) : (
                 <div className="assigned-tasks-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1044,7 +1054,25 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.3rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
+                              {/* Indicateur Client */}
+                              <span style={{
+                                fontSize: '0.7rem',
+                                fontWeight: '800',
+                                color: '#1e293b',
+                                background: '#f1f5f9',
+                                border: '1px solid #cbd5e1',
+                                padding: '0.12rem 0.5rem',
+                                borderRadius: '4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                letterSpacing: '0.2px'
+                              }}>
+                                <Building2 size={12} style={{ color: 'var(--brand-orange)' }} />
+                                {task.client_name}{task.client_code ? ` (${task.client_code})` : ''}
+                              </span>
+
                               <span style={{
                                 fontSize: '0.68rem',
                                 fontWeight: '700',
@@ -1056,6 +1084,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                               }}>
                                 {catTitle}
                               </span>
+
                               <h4 style={{
                                 fontSize: '0.95rem',
                                 fontWeight: '800',

@@ -41,7 +41,7 @@ async function getGroupedPendingRecipients() {
     const enrichedReq = {
       ...reqItem,
       service: service || 'Équipe',
-      employee_name: employeeProfile ? `${employeeProfile.employee_first_name || ''} ${employeeProfile.employee_name || ''}`.trim() || reqItem.employee_name : reqItem.employee_name
+      employee_name: employeeProfile ? (employeeProfile.employee_first_name || reqItem.employee_name) : reqItem.employee_name
     };
 
     const managerEmail = findManagerEmail(managerName, members || []);
@@ -61,7 +61,7 @@ async function getGroupedPendingRecipients() {
           if (!groupedByRecipient.has(hr.employee_email)) {
             groupedByRecipient.set(hr.employee_email, {
               recipientEmail: hr.employee_email,
-              recipientName: `${hr.employee_first_name || ''} ${hr.employee_name || ''}`.trim() || 'Ressources Humaines',
+              recipientName: hr.employee_first_name || 'Ressources Humaines',
               requests: []
             });
           }

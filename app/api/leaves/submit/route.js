@@ -173,7 +173,7 @@ export async function POST(req) {
       const managerName = balance.manager_name;
       const managerEmail = findManagerEmail(managerName, allMembers || []);
 
-      console.log(`[SubmitRoute] 📧 Début de l'envoi des notifications pour la demande ${requestId} (${fullName}, ${leaveType})`);
+      console.log(`[SubmitRoute] 📧 Début de l'envoi des notifications pour la demande ${requestId} (${fullName}, ${leave_type})`);
       console.log(`[SubmitRoute] Manager: "${managerName}" -> Email: ${managerEmail || 'Non trouvé (envoi direct aux RH)'}`);
 
       const emailPromises = [];
@@ -186,7 +186,7 @@ export async function POST(req) {
             managerName,
             employeeName: fullName,
             employeeService: balance.service,
-            leaveType,
+            leaveType: leave_type,
             startDate: start_date,
             endDate: end_date,
             businessDays,
@@ -207,7 +207,7 @@ export async function POST(req) {
                 managerName: `${hr.employee_first_name || ''} ${hr.employee_name || ''}`.trim() || 'Responsable RH',
                 employeeName: fullName,
                 employeeService: balance.service,
-                leaveType,
+                leaveType: leave_type,
                 startDate: start_date,
                 endDate: end_date,
                 businessDays,
@@ -227,7 +227,7 @@ export async function POST(req) {
           sendLeaveSubmissionConfirmationToEmployee({
             employeeEmail,
             employeeName: fullName,
-            leaveType,
+            leaveType: leave_type,
             startDate: start_date,
             endDate: end_date,
             businessDays,
