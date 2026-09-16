@@ -59,7 +59,7 @@ export async function POST(req) {
       finalClockOut = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
 
-    // 4. Check if early departure
+    // 4. Check if early departure and handle active break
     let newStatus = log.status || 'Présent';
     if (log.scheduled_clock_out) {
       const [outH, outM] = finalClockOut.split(':').map(Number);
@@ -71,12 +71,45 @@ export async function POST(req) {
       }
     }
 
+    // Auto-close active break if employee was currently on break
+    let updatedBreaks = Array.isArray(log.breaks) ? [...log.breaks] : [];
+    let updatedBreakDuration = log.break_duration;
+    let updatedBreakEnd = log.break_end;
+
+    if (log.is_on_break) {
+      for (let i = updatedBreaks.length - 1; i >= 0; i--) {
+        if (!updatedBreaks[i].end) {
+          updatedBreaks[i].end = finalClockOut;
+          break;
+        }
+      }
+      updatedBreakEnd = finalClockOut;
+
+      // Calculate total break minutes
+      let totalMins = 0;
+      for (const b of updatedBreaks) {
+        if (b.start && b.end) {
+          const [sH, sM] = b.start.split(':').map(Number);
+          const [eH, eM] = b.end.split(':').map(Number);
+          const diff = (eH * 60 + eM) - (sH * 60 + sM);
+          if (diff > 0) totalMins += diff;
+        }
+      }
+      const hrs = Math.floor(totalMins / 60);
+      const mins = totalMins % 60;
+      updatedBreakDuration = `${hrs}h ${mins.toString().padStart(2, '0')}m`;
+    }
+
     // 5. Update pointage row in Supabase
     const { data: updatedData, error: updateErr } = await supabase
       .from('time_logs')
       .update({
         clock_out: finalClockOut,
         status: newStatus,
+        is_on_break: false,
+        break_end: updatedBreakEnd,
+        break_duration: updatedBreakDuration,
+        breaks: updatedBreaks,
         updated_at: new Date().toISOString()
       })
       .eq('id', log.id)

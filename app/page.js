@@ -33,7 +33,9 @@ import {
   Lock,
   Calendar,
   Check,
-  X
+  X,
+  Coffee,
+  Play
 } from 'lucide-react';
 
 const formatDateStr = (str) => {
@@ -1393,6 +1395,114 @@ export default function Page() {
       }
     } catch (err) {
       console.error('Clock-out failed:', err);
+      setPointageEmployees(originalEmployees);
+    }
+  };
+
+  const handleTogglePause = async (employeeId) => {
+    if (!token) return;
+
+    const empIndex = pointageEmployees.findIndex(emp => emp.employee_id === employeeId);
+    if (empIndex === -1) return;
+
+    const emp = pointageEmployees[empIndex];
+    if (!emp.time_log || !emp.time_log.clock_in) {
+      alert("Ce collaborateur n'a pas encore pointé son arrivée.");
+      return;
+    }
+
+    // Compute current local time in Madagascar (UTC+3)
+    const d = new Date();
+    const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+    const localTime = new Date(utc + (3600000 * 3));
+    const nowTimeStr = `${String(localTime.getHours()).padStart(2, '0')}:${String(localTime.getMinutes()).padStart(2, '0')}`;
+
+    const originalEmployees = [...pointageEmployees];
+    const isCurrentlyOnBreak = Boolean(emp.time_log?.is_on_break);
+    const newIsOnBreak = !isCurrentlyOnBreak;
+
+    // Optimistic update
+    const updatedEmployees = [...pointageEmployees];
+    let existingBreaks = Array.isArray(emp.time_log?.breaks) ? [...emp.time_log.breaks] : [];
+    let updatedBreaks = [...existingBreaks];
+    let newBreakStart = emp.time_log?.break_start;
+    let newBreakEnd = emp.time_log?.break_end;
+    let newBreakDuration = emp.time_log?.break_duration || '0h 00m';
+
+    if (newIsOnBreak) {
+      // Starting pause
+      updatedBreaks.push({ start: nowTimeStr, end: null });
+      newBreakStart = nowTimeStr;
+    } else {
+      // Returning from pause
+      newBreakEnd = nowTimeStr;
+      let closed = false;
+      for (let i = updatedBreaks.length - 1; i >= 0; i--) {
+        if (!updatedBreaks[i].end) {
+          updatedBreaks[i].end = nowTimeStr;
+          closed = true;
+          break;
+        }
+      }
+      if (!closed) {
+        updatedBreaks.push({ start: newBreakStart || nowTimeStr, end: nowTimeStr });
+      }
+
+      // Calculate total break minutes
+      let totalMins = 0;
+      for (const b of updatedBreaks) {
+        if (b.start && b.end) {
+          const [sH, sM] = b.start.split(':').map(Number);
+          const [eH, eM] = b.end.split(':').map(Number);
+          const diff = (eH * 60 + eM) - (sH * 60 + sM);
+          if (diff > 0) totalMins += diff;
+        }
+      }
+      const hrs = Math.floor(totalMins / 60);
+      const mins = totalMins % 60;
+      newBreakDuration = `${hrs}h ${mins.toString().padStart(2, '0')}m`;
+    }
+
+    updatedEmployees[empIndex] = {
+      ...emp,
+      time_log: {
+        ...(emp.time_log || {}),
+        is_on_break: newIsOnBreak,
+        break_start: newBreakStart,
+        break_end: newBreakEnd,
+        break_duration: newBreakDuration,
+        breaks: updatedBreaks
+      }
+    };
+    setPointageEmployees(updatedEmployees);
+
+    try {
+      const res = await fetch('/api/time-logs/pause', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          employee_id: employeeId,
+          date: pointageDate,
+          action: newIsOnBreak ? 'start' : 'end',
+          time: nowTimeStr
+        })
+      });
+
+      if (!res.ok) {
+        setPointageEmployees(originalEmployees);
+        const errData = await res.json();
+        alert(errData.error || "Erreur lors de l'enregistrement de la pause.");
+      } else {
+        const data = await res.json();
+        if (data.log) {
+          setPointageEmployees(prev => prev.map(item => item.employee_id === employeeId ? { ...item, time_log: data.log } : item));
+        }
+      }
+    } catch (err) {
+      console.error('Pause toggle failed:', err);
       setPointageEmployees(originalEmployees);
     }
   };
@@ -3847,42 +3957,111 @@ export default function Page() {
                     return (
                       <>
                         {sorted.slice(0, pointagePresentLimit).map(emp => (
-                          <div key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-white)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border-light)' }}>
+                          <div key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-white)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: emp.time_log?.is_on_break ? '1px solid #fde68a' : '1px solid var(--border-light)', position: 'relative' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                               <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{emp.employee_first_name}</span>
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Service : {emp.service}</span>
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
                                 <span style={{ fontSize: '0.8rem', color: 'var(--success-color)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <LogIn size={12} /> Arrivée : {emp.time_log.clock_in.substring(0, 5)}
+                                  <LogIn size={12} /> Arrivée : {emp.time_log?.clock_in ? emp.time_log.clock_in.substring(0, 5) : '-'}
                                 </span>
-                                <span className={`status-badge ${emp.time_log.status === 'En retard' ? 'status-rejected' : 'status-approved'}`} style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
-                                  {emp.time_log.status}
+                                <span className={`status-badge ${emp.time_log?.status === 'En retard' ? 'status-rejected' : 'status-approved'}`} style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
+                                  {emp.time_log?.status}
                                 </span>
+                                {emp.time_log?.is_on_break && (
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    padding: '0.12rem 0.45rem',
+                                    borderRadius: '6px',
+                                    background: '#fef3c7',
+                                    color: '#b45309',
+                                    border: '1px solid #fde68a'
+                                  }}>
+                                    <Coffee size={11} /> En pause ({emp.time_log?.break_start ? emp.time_log.break_start.substring(0, 5) : '...'})
+                                  </span>
+                                )}
+                                {!emp.time_log?.is_on_break && emp.time_log?.break_duration && emp.time_log.break_duration !== '0h 00m' && (
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    fontSize: '0.72rem',
+                                    color: 'var(--text-secondary)',
+                                    fontWeight: 500
+                                  }}>
+                                    <Coffee size={11} /> Pause : {emp.time_log.break_duration}
+                                  </span>
+                                )}
                               </div>
                             </div>
 
-                            <button
-                              className="btn-accent"
-                              onClick={() => handleClockOut(emp.employee_id)}
-                              disabled={clockingEmployeeId === emp.employee_id}
-                              style={{
-                                padding: '0.4rem 0.8rem',
-                                fontSize: '0.85rem',
-                                background: 'var(--brand-orange)',
-                                borderColor: 'var(--brand-orange-hover)',
-                                minWidth: '90px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem'
-                              }}
-                            >
-                              {clockingEmployeeId === emp.employee_id ? 'Envoi...' : (
-                                <>
-                                  <LogOut size={14} /> Sortie
-                                </>
-                              )}
-                            </button>
+                            {/* Action Buttons Column: Pause above Sortie */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '92px' }}>
+                              {/* Pause / Retour button (Above Sortie) */}
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePause(emp.employee_id)}
+                                disabled={clockingEmployeeId === emp.employee_id}
+                                style={{
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  color: '#fff',
+                                  background: emp.time_log?.is_on_break ? '#16a34a' : '#f59e0b',
+                                  border: emp.time_log?.is_on_break ? '1px solid #15803d' : '1px solid #d97706',
+                                  borderRadius: '6px',
+                                  cursor: clockingEmployeeId === emp.employee_id ? 'not-allowed' : 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.3rem',
+                                  transition: 'all 0.15s ease',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+                                }}
+                                title={emp.time_log?.is_on_break ? "Enregistrer l'heure de retour au travail" : "Enregistrer l'heure de prise de pause (déjeuner / goûter)"}
+                              >
+                                {clockingEmployeeId === emp.employee_id ? 'Envoi...' : (
+                                  emp.time_log?.is_on_break ? (
+                                    <>
+                                      <Play size={13} fill="#fff" /> Retour
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Coffee size={13} /> Pause
+                                    </>
+                                  )
+                                )}
+                              </button>
+
+                              {/* Sortie button (Below Pause) */}
+                              <button
+                                className="btn-accent"
+                                onClick={() => handleClockOut(emp.employee_id)}
+                                disabled={clockingEmployeeId === emp.employee_id}
+                                style={{
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.8rem',
+                                  background: 'var(--brand-orange)',
+                                  borderColor: 'var(--brand-orange-hover)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.3rem'
+                                }}
+                                title="Pointer la sortie"
+                              >
+                                {clockingEmployeeId === emp.employee_id ? 'Envoi...' : (
+                                  <>
+                                    <LogOut size={13} /> Sortie
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
                         ))}
                         {filtered.length > 0 && (
