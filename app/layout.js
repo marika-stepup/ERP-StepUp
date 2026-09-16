@@ -1,4 +1,5 @@
 import './globals.css';
+import ServiceWorkerManager from './components/ServiceWorkerManager';
 
 export const metadata = {
   title: 'Step Hub - Gestion des Congés',
@@ -17,23 +18,11 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(function(reg) {
-                    console.log('ServiceWorker registration successful');
-                  }, function(err) {
-                    console.log('ServiceWorker registration failed: ', err);
-                  });
-                });
-              }
-            `,
-          }}
-        />
       </head>
-      <body>{children}</body>
+      <body>
+        <ServiceWorkerManager />
+        {children}
+      </body>
     </html>
   );
 }
