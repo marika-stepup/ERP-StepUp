@@ -11,12 +11,19 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { employee_id, name, firstName, email, role, manager_name, initial_balance, initial_perm, service, hire_date, work_schedule } = body;
+    const { employee_id, name, firstName, email, role, manager_name, initial_balance, initial_perm, service, hire_date, work_schedule, password } = body;
 
     // Validation
     if (!employee_id || !name || !firstName || !email) {
       return NextResponse.json(
         { error: 'Champs obligatoires manquants : employee_id, name, firstName, email.' },
+        { status: 400 }
+      );
+    }
+
+    if (password && password.trim().length > 0 && password.trim().length < 6) {
+      return NextResponse.json(
+        { error: 'Le mot de passe doit contenir au moins 6 caractères.' },
         { status: 400 }
       );
     }
@@ -100,16 +107,27 @@ export async function POST(req) {
       throw updateErr;
     }
 
-    // Update role in Supabase Auth user metadata as well
-    const { error: authUpdateErr } = await supabase.auth.admin.updateUserById(employee_id, {
+    // Update Supabase Auth user (email, metadata, and password if provided)
+    const authUpdatePayload = {
+      email: normalizedEmail,
       user_metadata: {
         full_name: `${firstName} ${name}`,
         role: role || 'employee'
       }
-    });
+    };
+
+    if (password && password.trim().length >= 6) {
+      authUpdatePayload.password = password.trim();
+    }
+
+    const { error: authUpdateErr } = await supabase.auth.admin.updateUserById(employee_id, authUpdatePayload);
 
     if (authUpdateErr) {
-      console.warn('[UpdateMember] Failed to update Supabase Auth metadata:', authUpdateErr.message);
+      console.error('[UpdateMember] Failed to update Supabase Auth:', authUpdateErr.message);
+      return NextResponse.json(
+        { error: `Erreur lors de la mise à jour de l'authentification : ${authUpdateErr.message}` },
+        { status: 400 }
+      );
     }
 
     // 6. Sync changes to Google Sheets (awaited for reliability)

@@ -31,7 +31,9 @@ import {
   Mail,
   ShieldCheck,
   Lock,
-  Calendar
+  Calendar,
+  Check,
+  X
 } from 'lucide-react';
 
 const formatDateStr = (str) => {
@@ -174,6 +176,7 @@ export default function Page() {
   const [myRequests, setMyRequests] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [pendingSearchTerm, setPendingSearchTerm] = useState('');
   const [sendingReminders, setSendingReminders] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [reminderRecipients, setReminderRecipients] = useState([]);
@@ -228,6 +231,8 @@ export default function Page() {
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberPassword, setNewMemberPassword] = useState('');
   const [showNewMemberPassword, setShowNewMemberPassword] = useState(false);
+  const [editMemberPassword, setEditMemberPassword] = useState('');
+  const [showEditMemberPassword, setShowEditMemberPassword] = useState(false);
   const [newMemberService, setNewMemberService] = useState('Direction');
   const [newMemberRole, setNewMemberRole] = useState('employee');
   const [newMemberManager, setNewMemberManager] = useState('Aucun');
@@ -1000,6 +1005,8 @@ export default function Page() {
     setNewMemberPerm((m.initial_perm || 5).toString());
     setNewMemberService(m.service || 'Non spécifié');
     setNewMemberHireDate(m.hire_date || '');
+    setEditMemberPassword('');
+    setShowEditMemberPassword(false);
 
     // Parse work schedule
     const schedule = m.work_schedule || {};
@@ -1041,6 +1048,8 @@ export default function Page() {
     setNewMemberPerm('5');
     setNewMemberService('Direction');
     setNewMemberHireDate('');
+    setEditMemberPassword('');
+    setShowEditMemberPassword(false);
 
     // Reset schedules
     setNewMemberDefaultArrival('08:00');
@@ -1173,6 +1182,12 @@ export default function Page() {
     setMemberSuccess(false);
     setMemberLoading(true);
 
+    if (editMemberPassword.trim().length > 0 && editMemberPassword.trim().length < 6) {
+      setMemberError('Le nouveau mot de passe doit contenir au moins 6 caractères.');
+      setMemberLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/admin/update-member', {
         method: 'POST',
@@ -1191,7 +1206,8 @@ export default function Page() {
           initial_perm: parseFloat(newMemberPerm || 0),
           service: newMemberService,
           hire_date: newMemberHireDate,
-          work_schedule: getWorkSchedulePayload()
+          work_schedule: getWorkSchedulePayload(),
+          password: editMemberPassword.trim() || undefined
         })
       });
 
@@ -2572,7 +2588,7 @@ export default function Page() {
 
             {/* Validation Panel */}
             <div className="panel" style={{ borderTop: '4px solid var(--brand-orange)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                     <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 0 }}>
@@ -2597,40 +2613,86 @@ export default function Page() {
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.35rem', marginBottom: 0 }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.25rem', marginBottom: 0 }}>
                     Valider ou refuser les demandes de congé et permission de l'équipe.
                   </p>
                 </div>
-                {pendingRequests.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => openReminderModal()}
-                      disabled={sendingReminders}
-                      className="btn-accent"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.85rem',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '8px',
-                        cursor: sendingReminders ? 'not-allowed' : 'pointer',
-                        fontWeight: 700,
-                        marginTop: 0,
-                        boxShadow: '0 2px 6px rgba(224, 105, 0, 0.25)'
-                      }}
-                      title="Ouvrir l'aperçu et envoyer des rappels groupés aux managers"
-                    >
-                      <Mail size={16} />
-                      <span>{sendingReminders ? 'Envoi en cours...' : 'Envoyer un rappel par email'}</span>
-                    </button>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <ShieldCheck size={13} style={{ color: 'var(--brand-orange)' }} />
-                      <span>1 email groupé par manager • {formatRelativeReminderTime()}</span>
-                    </span>
-                  </div>
-                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  {pendingRequests.length > 2 && (
+                    <div style={{ position: 'relative', width: '210px' }}>
+                      <Search size={13} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                      <input
+                        type="text"
+                        placeholder="Filtrer par nom, type..."
+                        value={pendingSearchTerm}
+                        onChange={(e) => setPendingSearchTerm(e.target.value)}
+                        style={{
+                          paddingLeft: '1.8rem',
+                          paddingRight: pendingSearchTerm ? '1.8rem' : '0.5rem',
+                          height: '32px',
+                          fontSize: '0.78rem',
+                          borderRadius: '6px',
+                          width: '100%',
+                          margin: 0
+                        }}
+                      />
+                      {pendingSearchTerm && (
+                        <button
+                          type="button"
+                          onClick={() => setPendingSearchTerm('')}
+                          style={{
+                            position: 'absolute',
+                            right: '0.35rem',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            padding: '0.2rem',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            boxShadow: 'none',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {pendingRequests.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => openReminderModal()}
+                        disabled={sendingReminders}
+                        className="btn-accent"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          fontSize: '0.8rem',
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '6px',
+                          cursor: sendingReminders ? 'not-allowed' : 'pointer',
+                          fontWeight: 700,
+                          margin: 0,
+                          boxShadow: '0 2px 4px rgba(224, 105, 0, 0.2)'
+                        }}
+                        title="Ouvrir l'aperçu et envoyer des rappels groupés aux managers"
+                      >
+                        <Mail size={14} />
+                        <span>{sendingReminders ? 'Envoi...' : 'Rappel par email'}</span>
+                      </button>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <ShieldCheck size={11} style={{ color: 'var(--brand-orange)' }} />
+                        <span>{formatRelativeReminderTime()}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {hrError && <div className="error-message" style={{ marginBottom: '1rem' }}>{hrError}</div>}
@@ -2641,105 +2703,115 @@ export default function Page() {
                   Aucun dossier validé par le N+1 en attente de traitement RH.
                 </p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {pendingRequests.map((req) => {
-                    const employeeMember = allMembers.find(m => m.employee_id === req.employee_id);
-                    const currentUserMember = allMembers.find(m => m.employee_email?.toLowerCase() === user?.email?.toLowerCase());
-                    const isN1 = employeeMember && currentUserMember && employeeMember.manager_name !== 'Aucun' && employeeMember.manager_name === currentUserMember.employee_first_name;
+                <div className="validation-list-container">
+                  {pendingRequests
+                    .filter(req => {
+                      if (!pendingSearchTerm.trim()) return true;
+                      const term = pendingSearchTerm.trim().toLowerCase();
+                      const emp = allMembers.find(m => m.employee_id === req.employee_id);
+                      const name = `${emp?.employee_first_name || ''} ${emp?.employee_name || req.employee_name || ''}`.toLowerCase();
+                      const type = (req.leave_type || '').toLowerCase();
+                      const manager = (emp?.manager_name || '').toLowerCase();
+                      return name.includes(term) || type.includes(term) || manager.includes(term);
+                    })
+                    .map((req) => {
+                      const employeeMember = allMembers.find(m => m.employee_id === req.employee_id);
+                      const currentUserMember = allMembers.find(m => m.employee_email?.toLowerCase() === user?.email?.toLowerCase());
+                      const isN1 = employeeMember && currentUserMember && employeeMember.manager_name !== 'Aucun' && employeeMember.manager_name === currentUserMember.employee_first_name;
 
-                    // Find manager profile for targeted reminder
-                    const managerMember = employeeMember?.manager_name && employeeMember.manager_name !== 'Aucun'
-                      ? allMembers.find(m => {
-                          const fn = (m.employee_first_name || '').trim().toLowerCase();
-                          const ln = (m.employee_name || '').trim().toLowerCase();
-                          const query = employeeMember.manager_name.trim().toLowerCase();
-                          return query === fn || query === ln || query === `${fn} ${ln}` || query === `${ln} ${fn}`;
-                        })
-                      : null;
+                      // Find manager profile for targeted reminder
+                      const managerMember = employeeMember?.manager_name && employeeMember.manager_name !== 'Aucun'
+                        ? allMembers.find(m => {
+                            const fn = (m.employee_first_name || '').trim().toLowerCase();
+                            const ln = (m.employee_name || '').trim().toLowerCase();
+                            const query = employeeMember.manager_name.trim().toLowerCase();
+                            return query === fn || query === ln || query === `${fn} ${ln}` || query === `${ln} ${fn}`;
+                          })
+                        : null;
 
-                    return (
-                      <div key={req.request_id} className="validation-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                          <div>
-                            <strong style={{ fontSize: '1.1rem' }}>{employeeMember?.employee_first_name || req.employee_name}</strong>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                              <span>Type :</span>
-                              <span className={`leave-type-badge ${getLeaveTypeConfig(req.leave_type).cellClass}`}>
+                      const empFirstName = employeeMember?.employee_first_name || req.employee_name || 'Collaborateur';
+
+                      return (
+                        <div key={req.request_id} className="validation-card-compact">
+                          {/* Colonne 1 : Employé, Type & Durée */}
+                          <div className="info-col">
+                            <div className="emp-header">
+                              <span className="emp-name">{empFirstName}</span>
+                              <span className={`leave-type-badge ${getLeaveTypeConfig(req.leave_type).cellClass}`} style={{ fontSize: '0.72rem', padding: '0.12rem 0.45rem' }}>
                                 {normalizeLeaveType(req.leave_type)}
                               </span>
-                              <span>| Durée : <strong>{formatDuration(req.business_days)}</strong></span>
+                              <span className="duration-pill">
+                                {formatDuration(req.business_days)}
+                              </span>
+                            </div>
+                            <div className="emp-meta">
+                              <span>Soumis le {req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}</span>
                               {employeeMember?.manager_name && employeeMember.manager_name !== 'Aucun' && (
-                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                  | Manager : <strong>{employeeMember.manager_name}</strong>
-                                </span>
+                                <>
+                                  <span>•</span>
+                                  <span>Manager : <strong style={{ color: 'var(--text-primary)' }}>{employeeMember.manager_name}</strong></span>
+                                </>
                               )}
                             </div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
-                              Demande soumise le : <strong>{req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : '-'}</strong>
-                            </div>
                           </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Période de congé :</div>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                              Du {formatDateStr(req.start_date)} au {formatDateStr(req.end_date)}
-                            </div>
-                          </div>
-                        </div>
 
-                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                          <input
-                            type="text"
-                            placeholder="Commentaire de validation..."
-                            style={{ flex: 1, minWidth: '220px' }}
-                            value={hrComments[req.request_id] || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setHrComments(prev => ({ ...prev, [req.request_id]: val }));
-                            }}
-                          />
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          {/* Colonne 2 : Dates / Période */}
+                          <div className="period-col">
+                            <div className="period-text">
+                              <Calendar size={13} style={{ color: 'var(--brand-orange)', flexShrink: 0 }} />
+                              <span>Du {formatDateStr(req.start_date)} au {formatDateStr(req.end_date)}</span>
+                            </div>
+                          </div>
+
+                          {/* Colonne 3 : Commentaire & Actions compactes */}
+                          <div className="actions-col">
+                            <input
+                              type="text"
+                              placeholder="Commentaire..."
+                              className="comment-input"
+                              value={hrComments[req.request_id] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setHrComments(prev => ({ ...prev, [req.request_id]: val }));
+                              }}
+                            />
                             {managerMember?.employee_email && (
                               <button
                                 type="button"
-                                className="btn-secondary"
+                                className="btn-secondary btn-action"
                                 onClick={() => openReminderModal(managerMember.employee_email)}
                                 style={{
-                                  padding: '0.4rem 0.75rem',
-                                  fontSize: '0.8rem',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.35rem',
-                                  borderRadius: '6px',
                                   color: 'var(--brand-orange)',
-                                  borderColor: 'var(--warning-border)'
+                                  borderColor: 'var(--warning-border)',
+                                  padding: '0 0.55rem'
                                 }}
                                 title={`Relancer uniquement ${employeeMember.manager_name} par email`}
                               >
-                                <Mail size={13} /> Relancer N+1
+                                <Mail size={12} /> Relancer N+1
                               </button>
                             )}
                             <button
-                              className="btn-small btn-approve"
+                              className="btn-approve btn-action"
                               disabled={!isN1}
                               onClick={() => handleValidateLeave(req.request_id, 'Approuver')}
+                              title={!isN1 ? "Seul le manager N+1 peut valider cette demande" : "Approuver la demande"}
                             >
-                              Accepter
+                              <Check size={13} /> Accepter
                             </button>
                             <button
-                              className="btn-small btn-reject"
+                              className="btn-reject btn-action"
                               disabled={!isN1}
                               onClick={() => handleValidateLeave(req.request_id, 'Refuser')}
+                              title={!isN1 ? "Seul le manager N+1 peut refuser cette demande" : "Refuser la demande"}
                             >
-                              Refuser
+                              <X size={13} /> Refuser
                             </button>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               )}
-
             </div>
 
             {/* Split creation form & adjustment table */}
@@ -4091,6 +4163,45 @@ export default function Page() {
                   required
                   disabled={memberLoading}
                 />
+              </div>
+
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Lock size={14} style={{ color: 'var(--brand-orange)' }} />
+                  Réinitialiser le mot de passe (optionnel)
+                </label>
+                <div className="password-input-wrapper">
+                  <input
+                    type={showEditMemberPassword ? 'text' : 'password'}
+                    placeholder="Laisser vide pour ne pas modifier (min 6 car.)"
+                    value={editMemberPassword}
+                    onChange={(e) => setEditMemberPassword(e.target.value)}
+                    disabled={memberLoading}
+                    minLength={6}
+                    style={{ paddingRight: '2.75rem' }}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowEditMemberPassword(!showEditMemberPassword)}
+                    disabled={memberLoading}
+                    aria-label={showEditMemberPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  >
+                    {showEditMemberPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.815 7.815 3 3m-3-3-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: '1.25rem', height: '1.25rem' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
+                  Laissez ce champ vide pour conserver le mot de passe actuel du collaborateur.
+                </span>
               </div>
 
               <div className="form-group">
