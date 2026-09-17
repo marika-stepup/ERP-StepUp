@@ -2628,3 +2628,62 @@ body.dark .status-badge.en-cours {
   align-items: center;
   gap: 0.3rem;
 }
+
+/* ==========================================================================
+   DOCUMENT PICTURE-IN-PICTURE (PiP) STYLES
+   ========================================================================== */
+.pip-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.pip-toggle-btn:hover {
+  background: #f1f5f9;
+  color: var(--brand-orange);
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.pip-toggle-btn.active {
+  background: rgba(23, 143, 203, 0.1);
+  color: #0284c7;
+  border-color: rgba(2, 132, 199, 0.3);
+}
+
+.pip-toggle-btn.active:hover {
+  background: rgba(23, 143, 203, 0.18);
+}
+
+.pip-window-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+@keyframes pulse-pip-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.pip-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  display: inline-block;
+  animation: pulse-pip-dot 1.8s infinite ease-in-out;
+}
