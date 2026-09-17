@@ -221,36 +221,37 @@ function ChronoCardView({
     <div
       className={`panel prod-active-card ${timerRunning ? 'running' : ''} ${isPip ? 'pip-window-card' : ''}`}
       style={{
-        padding: isPip ? '1.1rem 1rem' : '1.75rem 1.5rem',
+        padding: isPip ? '0.45rem 0.6rem' : '1.75rem 1.5rem',
         textAlign: 'center',
         background: '#ffffff',
-        borderRadius: isPip ? '12px' : '14px',
+        borderRadius: isPip ? '8px' : '14px',
         border: '1px solid var(--border-light)',
-        boxShadow: isPip ? '0 10px 25px -5px rgba(0,0,0,0.1)' : 'var(--shadow-sm)',
+        boxShadow: isPip ? '0 4px 12px rgba(0,0,0,0.08)' : 'var(--shadow-sm)',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
+        justifyContent: isPip ? 'space-around' : 'space-between',
         height: isPip ? '100%' : 'auto',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}
     >
       {/* CARD HEADER WITH TITLE & PiP TOGGLE */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: timerRunning ? '#0f172a' : activeInterruption ? '#ea580c' : '#64748b', fontWeight: '800', fontSize: '0.88rem', letterSpacing: '0.4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isPip ? '0.2rem' : '0.75rem', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isPip ? '0.3rem' : '0.45rem', color: timerRunning ? '#0f172a' : activeInterruption ? '#ea580c' : '#64748b', fontWeight: '800', fontSize: isPip ? '0.62rem' : '0.88rem', letterSpacing: '0.3px' }}>
           {timerRunning ? (
             <>
-              <span className="pip-live-dot" />
-              <Clock size={16} style={{ color: '#ea580c' }} />
+              <span className="pip-live-dot" style={{ width: isPip ? '5px' : '8px', height: isPip ? '5px' : '8px' }} />
+              <Clock size={isPip ? 11 : 16} style={{ color: '#ea580c' }} />
               <span>TÂCHE EN COURS</span>
             </>
           ) : activeInterruption ? (
             <>
-              <Clock size={16} style={{ color: '#ea580c' }} />
-              <span>INTERRUPTION EN COURS</span>
+              <Clock size={isPip ? 11 : 16} style={{ color: '#ea580c' }} />
+              <span>INTERRUPTION</span>
             </>
           ) : (
             <>
-              <Clock size={16} style={{ color: '#94a3b8' }} />
+              <Clock size={isPip ? 11 : 16} style={{ color: '#94a3b8' }} />
               <span>CHRONOMÈTRE</span>
             </>
           )}
@@ -262,11 +263,17 @@ function ChronoCardView({
             type="button"
             onClick={onTogglePip}
             className={`pip-toggle-btn ${isPipActive ? 'active' : ''}`}
+            style={{
+              padding: isPip ? '0.15rem 0.45rem' : '0.35rem 0.75rem',
+              fontSize: isPip ? '0.62rem' : '0.78rem',
+              borderRadius: isPip ? '5px' : '8px',
+              gap: isPip ? '0.25rem' : '0.4rem'
+            }}
             title={isPip ? "Réattacher à l'application principale" : isPipActive ? "Fermer la fenêtre PiP" : "Détacher le chronomètre en fenêtre flottante (Always-on-top)"}
           >
             {isPip ? (
               <>
-                <Minimize2 size={13} />
+                <Minimize2 size={10} />
                 <span>Réattacher</span>
               </>
             ) : isPipActive ? (
@@ -291,40 +298,39 @@ function ChronoCardView({
           <h3
             title={activeTask.name}
             style={{
-              fontSize: isPip ? '1.15rem' : '1.35rem',
+              fontSize: isPip ? '0.82rem' : '1.35rem',
               fontWeight: '800',
               color: '#0f172a',
-              margin: '0.25rem 0',
+              margin: isPip ? '0.05rem 0' : '0.25rem 0',
               textAlign: 'center',
-              lineHeight: '1.25',
-              maxHeight: '2.6em',
+              lineHeight: isPip ? '1.15' : '1.25',
+              maxHeight: isPip ? '1.3em' : '2.6em',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical'
+              whiteSpace: isPip ? 'nowrap' : 'normal',
+              width: '100%'
             }}
           >
             {activeTask.name}
           </h3>
 
           {/* Subtitle: Client Name Badge + Due date */}
-          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: isPip ? '0.62rem' : '0.8rem', color: '#64748b', fontWeight: '600', marginBottom: isPip ? '0.15rem' : '0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isPip ? '0.25rem' : '0.4rem', flexWrap: 'wrap' }}>
             <span style={{
               color: '#178FCB',
               fontWeight: '800',
               background: 'rgba(23, 143, 203, 0.08)',
-              padding: '0.12rem 0.5rem',
-              borderRadius: '4px',
+              padding: isPip ? '0.05rem 0.35rem' : '0.12rem 0.5rem',
+              borderRadius: isPip ? '3px' : '4px',
               border: '1px solid rgba(23, 143, 203, 0.2)',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.3rem'
+              gap: '0.25rem'
             }}>
-              <Briefcase size={12} />
+              <Briefcase size={isPip ? 9 : 12} />
               {activeTaskClientName || selectedClient?.name}
             </span>
-            {activeTask.due_date && (
+            {activeTask.due_date && !isPip && (
               <>
                 <span style={{ color: '#94a3b8' }}>•</span>
                 <span>Échéance : {new Date(activeTask.due_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
@@ -333,24 +339,32 @@ function ChronoCardView({
           </div>
 
           {/* Large Digital Timer Display in Orbitron Font */}
-          <div className="chrono-digits blue" style={{ fontSize: isPip ? '2.35rem' : undefined, margin: isPip ? '0.4rem 0 0.2rem 0' : undefined }}>
+          <div
+            className="chrono-digits blue"
+            style={{
+              fontSize: isPip ? '1.45rem' : '3.4rem',
+              margin: isPip ? '0.15rem 0 0.15rem 0' : '1.1rem 0 0.9rem 0',
+              letterSpacing: isPip ? '1px' : '2px',
+              textShadow: isPip ? '0 0 8px rgba(37, 99, 235, 0.22)' : undefined
+            }}
+          >
             {formatSecondsToHMS(timerSeconds)}
           </div>
 
           {/* Progress track indicator */}
-          <div style={{ width: '100%', maxWidth: '340px', height: '5px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden', margin: isPip ? '0.2rem auto 0.9rem auto' : '0.2rem auto 1.3rem auto' }}>
+          <div style={{ width: '100%', maxWidth: isPip ? '190px' : '340px', height: isPip ? '3px' : '5px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden', margin: isPip ? '0.1rem auto 0.45rem auto' : '0.2rem auto 1.3rem auto' }}>
             <div style={{ width: '35%', height: '100%', background: '#2563eb', borderRadius: '9999px' }}></div>
           </div>
 
           {activeInterruption && (
-            <div className="active-interruption-banner" style={{ marginBottom: '1rem', padding: '0.4rem 0.65rem', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '340px' }}>
-              <span style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: '600' }}>
+            <div className="active-interruption-banner" style={{ marginBottom: isPip ? '0.35rem' : '1rem', padding: isPip ? '0.2rem 0.4rem' : '0.4rem 0.65rem', borderRadius: isPip ? '4px' : '6px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: isPip ? '200px' : '340px' }}>
+              <span style={{ fontSize: isPip ? '0.62rem' : '0.8rem', color: '#d97706', fontWeight: '600' }}>
                 Pause ({activeInterruption}) : {formatSecondsToHMS(interruptionSeconds)}
               </span>
               <button
                 type="button"
                 onClick={() => handleToggleInterruption(activeInterruption)}
-                style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#d97706', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}
+                style={{ fontSize: isPip ? '0.58rem' : '0.75rem', padding: isPip ? '0.1rem 0.35rem' : '0.2rem 0.5rem', background: '#d97706', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontWeight: '600' }}
               >
                 Reprendre
               </button>
@@ -358,7 +372,7 @@ function ChronoCardView({
           )}
 
           {/* Action Buttons: Red STOP (and Green TERMINÉ only for specific assigned tasks) */}
-          <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: isStandardMission ? '240px' : '340px', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: isPip ? '0.4rem' : '0.75rem', width: '100%', maxWidth: isPip ? '200px' : (isStandardMission ? '240px' : '340px'), justifyContent: 'center' }}>
             <button
               type="button"
               onClick={handleStopTimer}
@@ -367,13 +381,13 @@ function ChronoCardView({
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.5rem',
-                padding: isPip ? '0.65rem 1rem' : '0.75rem 1.25rem',
+                gap: isPip ? '0.3rem' : '0.5rem',
+                padding: isPip ? '0.35rem 0.65rem' : '0.75rem 1.25rem',
                 background: '#ef4444',
                 color: '#ffffff',
                 fontWeight: '700',
-                fontSize: '0.92rem',
-                borderRadius: '8px',
+                fontSize: isPip ? '0.72rem' : '0.92rem',
+                borderRadius: isPip ? '5px' : '8px',
                 border: 'none',
                 cursor: 'pointer',
                 boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)',
@@ -382,7 +396,7 @@ function ChronoCardView({
               onMouseEnter={(e) => { e.currentTarget.style.background = '#dc2626'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              <Square size={13} fill="white" /> STOP
+              <Square size={isPip ? 9 : 13} fill="white" /> STOP
             </button>
 
             {!isStandardMission && (
@@ -394,13 +408,13 @@ function ChronoCardView({
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.5rem',
-                  padding: isPip ? '0.65rem 1rem' : '0.75rem 1.25rem',
+                  gap: isPip ? '0.3rem' : '0.5rem',
+                  padding: isPip ? '0.35rem 0.65rem' : '0.75rem 1.25rem',
                   background: '#10b981',
                   color: '#ffffff',
                   fontWeight: '700',
-                  fontSize: '0.92rem',
-                  borderRadius: '8px',
+                  fontSize: isPip ? '0.72rem' : '0.92rem',
+                  borderRadius: isPip ? '5px' : '8px',
                   border: 'none',
                   cursor: 'pointer',
                   boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)',
@@ -409,32 +423,40 @@ function ChronoCardView({
                 onMouseEnter={(e) => { e.currentTarget.style.background = '#059669'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = '#10b981'; e.currentTarget.style.transform = 'translateY(0)'; }}
               >
-                <CheckCircle size={16} color="white" /> TERMINÉ
+                <CheckCircle size={isPip ? 11 : 16} color="white" /> TERMINÉ
               </button>
             )}
           </div>
         </div>
       ) : activeInterruption ? (
         <div className="active-timer-display" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-          <h3 style={{ fontSize: isPip ? '1.15rem' : '1.35rem', fontWeight: '800', color: '#0f172a', margin: '0.4rem 0 0.15rem 0', textAlign: 'center', textTransform: 'capitalize' }}>
+          <h3 style={{ fontSize: isPip ? '0.82rem' : '1.35rem', fontWeight: '800', color: '#0f172a', margin: isPip ? '0.05rem 0' : '0.4rem 0 0.15rem 0', textAlign: 'center', textTransform: 'capitalize' }}>
             {activeInterruption === 'slack' ? 'Slack / Mails' :
               activeInterruption === 'meeting' ? 'Point Interne' :
                 activeInterruption === 'pause' ? 'Pause' : 'Appel Impromptu'}
           </h3>
 
-          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '500', marginBottom: '0.4rem' }}>
+          <div style={{ fontSize: isPip ? '0.62rem' : '0.8rem', color: '#64748b', fontWeight: '500', marginBottom: isPip ? '0.15rem' : '0.4rem' }}>
             {activeInterruptionClientName ? `Client : ${activeInterruptionClientName}` : 'Met le chrono en pause'}
           </div>
 
-          <div className="chrono-digits orange" style={{ fontSize: isPip ? '2.35rem' : undefined, margin: isPip ? '0.4rem 0 0.2rem 0' : undefined }}>
+          <div
+            className="chrono-digits orange"
+            style={{
+              fontSize: isPip ? '1.45rem' : '3.4rem',
+              margin: isPip ? '0.15rem 0 0.15rem 0' : '1.1rem 0 0.9rem 0',
+              letterSpacing: isPip ? '1px' : '2px',
+              textShadow: isPip ? '0 0 8px rgba(249, 115, 22, 0.22)' : undefined
+            }}
+          >
             {formatSecondsToHMS(interruptionSeconds)}
           </div>
 
-          <div style={{ width: '100%', maxWidth: '340px', height: '5px', background: '#fed7aa', borderRadius: '9999px', overflow: 'hidden', margin: isPip ? '0.2rem auto 0.9rem auto' : '0.2rem auto 1.3rem auto' }}>
+          <div style={{ width: '100%', maxWidth: isPip ? '190px' : '340px', height: isPip ? '3px' : '5px', background: '#fed7aa', borderRadius: '9999px', overflow: 'hidden', margin: isPip ? '0.1rem auto 0.45rem auto' : '0.2rem auto 1.3rem auto' }}>
             <div style={{ width: '50%', height: '100%', background: '#f97316', borderRadius: '9999px' }}></div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: '340px', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: isPip ? '0.4rem' : '0.75rem', width: '100%', maxWidth: isPip ? '190px' : '340px', justifyContent: 'center' }}>
             <button
               type="button"
               onClick={() => handleToggleInterruption(activeInterruption)}
@@ -443,43 +465,43 @@ function ChronoCardView({
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.5rem',
-                padding: isPip ? '0.65rem 1rem' : '0.7rem 1.25rem',
+                gap: isPip ? '0.3rem' : '0.5rem',
+                padding: isPip ? '0.35rem 0.65rem' : '0.7rem 1.25rem',
                 background: '#ef4444',
                 color: '#ffffff',
                 fontWeight: '700',
-                fontSize: '0.92rem',
-                borderRadius: '8px',
+                fontSize: isPip ? '0.72rem' : '0.92rem',
+                borderRadius: isPip ? '5px' : '8px',
                 border: 'none',
                 cursor: 'pointer',
                 boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)'
               }}
             >
-              <Square size={13} fill="white" /> STOP
+              <Square size={isPip ? 9 : 13} fill="white" /> STOP
             </button>
           </div>
         </div>
       ) : (
-        <div className="no-active-timer" style={{ textAlign: 'center', padding: isPip ? '0.5rem 0' : '1rem 0', width: '100%' }}>
-          <p style={{ color: '#0f172a', fontWeight: '700', margin: '0 0 0.35rem 0', fontSize: isPip ? '0.95rem' : '1rem' }}>
-            Aucune tâche en cours de suivi.
+        <div className="no-active-timer" style={{ textAlign: 'center', padding: isPip ? '0.25rem 0' : '1rem 0', width: '100%' }}>
+          <p style={{ color: '#0f172a', fontWeight: '700', margin: '0 0 0.2rem 0', fontSize: isPip ? '0.78rem' : '1rem' }}>
+            Aucune tâche en cours
           </p>
-          <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', marginBottom: isPip ? '0.75rem' : '0' }}>
-            {isPip ? 'Sélectionnez un livrable dans l\'application ou lancez une pause rapide :' : 'Lancez le chrono directement depuis la liste des livrables à droite.'}
+          <span style={{ fontSize: isPip ? '0.62rem' : '0.8rem', color: '#64748b', display: 'block', marginBottom: isPip ? '0.35rem' : '0' }}>
+            {isPip ? 'Lancez une pause rapide :' : 'Lancez le chrono directement depuis la liste des livrables à droite.'}
           </span>
           {isPip && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem', marginTop: '0.65rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem', marginTop: '0.35rem' }}>
               <button
                 type="button"
                 onClick={() => handleInterruptionClick('pause')}
-                style={{ padding: '0.45rem', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', border: '1px solid #fed7aa', background: '#fff7ed', color: '#c2410c', cursor: 'pointer' }}
+                style={{ padding: '0.25rem', fontSize: '0.62rem', fontWeight: '700', borderRadius: '4px', border: '1px solid #fed7aa', background: '#fff7ed', color: '#c2410c', cursor: 'pointer' }}
               >
                 ☕ Pause
               </button>
               <button
                 type="button"
                 onClick={() => handleInterruptionClick('slack')}
-                style={{ padding: '0.45rem', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
+                style={{ padding: '0.25rem', fontSize: '0.62rem', fontWeight: '700', borderRadius: '4px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
               >
                 💬 Slack
               </button>
@@ -570,8 +592,8 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
     try {
       const pip = await window.documentPictureInPicture.requestWindow({
-        width: 380,
-        height: 380,
+        width: 250,
+        height: 180,
         disallowReturnToOpener: false
       });
 
@@ -600,7 +622,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
       pip.document.title = activeTask ? `⏱️ ${activeTask.name} — StepUp RH` : "⏱️ Chronomètre — StepUp RH";
 
-      // 3. Style personnalisé dédié pour la fenêtre Always-on-top
+      // 3. Style personnalisé dédié pour la fenêtre Always-on-top (Ultra-compacte)
       const customStyle = pip.document.createElement('style');
       customStyle.textContent = `
         :root {
@@ -635,25 +657,25 @@ export default function EspaceProduction({ user, token, clients, loading, refres
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          padding: 0.75rem;
+          padding: 0.35rem;
           box-sizing: border-box;
         }
         .chrono-digits {
           font-family: 'Orbitron', monospace, sans-serif !important;
           font-weight: 800;
-          letter-spacing: 2px;
+          letter-spacing: 1px;
           text-align: center;
-          margin: 0.4rem 0 0.3rem 0;
+          margin: 0.15rem 0 0.15rem 0;
           line-height: 1;
-          font-size: 2.35rem !important;
+          font-size: 1.45rem !important;
         }
         .chrono-digits.blue {
           color: #2563eb;
-          text-shadow: 0 0 14px rgba(37, 99, 235, 0.28);
+          text-shadow: 0 0 8px rgba(37, 99, 235, 0.22);
         }
         .chrono-digits.orange {
           color: #f97316;
-          text-shadow: 0 0 14px rgba(249, 115, 22, 0.28);
+          text-shadow: 0 0 8px rgba(249, 115, 22, 0.22);
         }
       `;
       pip.document.head.appendChild(customStyle);
