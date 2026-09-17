@@ -247,8 +247,8 @@ export default function StatistiquesRH({
     summary.punctualityRate >= 90
       ? 'var(--success-color)'
       : summary.punctualityRate >= 75
-      ? 'var(--warning-color)'
-      : 'var(--error-color)';
+        ? 'var(--warning-color)'
+        : 'var(--error-color)';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -258,7 +258,7 @@ export default function StatistiquesRH({
       {/* ==================================================== */}
       <div className="panel" style={{ padding: '1.25rem 1.5rem', background: 'var(--panel-white)', border: '1px solid var(--border-light)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-          
+
           {/* Header title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
@@ -276,7 +276,7 @@ export default function StatistiquesRH({
             </div>
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                Statistiques & Indicateurs RH
+                Statistiques et indicateurs RH
               </h2>
               <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                 Analyse de l'assiduité, de la ponctualité, des effectifs et des congés
@@ -428,7 +428,7 @@ export default function StatistiquesRH({
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Building2 size={16} style={{ color: 'var(--brand-orange)' }} /> Vue d'ensemble Globale & Effectifs
+            <Building2 size={16} style={{ color: 'var(--brand-orange)' }} /> Vue d'ensemble globale et effectifs
           </h3>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Données consolidées entreprise</span>
         </div>
@@ -512,7 +512,7 @@ export default function StatistiquesRH({
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Timer size={16} style={{ color: 'var(--brand-orange)' }} /> Indicateurs de Pointage & Ponctualité (Sur la période)
+            <Timer size={16} style={{ color: 'var(--brand-orange)' }} /> Indicateurs de pointage et ponctualité sur la période
           </h3>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             Du {formatDateFR(startDate)} au {formatDateFR(endDate)}
@@ -520,7 +520,7 @@ export default function StatistiquesRH({
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-          
+
           {/* Taux de Ponctualité */}
           <div className="panel" style={{ padding: '1.25rem', borderLeft: `4px solid ${punctualityColor}`, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -597,13 +597,13 @@ export default function StatistiquesRH({
       {/* 4. SECTION: VISUAL CHARTS & ATTENDANCE TRENDS        */}
       {/* ==================================================== */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'stretch' }}>
-        
+
         {/* Main Stacked Bar Chart */}
         <div className="panel" style={{ gridColumn: chartData.length > 7 ? '1 / -1' : 'span 2', minHeight: '340px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
             <div>
               <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.35rem 0' }}>
-                <TrendingUp size={20} style={{ color: 'var(--brand-orange)' }} /> Assiduité Quotidienne de l'Équipe
+                <TrendingUp size={20} style={{ color: 'var(--brand-orange)' }} /> Assiduité quotidienne de l'équipe
               </h2>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Répartition jour par jour : À l'heure, Retard, En congé et Non pointé
@@ -892,7 +892,7 @@ export default function StatistiquesRH({
         <div className="panel">
           <div style={{ marginBottom: '1.25rem' }}>
             <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.35rem 0' }}>
-              <Building2 size={20} style={{ color: 'var(--brand-orange)' }} /> Comparatif par Département & Service
+              <Building2 size={20} style={{ color: 'var(--brand-orange)' }} /> Comparatif par département et service
             </h2>
             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               Performances de ponctualité, volume de pointages et congés posés par service
@@ -905,8 +905,8 @@ export default function StatistiquesRH({
                 svc.punctualityRate >= 90
                   ? 'var(--success-color)'
                   : svc.punctualityRate >= 75
-                  ? 'var(--warning-color)'
-                  : 'var(--error-color)';
+                    ? 'var(--warning-color)'
+                    : 'var(--error-color)';
 
               return (
                 <div
@@ -1074,8 +1074,8 @@ export default function StatistiquesRH({
                     emp.punctualityRate >= 90
                       ? 'var(--success-color)'
                       : emp.punctualityRate >= 75
-                      ? 'var(--warning-color)'
-                      : 'var(--error-color)';
+                        ? 'var(--warning-color)'
+                        : 'var(--error-color)';
 
                   return (
                     <tr key={emp.employee_id} style={{ borderBottom: '1px solid var(--border-light)' }}>

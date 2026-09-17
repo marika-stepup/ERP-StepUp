@@ -135,6 +135,7 @@ export async function POST(req) {
       posts_google,
       newsletter_count,
       blog_count,
+      tma,
       unquantifiable_tasks
     } = body;
 
@@ -144,27 +145,48 @@ export async function POST(req) {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: newClient, error } = await supabase
+    const insertPayload = {
+      name,
+      code,
+      contract_period,
+      total_budget_hours: Number(total_budget_hours) || 0,
+      start_date: start_date || null,
+      end_date: end_date || null,
+      posts_facebook: Number(posts_facebook) || 0,
+      posts_instagram: Number(posts_instagram) || 0,
+      posts_linkedin: Number(posts_linkedin) || 0,
+      posts_google: Number(posts_google) || 0,
+      newsletter_count: Number(newsletter_count) || 0,
+      blog_count: Number(blog_count) || 0,
+      unquantifiable_tasks: unquantifiable_tasks || null
+    };
+
+    if (tma !== undefined && tma !== null) {
+      insertPayload.tma = String(tma);
+    }
+
+    let newClient = null;
+    let { data: insertedData, error } = await supabase
       .from('production_clients')
-      .insert({
-        name,
-        code,
-        contract_period,
-        total_budget_hours: Number(total_budget_hours) || 0,
-        start_date: start_date || null,
-        end_date: end_date || null,
-        posts_facebook: Number(posts_facebook) || 0,
-        posts_instagram: Number(posts_instagram) || 0,
-        posts_linkedin: Number(posts_linkedin) || 0,
-        posts_google: Number(posts_google) || 0,
-        newsletter_count: Number(newsletter_count) || 0,
-        blog_count: Number(blog_count) || 0,
-        unquantifiable_tasks: unquantifiable_tasks || null
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error && (error.message?.includes("'tma'") || error.code === 'PGRST204')) {
+      // Fallback if 'tma' column is not created yet
+      delete insertPayload.tma;
+      const resFallback = await supabase
+        .from('production_clients')
+        .insert(insertPayload)
+        .select()
+        .single();
+      if (resFallback.error) throw resFallback.error;
+      newClient = { ...resFallback.data, tma: tma || '' };
+    } else if (error) {
+      throw error;
+    } else {
+      newClient = insertedData;
+    }
 
     // Async sync to Google Sheets (non-blocking)
     syncProductionClient(newClient.id);
@@ -202,6 +224,7 @@ export async function PATCH(req) {
       posts_google,
       newsletter_count,
       blog_count,
+      tma,
       unquantifiable_tasks
     } = body;
 
@@ -211,28 +234,50 @@ export async function PATCH(req) {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: updatedClient, error } = await supabase
+    const updatePayload = {
+      name,
+      code,
+      contract_period,
+      total_budget_hours: Number(total_budget_hours) || 0,
+      start_date: start_date || null,
+      end_date: end_date || null,
+      posts_facebook: Number(posts_facebook) || 0,
+      posts_instagram: Number(posts_instagram) || 0,
+      posts_linkedin: Number(posts_linkedin) || 0,
+      posts_google: Number(posts_google) || 0,
+      newsletter_count: Number(newsletter_count) || 0,
+      blog_count: Number(blog_count) || 0,
+      unquantifiable_tasks: unquantifiable_tasks || null
+    };
+
+    if (tma !== undefined && tma !== null) {
+      updatePayload.tma = String(tma);
+    }
+
+    let updatedClient = null;
+    let { data: updatedData, error } = await supabase
       .from('production_clients')
-      .update({
-        name,
-        code,
-        contract_period,
-        total_budget_hours: Number(total_budget_hours) || 0,
-        start_date: start_date || null,
-        end_date: end_date || null,
-        posts_facebook: Number(posts_facebook) || 0,
-        posts_instagram: Number(posts_instagram) || 0,
-        posts_linkedin: Number(posts_linkedin) || 0,
-        posts_google: Number(posts_google) || 0,
-        newsletter_count: Number(newsletter_count) || 0,
-        blog_count: Number(blog_count) || 0,
-        unquantifiable_tasks: unquantifiable_tasks || null
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error && (error.message?.includes("'tma'") || error.code === 'PGRST204')) {
+      // Fallback if 'tma' column is not created yet
+      delete updatePayload.tma;
+      const resFallback = await supabase
+        .from('production_clients')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single();
+      if (resFallback.error) throw resFallback.error;
+      updatedClient = { ...resFallback.data, tma: tma || '' };
+    } else if (error) {
+      throw error;
+    } else {
+      updatedClient = updatedData;
+    }
 
     // Async sync to Google Sheets (non-blocking)
     syncProductionClient(updatedClient.id);

@@ -4001,7 +4001,7 @@ export default function Page() {
                             </div>
 
                             {/* Action Buttons Column: Pause above Sortie */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '92px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: '95px' }}>
                               {/* Pause / Retour button (Above Sortie) */}
                               <button
                                 type="button"
