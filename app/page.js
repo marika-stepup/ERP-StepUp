@@ -1737,7 +1737,7 @@ export default function Page() {
   if (loading) {
     return (
       <div className="card" style={{ marginTop: '5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <img src="/Logo Step Up.png" alt="Step Hub" style={{ height: '40px', marginBottom: '1.5rem' }} />
+        <img src="/Logo Step Up.png" alt="Step Hub" style={{ height: '140px', width: 'auto', objectFit: 'contain', marginBottom: '1.5rem' }} />
         <h1>Chargement de l'espace...</h1>
       </div>
     );

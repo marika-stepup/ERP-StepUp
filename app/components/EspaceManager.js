@@ -725,30 +725,44 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
   return (
     <div className="espace-manager">
       {/* HEADER CONTROLS */}
-      <div className="prod-header" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-            <h1 className="prod-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Briefcase size={24} style={{ color: 'var(--brand-orange)' }} />
-              Pilotage Client :
-            </h1>
-            <select 
-              className="client-selector"
-              value={selectedClient?.id || ''}
-              onChange={(e) => {
-                const client = clients.find(c => c.id === e.target.value);
-                setSelectedClient(client || null);
-              }}
-            >
-              {clients.map(c => (
-                <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
-              ))}
-              {clients.length === 0 && <option value="">Aucun client</option>}
-            </select>
+      <div className="panel prod-header" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.25rem 1.5rem', borderRadius: '12px', border: '1px solid var(--border-light)', marginBottom: '1.5rem', background: 'var(--panel-white)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(234, 88, 12, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-orange)' }}>
+              <Briefcase size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#64748b', marginBottom: '2px' }}>
+                Pilotage Client
+              </div>
+              <select 
+                className="client-selector"
+                value={selectedClient?.id || ''}
+                onChange={(e) => {
+                  const client = clients.find(c => c.id === e.target.value);
+                  setSelectedClient(client || null);
+                }}
+                style={{
+                  fontSize: '1rem',
+                  fontWeight: '700',
+                  color: '#0f172a',
+                  padding: '0.4rem 0.8rem',
+                  borderRadius: '8px',
+                  border: '1.5px solid var(--border-color)',
+                  background: 'var(--background-light)',
+                  cursor: 'pointer'
+                }}
+              >
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                ))}
+                {clients.length === 0 && <option value="">Aucun client</option>}
+              </select>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button className="btn btn-primary" onClick={() => setShowAddClient(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button className="btn btn-primary" onClick={() => setShowAddClient(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px', padding: '0.55rem 1rem', fontWeight: '700' }}>
               <PlusCircle size={16} /> Nouveau Client
             </button>
           </div>
@@ -785,27 +799,27 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             </div>
 
             {/* Détails du contrat (Facebook, Instagram, LinkedIn, Google Post, TMA, Blog, Newsletter) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.65rem' }}>
               {/* Facebook */}
               <div 
                 className="contract-detail-card" 
                 style={{ 
-                  padding: '0.65rem 0.85rem', 
+                  padding: '0.65rem 0.8rem', 
                   borderRadius: '8px', 
                   border: '1px solid rgba(24, 119, 242, 0.25)', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '0.65rem', 
+                  gap: '0.6rem', 
                   background: 'rgba(24, 119, 242, 0.04)' 
                 }}
               >
-                <div style={{ color: '#1877F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FacebookIcon size={20} color="#1877F2" />
+                <div style={{ color: '#1877F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FacebookIcon size={18} color="#1877F2" />
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Posts Facebook</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a' }}>
-                    {selectedClient.posts_facebook || 0} <span style={{ fontSize: '0.7rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Posts Facebook</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>
+                    {selectedClient.posts_facebook || 0} <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
                   </div>
                 </div>
               </div>
@@ -814,22 +828,22 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               <div 
                 className="contract-detail-card" 
                 style={{ 
-                  padding: '0.65rem 0.85rem', 
+                  padding: '0.65rem 0.8rem', 
                   borderRadius: '8px', 
                   border: '1px solid rgba(225, 48, 108, 0.25)', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '0.65rem', 
+                  gap: '0.6rem', 
                   background: 'rgba(225, 48, 108, 0.04)' 
                 }}
               >
-                <div style={{ color: '#E1306C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <InstagramIcon size={20} color="#E1306C" />
+                <div style={{ color: '#E1306C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <InstagramIcon size={18} color="#E1306C" />
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Posts Instagram</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a' }}>
-                    {selectedClient.posts_instagram || 0} <span style={{ fontSize: '0.7rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Posts Instagram</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>
+                    {selectedClient.posts_instagram || 0} <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
                   </div>
                 </div>
               </div>
@@ -838,22 +852,22 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               <div 
                 className="contract-detail-card" 
                 style={{ 
-                  padding: '0.65rem 0.85rem', 
+                  padding: '0.65rem 0.8rem', 
                   borderRadius: '8px', 
                   border: '1px solid rgba(10, 102, 194, 0.25)', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '0.65rem', 
+                  gap: '0.6rem', 
                   background: 'rgba(10, 102, 194, 0.04)' 
                 }}
               >
-                <div style={{ color: '#0A66C2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <LinkedinIcon size={20} color="#0A66C2" />
+                <div style={{ color: '#0A66C2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <LinkedinIcon size={18} color="#0A66C2" />
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Posts LinkedIn</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a' }}>
-                    {selectedClient.posts_linkedin || 0} <span style={{ fontSize: '0.7rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Posts LinkedIn</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>
+                    {selectedClient.posts_linkedin || 0} <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
                   </div>
                 </div>
               </div>
@@ -862,22 +876,22 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               <div 
                 className="contract-detail-card" 
                 style={{ 
-                  padding: '0.65rem 0.85rem', 
+                  padding: '0.65rem 0.8rem', 
                   borderRadius: '8px', 
                   border: '1px solid rgba(66, 133, 244, 0.25)', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '0.65rem', 
+                  gap: '0.6rem', 
                   background: 'rgba(66, 133, 244, 0.04)' 
                 }}
               >
-                <div style={{ color: '#4285F4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <GooglePostIcon size={20} />
+                <div style={{ color: '#4285F4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <GooglePostIcon size={18} />
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Google Posts</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a' }}>
-                    {selectedClient.posts_google || 0} <span style={{ fontSize: '0.7rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Google Posts</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>
+                    {selectedClient.posts_google || 0} <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
                   </div>
                 </div>
               </div>
@@ -886,21 +900,21 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               <div 
                 className="contract-detail-card" 
                 style={{ 
-                  padding: '0.65rem 0.85rem', 
+                  padding: '0.65rem 0.8rem', 
                   borderRadius: '8px', 
                   border: '1px solid rgba(99, 102, 241, 0.25)', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '0.65rem', 
+                  gap: '0.6rem', 
                   background: 'rgba(99, 102, 241, 0.04)' 
                 }}
               >
-                <div style={{ color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Wrench size={19} />
+                <div style={{ color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Wrench size={18} />
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>TMA / Maintenance</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a' }}>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>TMA / Maint.</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>
                     {selectedClient.tma ? (typeof selectedClient.tma === 'string' && (selectedClient.tma.toLowerCase().includes('h') || selectedClient.tma.toLowerCase().includes('min')) ? selectedClient.tma : `${selectedClient.tma}h`) : (selectedClient.tma_hours ? `${selectedClient.tma_hours}h` : '0h')}
                   </div>
                 </div>
@@ -910,22 +924,22 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               <div 
                 className="contract-detail-card" 
                 style={{ 
-                  padding: '0.65rem 0.85rem', 
+                  padding: '0.65rem 0.8rem', 
                   borderRadius: '8px', 
                   border: '1px solid rgba(234, 88, 12, 0.25)', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '0.65rem', 
+                  gap: '0.6rem', 
                   background: 'rgba(234, 88, 12, 0.04)' 
                 }}
               >
-                <div style={{ color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FileText size={19} />
+                <div style={{ color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText size={18} />
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Articles Blog</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a' }}>
-                    {selectedClient.blog_count || 0} <span style={{ fontSize: '0.7rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Articles Blog</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>
+                    {selectedClient.blog_count || 0} <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
                   </div>
                 </div>
               </div>
@@ -934,22 +948,22 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               <div 
                 className="contract-detail-card" 
                 style={{ 
-                  padding: '0.65rem 0.85rem', 
+                  padding: '0.65rem 0.8rem', 
                   borderRadius: '8px', 
                   border: '1px solid rgba(2, 132, 199, 0.25)', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '0.65rem', 
+                  gap: '0.6rem', 
                   background: 'rgba(2, 132, 199, 0.04)' 
                 }}
               >
-                <div style={{ color: '#0284C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Mail size={19} />
+                <div style={{ color: '#0284C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Mail size={18} />
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Newsletters</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a' }}>
-                    {selectedClient.newsletter_count || 0} <span style={{ fontSize: '0.7rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Newsletters</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>
+                    {selectedClient.newsletter_count || 0} <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#64748b' }}>/ mois</span>
                   </div>
                 </div>
               </div>
@@ -957,8 +971,8 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
             {/* Unquantifiable tasks */}
             {selectedClient.unquantifiable_tasks && (
-              <div style={{ marginTop: '1rem', fontSize: '0.85rem', background: 'var(--background-light)', padding: '0.6rem 0.8rem', borderRadius: '6px', borderLeft: '3px solid var(--brand-orange)', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                <strong>Tâches inquantifiables :</strong> {selectedClient.unquantifiable_tasks}
+              <div style={{ marginTop: '0.75rem', fontSize: '0.82rem', background: '#fffbeb', padding: '0.5rem 0.75rem', borderRadius: '6px', borderLeft: '3px solid #f59e0b', color: '#92400e', lineHeight: '1.4' }}>
+                <strong>📌 Notes / Tâches inquantifiables :</strong> {selectedClient.unquantifiable_tasks}
               </div>
             )}
           </div>
