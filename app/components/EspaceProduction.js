@@ -58,10 +58,8 @@ export const GooglePostIcon = ({ size = 18 }) => (
 );
 
 export const PAUSE_PRESETS = [
-  { id: 'cigarette', label: 'Cigarette', icon: '🚬', fullLabel: 'Pause Cigarette', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
-  { id: 'gouter', label: 'Goûter', icon: '🍪', fullLabel: 'Pause Goûter', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
   { id: 'dejeuner', label: 'Déjeuner', icon: '🍽️', fullLabel: 'Pause Déjeuner', color: '#ea580c', bg: '#fff7ed', border: '#fed7aa' },
-  { id: 'general', label: 'Pause', icon: '☕', fullLabel: 'Pause Café / Détente', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' }
+  { id: 'general', label: 'Pause', icon: '☕', fullLabel: 'Pause', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' }
 ];
 
 export const DELIVERABLE_CARDS = [
@@ -275,7 +273,7 @@ function ChronoCardView({
           ) : (
             <>
               <Clock size={isPip ? 11 : 16} style={{ color: '#94a3b8' }} />
-              <span>CHRONOMÈTRE DE PRODUCTION</span>
+              <span>TEMPS DE PRODUCTION</span>
             </>
           )}
         </div>
@@ -564,11 +562,12 @@ function ChronoCardView({
           </div>
 
           {/* Quick Pause Toolbar while task is running */}
+          {/* Quick Pause Bar when timer is running */}
           <div style={{ marginTop: isPip ? '0.4rem' : '1.25rem', width: '100%', borderTop: '1px solid var(--border-light)', paddingTop: isPip ? '0.3rem' : '0.85rem' }}>
-            <span style={{ fontSize: isPip ? '0.58rem' : '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block', marginBottom: isPip ? '0.2rem' : '0.45rem' }}>
+            <span style={{ fontSize: isPip ? '0.58rem' : '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block', marginBottom: isPip ? '0.2rem' : '0.45rem', textAlign: 'center' }}>
               Prendre une pause :
             </span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: isPip ? '0.25rem' : '0.4rem', width: '100%', maxWidth: '340px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: isPip ? '0.25rem' : '0.6rem', width: '100%', maxWidth: '280px', margin: '0 auto' }}>
               {PAUSE_PRESETS.map(preset => (
                 <button
                   key={preset.id}
@@ -576,14 +575,15 @@ function ChronoCardView({
                   onClick={() => handleStartPause(preset.id)}
                   title={`Lancer une pause ${preset.label}`}
                   style={{
+                    flex: '1 1 0',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: isPip ? '0.15rem' : '0.3rem',
-                    padding: isPip ? '0.2rem 0.3rem' : '0.4rem 0.5rem',
-                    fontSize: isPip ? '0.58rem' : '0.78rem',
+                    gap: isPip ? '0.15rem' : '0.35rem',
+                    padding: isPip ? '0.2rem 0.3rem' : '0.45rem 0.75rem',
+                    fontSize: isPip ? '0.58rem' : '0.8rem',
                     fontWeight: '700',
-                    borderRadius: isPip ? '4px' : '6px',
+                    borderRadius: isPip ? '4px' : '7px',
                     border: `1px solid ${preset.border}`,
                     background: preset.bg,
                     color: preset.color,
@@ -607,11 +607,11 @@ function ChronoCardView({
             Aucune tâche en cours
           </p>
           <span style={{ fontSize: isPip ? '0.62rem' : '0.82rem', color: '#64748b', display: 'block', marginBottom: isPip ? '0.4rem' : '1rem' }}>
-            {isPip ? 'Prenez une pause rapide :' : 'Lancez un livrable à droite ou prenez une pause immédiate :'}
+            {isPip ? 'Prenez une pause rapide :' : 'Lancez la prod. ou prenez une pause :'}
           </span>
 
           {/* Quick Pause Buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: isPip ? '1fr 1fr' : 'repeat(4, 1fr)', gap: isPip ? '0.3rem' : '0.5rem', width: '100%', maxWidth: '380px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: isPip ? '0.35rem' : '0.75rem', width: '100%', maxWidth: isPip ? '240px' : '300px', margin: '0 auto' }}>
             {PAUSE_PRESETS.map(preset => (
               <button
                 key={preset.id}
@@ -619,14 +619,16 @@ function ChronoCardView({
                 onClick={() => handleStartPause(preset.id)}
                 title={`Démarrer une pause ${preset.label}`}
                 style={{
+                  flex: '1 1 0',
+                  minWidth: isPip ? 'auto' : '110px',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.35rem',
-                  padding: isPip ? '0.35rem' : '0.6rem 0.5rem',
-                  fontSize: isPip ? '0.65rem' : '0.85rem',
+                  gap: '0.45rem',
+                  padding: isPip ? '0.35rem 0.5rem' : '0.65rem 1rem',
+                  fontSize: isPip ? '0.65rem' : '0.88rem',
                   fontWeight: '700',
-                  borderRadius: isPip ? '5px' : '8px',
+                  borderRadius: isPip ? '6px' : '10px',
                   border: `1.5px solid ${preset.border}`,
                   background: preset.bg,
                   color: preset.color,
@@ -637,7 +639,7 @@ function ChronoCardView({
                 onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.08)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.03)'; }}
               >
-                <span>{preset.icon}</span>
+                <span style={{ fontSize: isPip ? '0.8rem' : '1.05rem' }}>{preset.icon}</span>
                 <span>{preset.label}</span>
               </button>
             ))}
@@ -661,8 +663,8 @@ export default function EspaceProduction({ user, token, clients, loading, refres
   const [pipWindow, setPipWindow] = useState(null);
   const [isPipSupported, setIsPipSupported] = useState(false);
 
-  // Pauses (cigarette, gouter, dejeuner, general)
-  const [activePause, setActivePause] = useState(null); // 'cigarette' | 'gouter' | 'dejeuner' | 'general'
+  // Pauses (dejeuner, general)
+  const [activePause, setActivePause] = useState(null); // 'dejeuner' | 'general'
   const [pauseLogId, setPauseLogId] = useState(null);
   const [pauseSeconds, setPauseSeconds] = useState(0);
   const [suspendedTask, setSuspendedTask] = useState(null);
@@ -697,7 +699,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       if (pipWindow) {
         try {
           pipWindow.close();
-        } catch (e) {}
+        } catch (e) { }
       }
     };
   }, [pipWindow]);
@@ -864,7 +866,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     if (pipWindow) {
       try {
         pipWindow.close();
-      } catch (e) {}
+      } catch (e) { }
       setPipWindow(null);
       return;
     }
@@ -1476,23 +1478,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
             </span>
           ))}
         </div>
-
-        {/* Progress bar for category if budget exists */}
-        {totalBudgetHours > 0 && (
-          <div style={{ marginTop: '0.2rem' }}>
-            <div className="progress-bar-container" style={{ height: '5px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
-              <div
-                className={`progress-bar-fill ${areAllTasksCompleted ? 'green' : isCategoryActive ? 'orange' : 'blue'}`}
-                style={{
-                  width: `${progressPercent}%`,
-                  height: '100%',
-                  background: areAllTasksCompleted ? '#338855' : isCategoryActive ? '#ff7a00' : '#2563eb',
-                  borderRadius: '9999px'
-                }}
-              ></div>
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -1533,15 +1518,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                     {selectedClient.total_spent_hours}h consommées
                   </span>
                 </div>
-
-                {selectedClient.total_budget_hours > 0 && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(37, 99, 235, 0.08)', padding: '0.55rem 0.95rem', borderRadius: '9px', border: '1px solid rgba(37, 99, 235, 0.25)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                    <BarChart3 size={15} style={{ color: '#2563eb' }} />
-                    <span style={{ fontSize: '0.84rem', fontWeight: '800', color: '#2563eb' }}>
-                      Budget : {selectedClient.total_budget_hours}h ({selectedClient.progression_percent || 0}%)
-                    </span>
-                  </div>
-                )}
               </div>
             );
           })()}
@@ -1683,10 +1659,10 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                           </span>
                         </div>
 
-                        <div style={{ width: '100%', height: '6px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden' }}>
+                        <div style={{ width: '100%', height: '5px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden' }}>
                           <div
                             style={{
-                              width: `${Math.max(fillPercent, spentSec > 0 ? 8 : 0)}%`,
+                              width: `${Math.min(Math.max((spentSec / (selectedClient.total_spent_seconds || 1)) * 100, spentSec > 0 ? 12 : 0), 100)}%`,
                               height: '100%',
                               background: card.themeColor,
                               borderRadius: '9999px',
@@ -1696,8 +1672,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', color: '#64748b' }}>
-                          <span>{budgetHours > 0 ? `Budget : ${budgetHours}h` : 'Consommation'}</span>
-                          {budgetHours > 0 && <span style={{ fontWeight: '700' }}>{fillPercent}%</span>}
+                          <span>Consommation</span>
                         </div>
                       </div>
                     );
@@ -1910,10 +1885,83 @@ export default function EspaceProduction({ user, token, clients, loading, refres
           <p style={{ color: 'var(--text-secondary)' }}>Veuillez sélectionner un client dans le menu ci-dessus.</p>
         </div>
       ) : (
-        <div className="prod-vertical-layout" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+        <div className="prod-main-grid-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.5rem', alignItems: 'start', width: '100%' }}>
 
-          {/* 1. CHRONOMÈTRE POSITIONNÉ AU-DESSUS (COMMAND CENTER) */}
-          <div className="prod-chrono-hero-wrapper" style={{ width: '100%' }}>
+          {/* 1. MISSIONS ACTIVES : SECTION PRINCIPALE (À GAUCHE) */}
+          <div className="panel deliverables-card" style={{ width: '100%', padding: '1.35rem 1.5rem', borderRadius: '14px', border: '1px solid var(--border-light)', background: '#ffffff', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem', marginBottom: '1.25rem', paddingBottom: '0.85rem', borderBottom: '1px solid var(--border-light)' }}>
+              <div>
+                <h2 className="panel-title" style={{ margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                  <Layers size={20} style={{ color: 'var(--brand-orange)' }} />
+                  MISSIONS ACTIVES
+                </h2>
+                <p className="panel-subtitle" style={{ margin: '0.15rem 0 0 0', fontSize: '0.82rem' }}>
+                  Sélectionnez votre pôle d'intervention et démarrez votre session de travail.
+                </p>
+              </div>
+
+              {selectedClient && (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    background: 'rgba(23, 143, 203, 0.08)',
+                    border: '1.5px solid rgba(23, 143, 203, 0.25)',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '8px'
+                  }}
+                >
+                  <Briefcase size={14} style={{ color: '#178FCB' }} />
+                  <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Client :</span>
+                  <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#178FCB' }}>
+                    {selectedClient.code ? `${selectedClient.code} - ` : ''}{selectedClient.name}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* GRILLE À 2 COLONNES (Rédaction & Création D'UN CÔTÉ, Gestion, Data & Tech DE L'AUTRE) */}
+            <div
+              className="deliverables-two-columns-layout"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: '1.25rem',
+                alignItems: 'start'
+              }}
+            >
+              {/* COLONNE GAUCHE : RÉDACTION & CRÉATION */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.4rem', borderBottom: '2px solid rgba(217, 18, 7, 0.25)' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    ✍️ Rédaction & Création
+                  </span>
+                </div>
+
+                {DELIVERABLE_CARDS.filter(c => ['redaction', 'crea_graphique'].includes(c.id)).map(card => (
+                  renderDeliverableCard(card)
+                ))}
+              </div>
+
+              {/* COLONNE DROITE : GESTION, DATA & TECH */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.4rem', borderBottom: '2px solid rgba(51, 136, 85, 0.25)' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    👥 Gestion, Data & Tech
+                  </span>
+                </div>
+
+                {DELIVERABLE_CARDS.filter(c => ['reunion', 'data', 'tech'].includes(c.id)).map(card => (
+                  renderDeliverableCard(card)
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          {/* 2. TEMPS DE PRODUCTION / CHRONOMÈTRE (PANNEAU LATÉRAL STICKY À DROITE) */}
+          <div className="prod-chrono-sidebar-wrapper" style={{ position: 'sticky', top: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
             <ChronoCardView
               isPip={false}
               timerRunning={timerRunning}
@@ -1934,79 +1982,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               handleStopPause={handleStopPause}
               suspendedTask={suspendedTask}
             />
-          </div>
-
-          {/* 2. MISSIONS ACTIVES : PLEINE LARGEUR & SCINDÉE EN 2 COLONNES */}
-          <div className="panel deliverables-card" style={{ width: '100%', padding: '1.5rem 1.75rem', borderRadius: '14px', border: '1px solid var(--border-light)', background: '#ffffff', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-light)' }}>
-              <div>
-                <h2 className="panel-title" style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                  <Layers size={22} style={{ color: 'var(--brand-orange)' }} />
-                  MISSIONS ACTIVES
-                </h2>
-                <p className="panel-subtitle" style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem' }}>
-                  Sélectionnez votre pôle d'intervention et démarrez votre session de travail.
-                </p>
-              </div>
-
-              {selectedClient && (
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.55rem',
-                    background: 'rgba(23, 143, 203, 0.08)',
-                    border: '1.5px solid rgba(23, 143, 203, 0.25)',
-                    padding: '0.45rem 0.95rem',
-                    borderRadius: '8px'
-                  }}
-                >
-                  <Briefcase size={16} style={{ color: '#178FCB' }} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Client actif :</span>
-                  <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#178FCB' }}>
-                    {selectedClient.code ? `${selectedClient.code} - ` : ''}{selectedClient.name}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* GRILLE À 2 COLONNES (Rédaction + Créa graphique D'UN CÔTÉ, Réunion + Data + Tech DE L'AUTRE) */}
-            <div
-              className="deliverables-two-columns-layout"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-                gap: '1.5rem',
-                alignItems: 'start'
-              }}
-            >
-              {/* COLONNE GAUCHE : RÉDACTION & CRÉA GRAPHIQUE */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.4rem', borderBottom: '2px solid rgba(217, 18, 7, 0.25)' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    ✍️ Pôle Contenu & Création
-                  </span>
-                </div>
-
-                {DELIVERABLE_CARDS.filter(c => ['redaction', 'crea_graphique'].includes(c.id)).map(card => (
-                  renderDeliverableCard(card)
-                ))}
-              </div>
-
-              {/* COLONNE DROITE : RÉUNION, DATA & TECH */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.4rem', borderBottom: '2px solid rgba(51, 136, 85, 0.25)' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    👥 Pôle Gestion, Data & Tech
-                  </span>
-                </div>
-
-                {DELIVERABLE_CARDS.filter(c => ['reunion', 'data', 'tech'].includes(c.id)).map(card => (
-                  renderDeliverableCard(card)
-                ))}
-              </div>
-            </div>
-
           </div>
 
         </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
+import { extractMotif, extractHrComment } from '../../../../lib/utils';
 
 export async function GET(req) {
   // 1. Authenticate user
@@ -41,7 +42,7 @@ export async function GET(req) {
       throw dbError;
     }
 
-    // 3. Data minimization: only expose hr_comment to HR/Managers/Directors or the requester themselves
+    // 3. Data minimization: only expose hr_comment and reason to HR/Managers/Directors or the requester themselves
     const requests = (dbRequests || []).map((reqItem) => {
       const isOwner = reqItem.employee_id === auth.user.id;
       const canSeeComments = isPrivileged || isOwner;
@@ -55,9 +56,10 @@ export async function GET(req) {
         business_days: Number(reqItem.business_days || 0),
         leave_type: reqItem.leave_type,
         status: reqItem.status,
+        reason: canSeeComments ? (reqItem.reason || extractMotif(reqItem.hr_comment) || '') : '',
         created_at: reqItem.created_at,
         updated_at: reqItem.updated_at,
-        hr_comment: canSeeComments ? (reqItem.hr_comment || '') : '',
+        hr_comment: canSeeComments ? (extractHrComment(reqItem.hr_comment) || '') : '',
         service: reqItem.leave_balances?.service || 'Non spécifié'
       };
     });

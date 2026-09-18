@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { splitFullName } from '../../../../lib/utils';
+import { checkAndCreditAnniversaries } from '../../../../lib/anniversaryService';
 
 export async function GET(req) {
   // 1. Authenticate user
@@ -11,9 +12,12 @@ export async function GET(req) {
   const user = auth.user;
 
   try {
+    // 2. Automatically check and credit contract anniversary if due
+    await checkAndCreditAnniversaries(user.id);
+
     const supabase = getSupabaseAdmin();
 
-    // 2. Fetch the leave balance from Supabase
+    // 3. Fetch the updated leave balance from Supabase
     const { data: balance, error: dbError } = await supabase
       .from('leave_balances')
       .select('*')

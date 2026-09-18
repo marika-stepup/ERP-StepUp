@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { splitFullName } from '../../../../lib/utils';
+import { checkAndCreditAnniversaries } from '../../../../lib/anniversaryService';
 
 export async function GET(req) {
   // 1. Authenticate user (all authenticated roles can fetch member balances for the global dashboard, except Pointeur)
@@ -25,7 +26,10 @@ export async function GET(req) {
       }
     }
 
-    // 2. Fetch the leave balances from Supabase
+    // 2. Automatically check and credit contract anniversaries for members
+    await checkAndCreditAnniversaries();
+
+    // 3. Fetch the leave balances from Supabase
     const { data: balances, error: dbError } = await supabase
       .from('leave_balances')
       .select('*')

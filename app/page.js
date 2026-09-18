@@ -287,6 +287,7 @@ export default function Page() {
   const [editStartTime, setEditStartTime] = useState('08:00');
   const [editEndTime, setEditEndTime] = useState('17:00');
   const [editLeaveType, setEditLeaveType] = useState('Congés Payés');
+  const [editReason, setEditReason] = useState('');
   const [editLeaveError, setEditLeaveError] = useState(null);
   const [editLeaveLoading, setEditLeaveLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -1106,6 +1107,7 @@ export default function Page() {
     else typeVal = 'Congé payé';
 
     setEditLeaveType(typeVal);
+    setEditReason(req.reason || '');
     setEditStartTime(sTime);
     setEditEndTime(eTime);
     setEditLeaveError(null);
@@ -1129,7 +1131,8 @@ export default function Page() {
           end_date: editEndDate,
           start_time: editStartTime,
           end_time: editEndTime,
-          leave_type: editLeaveType
+          leave_type: editLeaveType,
+          reason: editReason
         })
       });
 
@@ -2173,6 +2176,7 @@ export default function Page() {
                         <tr>
                           <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
                           <th>Type</th>
+                          <th>Motif</th>
                           <th>Dates</th>
                           <th>Durée</th>
                           <th>Demandé le</th>
@@ -2235,6 +2239,11 @@ export default function Page() {
                             <td>
                               <span className={`leave-type-badge ${getLeaveTypeConfig(req.leave_type).cellClass}`}>
                                 {normalizeLeaveType(req.leave_type)}
+                              </span>
+                            </td>
+                            <td style={{ maxWidth: '180px' }}>
+                              <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                                {req.reason || '-'}
                               </span>
                             </td>
                             <td>
@@ -2889,6 +2898,12 @@ export default function Page() {
                                 </>
                               )}
                             </div>
+                            {req.reason && (
+                              <div style={{ marginTop: '0.35rem', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '0.35rem', background: 'var(--background-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--brand-navy)', flexShrink: 0 }}>Motif :</span>
+                                <span style={{ fontStyle: 'italic', color: 'var(--text-primary)' }}>{req.reason}</span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Colonne 2 : Dates / Période */}
@@ -3519,6 +3534,7 @@ export default function Page() {
                           <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
                           <th>Collaborateur</th>
                           <th>Type</th>
+                          <th>Motif</th>
                           <th>Dates</th>
                           <th>Durée</th>
                           <th>Statut</th>
@@ -3528,7 +3544,7 @@ export default function Page() {
                       <tbody>
                         {allRequests.length === 0 ? (
                           <tr>
-                            <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                            <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                               Aucune demande de congé enregistrée.
                             </td>
                           </tr>
@@ -3584,6 +3600,11 @@ export default function Page() {
                               </td>
                               <td>
                                 <strong style={{ color: 'var(--brand-orange)' }}>{req.leave_type}</strong>
+                              </td>
+                              <td style={{ maxWidth: '180px' }}>
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                                  {req.reason || '-'}
+                                </span>
                               </td>
                               <td>
                                 Du {formatDateStr(req.start_date)} au {formatDateStr(req.end_date)}
@@ -4481,6 +4502,18 @@ export default function Page() {
                 </select>
               </div>
 
+              <div className="form-group">
+                <label>Motif / Justification</label>
+                <textarea
+                  placeholder="Raison..."
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  disabled={editLeaveLoading}
+                  rows={2}
+                  required
+                />
+              </div>
+
               {editLeaveError && <div className="error-message" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>{editLeaveError}</div>}
 
               <div className="modal-footer">
@@ -4817,7 +4850,7 @@ export default function Page() {
                                   borderRadius: '4px',
                                   color: 'var(--text-primary)'
                                 }}>
-                                  <strong>{rq.employee_name}</strong> ({normalizeLeaveType(rq.leave_type)}, {formatDuration(rq.business_days)})
+                                  <strong>{rq.employee_name}</strong> ({normalizeLeaveType(rq.leave_type)}, {formatDuration(rq.business_days)}){rq.reason ? ` — "${rq.reason}"` : ''}
                                 </span>
                               ))}
                             </div>

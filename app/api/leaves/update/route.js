@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
-import { calculateBusinessDays } from '../../../../lib/utils';
+import { calculateBusinessDays, extractMotif, extractHrComment, formatCombinedComment } from '../../../../lib/utils';
 import { syncLeaveRequest, syncEmployeeBalance } from '../../../../lib/sheetsSync';
 
 export async function POST(req) {
@@ -12,7 +12,7 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { request_id, start_date, end_date, start_time, end_time } = body;
+    const { request_id, start_date, end_date, start_time, end_time, reason } = body;
     let { leave_type } = body;
 
     if (!request_id || !start_date || !end_date || !leave_type) {
@@ -218,19 +218,46 @@ export async function POST(req) {
 
     // 4. Update request row
     const nowStr = new Date().toISOString();
-    const { error: updateReqErr } = await supabase
-      .from('leave_requests')
-      .update({
-        start_date,
-        end_date,
-        business_days: businessDays,
-        leave_type,
-        updated_at: nowStr
-      })
-      .eq('request_id', request_id);
+    const currentMotif = targetRequest.reason || extractMotif(targetRequest.hr_comment) || '';
+    const updatedMotif = reason !== undefined ? (reason || '').trim() : currentMotif;
+    const currentHrOnly = extractHrComment(targetRequest.hr_comment);
+    const updatedCombinedComment = formatCombinedComment(updatedMotif, currentHrOnly);
+
+    let updateReqErr = null;
+    try {
+      const { error: err1 } = await supabase
+        .from('leave_requests')
+        .update({
+          start_date,
+          end_date,
+          business_days: businessDays,
+          leave_type,
+          reason: updatedMotif,
+          hr_comment: updatedCombinedComment,
+          updated_at: nowStr
+        })
+        .eq('request_id', request_id);
+      updateReqErr = err1;
+    } catch (e) {
+      updateReqErr = e;
+    }
 
     if (updateReqErr) {
-      throw updateReqErr;
+      // Fallback without reason column
+      const { error: err2 } = await supabase
+        .from('leave_requests')
+        .update({
+          start_date,
+          end_date,
+          business_days: businessDays,
+          leave_type,
+          hr_comment: updatedCombinedComment,
+          updated_at: nowStr
+        })
+        .eq('request_id', request_id);
+      if (err2) {
+        throw err2;
+      }
     }
 
     // 5. Sync updates to Google Sheets (awaited for reliability)

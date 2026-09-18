@@ -5,6 +5,7 @@ import {
   sendPendingLeavesDigestEmail, 
   isEmailConfigured 
 } from '../../../../lib/emailService';
+import { extractMotif } from '../../../../lib/utils';
 
 // Helper to compute grouped recipients for pending leaves
 async function getGroupedPendingRecipients() {
@@ -41,7 +42,8 @@ async function getGroupedPendingRecipients() {
     const enrichedReq = {
       ...reqItem,
       service: service || 'Équipe',
-      employee_name: employeeProfile ? (employeeProfile.employee_first_name || reqItem.employee_name) : reqItem.employee_name
+      employee_name: employeeProfile ? (employeeProfile.employee_first_name || reqItem.employee_name) : reqItem.employee_name,
+      reason: reqItem.reason || extractMotif(reqItem.hr_comment) || ''
     };
 
     const managerEmail = findManagerEmail(managerName, members || []);

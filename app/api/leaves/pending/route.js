@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
+import { extractMotif, extractHrComment } from '../../../../lib/utils';
 
 export async function GET(req) {
   // 1. Authenticate and verify role 'hr', 'manager' or 'director'
@@ -31,9 +32,10 @@ export async function GET(req) {
       business_days: Number(req.business_days || 0),
       leave_type: req.leave_type,
       status: req.status,
+      reason: req.reason || extractMotif(req.hr_comment) || '',
       created_at: req.created_at,
       updated_at: req.updated_at,
-      hr_comment: req.hr_comment || ''
+      hr_comment: extractHrComment(req.hr_comment) || ''
     }));
 
     return NextResponse.json({

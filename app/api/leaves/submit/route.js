@@ -18,7 +18,7 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { start_date, end_date, start_time, end_time } = body;
+    const { start_date, end_date, start_time, end_time, reason } = body;
     let { leave_type } = body;
 
     // Validation
@@ -135,25 +135,53 @@ export async function POST(req) {
     const requestId = generateUUID();
     const nowStr = new Date().toISOString();
     const fullName = `${balance.employee_first_name} ${balance.employee_name}`.trim() || employee.name;
+    const motifStr = (reason || '').trim();
 
-    const { error: insertError } = await supabase
-      .from('leave_requests')
-      .insert({
-        request_id: requestId,
-        employee_id: employee.id,
-        employee_name: fullName,
-        start_date,
-        end_date,
-        business_days: businessDays,
-        leave_type,
-        status: 'En attente',
-        hr_comment: '',
-        created_at: nowStr,
-        updated_at: nowStr
-      });
+    // Try inserting with reason field first
+    let insertError = null;
+    try {
+      const { error: err1 } = await supabase
+        .from('leave_requests')
+        .insert({
+          request_id: requestId,
+          employee_id: employee.id,
+          employee_name: fullName,
+          start_date,
+          end_date,
+          business_days: businessDays,
+          leave_type,
+          status: 'En attente',
+          reason: motifStr,
+          hr_comment: motifStr ? `[Motif: ${motifStr}]` : '',
+          created_at: nowStr,
+          updated_at: nowStr
+        });
+      insertError = err1;
+    } catch (e) {
+      insertError = e;
+    }
 
+    // Fallback if 'reason' column does not exist in DB yet
     if (insertError) {
-      throw insertError;
+      console.warn('[SubmitRoute] Insert with reason column failed, falling back without reason column:', insertError.message);
+      const { error: err2 } = await supabase
+        .from('leave_requests')
+        .insert({
+          request_id: requestId,
+          employee_id: employee.id,
+          employee_name: fullName,
+          start_date,
+          end_date,
+          business_days: businessDays,
+          leave_type,
+          status: 'En attente',
+          hr_comment: motifStr ? `[Motif: ${motifStr}]` : '',
+          created_at: nowStr,
+          updated_at: nowStr
+        });
+      if (err2) {
+        throw err2;
+      }
     }
 
     // 6. Sync changes to Google Sheets in the background (awaited for reliability)
@@ -173,7 +201,7 @@ export async function POST(req) {
       const managerName = balance.manager_name;
       const managerEmail = findManagerEmail(managerName, allMembers || []);
 
-      console.log(`[SubmitRoute] 📧 Début de l'envoi des notifications pour la demande ${requestId} (${fullName}, ${leave_type})`);
+      console.log(`[SubmitRoute] 📧 Début de l'envoi des notifications pour la demande ${requestId} (${fullName}, ${leave_type}, Motif: "${motifStr}")`);
       console.log(`[SubmitRoute] Manager: "${managerName}" -> Email: ${managerEmail || 'Non trouvé (envoi direct aux RH)'}`);
 
       const emailPromises = [];
@@ -191,7 +219,8 @@ export async function POST(req) {
             endDate: end_date,
             businessDays,
             createdDate: nowStr,
-            requestId
+            requestId,
+            reason: motifStr
           }).then(res => console.log(`[SubmitRoute] ✅ Notification manager (${managerEmail}):`, res))
             .catch(err => console.error(`[SubmitRoute] ❌ Notification manager (${managerEmail}) échouée:`, err))
         );
@@ -212,7 +241,8 @@ export async function POST(req) {
                 endDate: end_date,
                 businessDays,
                 createdDate: nowStr,
-                requestId
+                requestId,
+                reason: motifStr
               }).then(res => console.log(`[SubmitRoute] ✅ Notification RH (${hr.employee_email}):`, res))
                 .catch(err => console.error(`[SubmitRoute] ❌ Notification RH (${hr.employee_email}) échouée:`, err))
             );
@@ -231,7 +261,8 @@ export async function POST(req) {
             startDate: start_date,
             endDate: end_date,
             businessDays,
-            managerName: managerName || 'Responsable RH'
+            managerName: managerName || 'Responsable RH',
+            reason: motifStr
           }).then(res => console.log(`[SubmitRoute] ✅ Confirmation employé (${employeeEmail}):`, res))
             .catch(err => console.error(`[SubmitRoute] ❌ Confirmation employé (${employeeEmail}) échouée:`, err))
         );

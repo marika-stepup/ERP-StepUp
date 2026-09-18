@@ -7,6 +7,7 @@ import {
   sendPendingLeavesDigestEmail, 
   isEmailConfigured 
 } from '../../../../lib/emailService';
+import { extractMotif } from '../../../../lib/utils';
 
 /**
  * Endpoint CRON pour envoyer automatiquement un récapitulatif par email des demandes en attente.
@@ -82,7 +83,8 @@ async function handleNotifyPending(req) {
       const enrichedReq = {
         ...reqItem,
         service: service || 'Équipe',
-        employee_name: employeeProfile ? `${employeeProfile.employee_first_name || ''} ${employeeProfile.employee_name || ''}`.trim() || reqItem.employee_name : reqItem.employee_name
+        employee_name: employeeProfile ? `${employeeProfile.employee_first_name || ''} ${employeeProfile.employee_name || ''}`.trim() || reqItem.employee_name : reqItem.employee_name,
+        reason: reqItem.reason || extractMotif(reqItem.hr_comment) || ''
       };
 
       const managerEmail = findManagerEmail(managerName, members || []);

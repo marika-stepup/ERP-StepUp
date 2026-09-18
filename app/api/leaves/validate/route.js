@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRole, getSupabaseAdmin } from '../../../../lib/supabaseAuth';
 import { syncLeaveRequest, syncEmployeeBalance } from '../../../../lib/sheetsSync';
 import { sendLeaveDecisionToEmployee } from '../../../../lib/emailService';
+import { extractMotif, formatCombinedComment } from '../../../../lib/utils';
 
 export async function POST(req) {
   // 1. Authenticate and verify role 'hr', 'manager' or 'director'
@@ -152,12 +153,15 @@ export async function POST(req) {
         }
       }
 
+      const reqMotif = targetRequest.reason || extractMotif(targetRequest.hr_comment) || '';
+      const finalComment = formatCombinedComment(reqMotif, hr_comment || 'Approuvé');
+
       // Update request status in Supabase
       const { error: reqUpdateErr } = await supabase
         .from('leave_requests')
         .update({
           status: 'Approuvé',
-          hr_comment: hr_comment || 'Approuvé',
+          hr_comment: finalComment,
           updated_at: nowStr
         })
         .eq('request_id', request_id);
@@ -192,7 +196,8 @@ export async function POST(req) {
           status: 'Approuvé',
           hrComment: hr_comment || 'Votre demande a été validée.',
           remainingBalance: currentRemainingCP,
-          remainingPerm: currentRemainingPerm
+          remainingPerm: currentRemainingPerm,
+          reason: reqMotif
         });
       } catch (emailErr) {
         console.error('[ValidateRoute] Erreur lors de l\'envoi de l\'email de décision (Approuvé) :', emailErr);
@@ -210,11 +215,14 @@ export async function POST(req) {
 
     } else {
       // Reject request
+      const reqMotif = targetRequest.reason || extractMotif(targetRequest.hr_comment) || '';
+      const finalComment = formatCombinedComment(reqMotif, hr_comment || 'Refusé');
+
       const { error: reqUpdateErr } = await supabase
         .from('leave_requests')
         .update({
           status: 'Refusé',
-          hr_comment: hr_comment || 'Refusé',
+          hr_comment: finalComment,
           updated_at: nowStr
         })
         .eq('request_id', request_id);
@@ -243,7 +251,8 @@ export async function POST(req) {
           status: 'Refusé',
           hrComment: hr_comment || 'Demande refusée par votre responsable.',
           remainingBalance: requesterProfile.remaining_balance,
-          remainingPerm: requesterProfile.remaining_perm
+          remainingPerm: requesterProfile.remaining_perm,
+          reason: reqMotif
         });
       } catch (emailErr) {
         console.error('[ValidateRoute] Erreur lors de l\'envoi de l\'email de décision (Refusé) :', emailErr);

@@ -162,7 +162,7 @@ export async function GET(req) {
         // Pauses
         pauseMinutes: 0,
         pauseCount: 0,
-        pauseTypes: { dejeuner: 0, gouter: 0, cigarette: 0, autre: 0 },
+        pauseTypes: { dejeuner: 0, autre: 0 },
         // Flux entrées/sorties
         entriesCount: 0,
         exitsCount: 0,
@@ -227,7 +227,7 @@ export async function GET(req) {
               durMin = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
             }
             if (durMin > 0) {
-              const bType = brk.type ? (brk.type.includes('dej') ? 'dejeuner' : brk.type.includes('gout') ? 'gouter' : brk.type.includes('cig') ? 'cigarette' : 'autre') : 'autre';
+              const bType = brk.type && brk.type.includes('dej') ? 'dejeuner' : 'autre';
               dayLogsMap[log.date].pauseMinutes += durMin;
               dayLogsMap[log.date].pauseCount++;
               dayLogsMap[log.date].pauseTypes[bType] = (dayLogsMap[log.date].pauseTypes[bType] || 0) + durMin;
@@ -244,7 +244,7 @@ export async function GET(req) {
         const durMin = Math.round((log.duration_seconds || 0) / 60);
         if (durMin > 0) {
           const lType = log.log_type || '';
-          const category = lType.includes('dejeuner') ? 'dejeuner' : lType.includes('gouter') ? 'gouter' : lType.includes('cigarette') ? 'cigarette' : 'autre';
+          const category = lType.includes('dejeuner') ? 'dejeuner' : 'autre';
           dayLogsMap[dStr].pauseMinutes += durMin;
           dayLogsMap[dStr].pauseCount++;
           dayLogsMap[dStr].pauseTypes[category] = (dayLogsMap[dStr].pauseTypes[category] || 0) + durMin;
@@ -276,7 +276,7 @@ export async function GET(req) {
 
     let totalPauseMinutes = 0;
     let totalPauseCount = 0;
-    const pauseBreakdown = { dejeuner: 0, gouter: 0, cigarette: 0, autre: 0 };
+    const pauseBreakdown = { dejeuner: 0, autre: 0 };
 
     let totalFluxEntries = 0;
     let totalFluxExits = 0;
@@ -287,8 +287,6 @@ export async function GET(req) {
       totalPauseMinutes += dayStats.pauseMinutes;
       totalPauseCount += dayStats.pauseCount;
       pauseBreakdown.dejeuner += dayStats.pauseTypes.dejeuner;
-      pauseBreakdown.gouter += dayStats.pauseTypes.gouter;
-      pauseBreakdown.cigarette += dayStats.pauseTypes.cigarette;
       pauseBreakdown.autre += dayStats.pauseTypes.autre;
 
       totalFluxEntries += dayStats.entriesCount;
@@ -456,8 +454,6 @@ export async function GET(req) {
         dayNum: item.dayNum,
         isWeekend: item.isWeekend,
         dejeuner: stats.pauseTypes.dejeuner,
-        gouter: stats.pauseTypes.gouter,
-        cigarette: stats.pauseTypes.cigarette,
         autre: stats.pauseTypes.autre,
         totalMinutes: stats.pauseMinutes,
         count: stats.pauseCount

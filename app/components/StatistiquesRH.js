@@ -245,7 +245,7 @@ export default function StatistiquesRH({
     totalHours: '0',
     avgMinutesPerDay: 0,
     totalCount: 0,
-    breakdown: { dejeuner: 0, gouter: 0, cigarette: 0, autre: 0 }
+    breakdown: { dejeuner: 0, autre: 0 }
   };
   const maxPauseMin = Math.max(30, ...pauseChartData.map(d => d.totalMinutes || 0));
 
@@ -947,14 +947,6 @@ export default function StatistiquesRH({
               <span>🍽️ Déjeuner ({pauseSummary.breakdown.dejeuner}m)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#f59e0b' }}></span>
-              <span>🍪 Goûter ({pauseSummary.breakdown.gouter}m)</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#64748b' }}></span>
-              <span>🚬 Cigarette ({pauseSummary.breakdown.cigarette}m)</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#3b82f6' }}></span>
               <span>☕ Pause ({pauseSummary.breakdown.autre}m)</span>
             </div>
@@ -989,14 +981,10 @@ export default function StatistiquesRH({
                     const maxHeight = 150;
 
                     const dejH = (d.dejeuner / maxPauseMin) * maxHeight;
-                    const goutH = (d.gouter / maxPauseMin) * maxHeight;
-                    const cigH = (d.cigarette / maxPauseMin) * maxHeight;
                     const autrH = (d.autre / maxPauseMin) * maxHeight;
 
                     const yDej = 175 - dejH;
-                    const yGout = yDej - goutH;
-                    const yCig = yGout - cigH;
-                    const yAutr = yCig - autrH;
+                    const yAutr = yDej - autrH;
 
                     const isHovered = hoveredPauseDayIndex === index;
 
@@ -1017,14 +1005,6 @@ export default function StatistiquesRH({
                         {/* Déjeuner Segment */}
                         {dejH > 0 && (
                           <rect x={x} y={yDej} width={barWidth} height={dejH} fill="#ea580c" rx="2" />
-                        )}
-                        {/* Goûter Segment */}
-                        {goutH > 0 && (
-                          <rect x={x} y={yGout} width={barWidth} height={goutH} fill="#f59e0b" rx="2" />
-                        )}
-                        {/* Cigarette Segment */}
-                        {cigH > 0 && (
-                          <rect x={x} y={yCig} width={barWidth} height={cigH} fill="#64748b" rx="2" />
                         )}
                         {/* Autre Segment */}
                         {autrH > 0 && (
@@ -1050,7 +1030,7 @@ export default function StatistiquesRH({
                               x={Math.max(10, Math.min(chartWidth - 170, x - 75))}
                               y="5"
                               width="165"
-                              height="75"
+                              height="55"
                               fill="var(--brand-navy)"
                               rx="6"
                               filter="drop-shadow(0 4px 6px rgba(0,0,0,0.3))"
@@ -1061,13 +1041,7 @@ export default function StatistiquesRH({
                             <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="33" fill="#fb923c" fontSize="9">
                               🍽️ Déjeuner : {d.dejeuner} min
                             </text>
-                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="45" fill="#fde047" fontSize="9">
-                              🍪 Goûter : {d.gouter} min
-                            </text>
-                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="57" fill="#cbd5e1" fontSize="9">
-                              🚬 Cigarette : {d.cigarette} min
-                            </text>
-                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="69" fill="#93c5fd" fontSize="9">
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="47" fill="#93c5fd" fontSize="9">
                               ☕ Autre / Détente : {d.autre} min
                             </text>
                           </g>
