@@ -1320,393 +1320,395 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             </div>
           )}
           
-          {/* LIVRABLES / TÂCHES */}
-          <div className="panel deliverables-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                LIVRABLES / TÂCHES
-                {selectedClient && (
-                  <span style={{ 
-                    fontSize: '0.85rem', 
-                    fontWeight: '600', 
-                    color: 'var(--brand-orange)', 
-                    backgroundColor: 'rgba(234, 88, 12, 0.12)', 
-                    padding: '0.2rem 0.6rem', 
-                    borderRadius: '12px' 
-                  }}>
-                    {selectedClient.name}
-                  </span>
-                )}
-              </h2>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowAddTask(true)}>
-                <Plus size={14} /> Nouvelle Tâche
-              </button>
-            </div>
-            <p className="panel-subtitle">Administrez et mettez à jour les livrables du client organisés selon les 5 catégories.</p>
-
-            {/* Barre d'action sélection multiple pour livrables du client */}
-            {selectedTaskIds.length > 0 && (
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                background: '#fee2e2',
-                border: '1.5px solid #f87171',
-                borderRadius: '8px',
-                padding: '0.65rem 1rem',
-                marginTop: '1rem',
-                flexWrap: 'wrap',
-                gap: '0.75rem',
-                boxShadow: '0 2px 6px rgba(239, 68, 68, 0.15)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#991b1b' }}>
-                    {selectedTaskIds.length} tâche(s) sélectionnée(s)
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <button
-                    type="button"
-                    onClick={handleClearSelectedTasks}
-                    className="btn btn-outline btn-sm"
-                    style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem', background: '#fff' }}
-                  >
-                    Annuler la sélection
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteSelectedTasks}
-                    style={{
-                      background: '#ef4444',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '0.45rem 0.9rem',
-                      fontSize: '0.84rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)'
-                    }}
-                  >
-                    <Trash2 size={14} /> Supprimer les {selectedTaskIds.length} éléments sélectionnés
-                  </button>
-                </div>
+          {/* LIVRABLES / TÂCHES - MASQUÉ TEMPORAIREMENT */}
+          {false && (
+            <div className="panel deliverables-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  LIVRABLES / TÂCHES
+                  {selectedClient && (
+                    <span style={{ 
+                      fontSize: '0.85rem', 
+                      fontWeight: '600', 
+                      color: 'var(--brand-orange)', 
+                      backgroundColor: 'rgba(234, 88, 12, 0.12)', 
+                      padding: '0.2rem 0.6rem', 
+                      borderRadius: '12px' 
+                    }}>
+                      {selectedClient.name}
+                    </span>
+                  )}
+                </h2>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowAddTask(true)}>
+                  <Plus size={14} /> Nouvelle Tâche
+                </button>
               </div>
-            )}
+              <p className="panel-subtitle">Administrez et mettez à jour les livrables du client organisés selon les 5 catégories.</p>
 
-            <div className="deliverables-5-container" style={{ marginTop: '1.25rem' }}>
-              {DELIVERABLE_CATEGORIES.map(card => {
-                const IconComp = card.icon;
-                const catTasks = (selectedClient.tasks || []).filter(t => {
+              {/* Barre d'action sélection multiple pour livrables du client */}
+              {selectedTaskIds.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: '#fee2e2',
+                  border: '1.5px solid #f87171',
+                  borderRadius: '8px',
+                  padding: '0.65rem 1rem',
+                  marginTop: '1rem',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                  boxShadow: '0 2px 6px rgba(239, 68, 68, 0.15)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#991b1b' }}>
+                      {selectedTaskIds.length} tâche(s) sélectionnée(s)
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <button
+                      type="button"
+                      onClick={handleClearSelectedTasks}
+                      className="btn btn-outline btn-sm"
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem', background: '#fff' }}
+                    >
+                      Annuler la sélection
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteSelectedTasks}
+                      style={{
+                        background: '#ef4444',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.45rem 0.9rem',
+                        fontSize: '0.84rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)'
+                      }}
+                    >
+                      <Trash2 size={14} /> Supprimer les {selectedTaskIds.length} éléments sélectionnés
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="deliverables-5-container" style={{ marginTop: '1.25rem' }}>
+                {DELIVERABLE_CATEGORIES.map(card => {
+                  const IconComp = card.icon;
+                  const catTasks = (selectedClient.tasks || []).filter(t => {
+                    const cat = (t.category || '').toLowerCase();
+                    const name = (t.name || '').toLowerCase();
+
+                    if (card.id === 'redaction') {
+                      return cat === 'rédaction' || cat === 'redaction' || cat.includes('post') || cat.includes('article') || cat.includes('bb') || cat.includes('linkedin') || cat.includes('facebook') || cat.includes('instagram') || name.includes('post') || name.includes('article') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
+                    }
+                    if (card.id === 'crea_graphique') {
+                      return cat === 'créa graphique' || cat === 'crea graphique' || cat === 'créa' || cat === 'crea' || cat.includes('visuel') || cat.includes('video') || cat.includes('vidéo') || cat.includes('maquette') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
+                    }
+                    if (card.id === 'reunion') {
+                      return cat === 'réunion' || cat === 'reunion' || cat.includes('reunion') || cat.includes('réunion') || cat.includes('brief') || cat.includes('meeting') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
+                    }
+                    if (card.id === 'data') {
+                      return cat === 'data' || cat.includes('reporting') || cat.includes('rapport') || cat.includes('rh') || cat.includes('comptabilite') || cat.includes('comptabilité') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
+                    }
+                    if (card.id === 'tech') {
+                      return cat === 'tech' || cat.includes('web') || cat.includes('ia') || cat.includes('dev') || cat.includes('tma') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
+                    }
+                    return t.category?.toLowerCase() === card.categoryKey.toLowerCase() || t.name?.toLowerCase() === card.title.toLowerCase();
+                  });
+
+                  let catSpentSec = 0;
+                  let catBudgetHours = 0;
+                  catTasks.forEach(t => {
+                    catSpentSec += (t.time_spent_seconds || 0);
+                    catBudgetHours += (t.budget_hours || 0);
+                  });
+
+                  return (
+                    <div 
+                      key={card.id}
+                      className="deliverable-card-item"
+                      style={{ borderLeft: `4px solid ${card.themeColor}` }}
+                    >
+                      <div className="deliverable-card-header">
+                        <div className="deliverable-card-title-group">
+                          <div 
+                            className="deliverable-card-icon-badge"
+                            style={{ backgroundColor: `${card.themeColor}15`, color: card.themeColor }}
+                          >
+                            <IconComp size={20} />
+                          </div>
+                          <div>
+                            <h3 className="deliverable-card-title">{card.title}</h3>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                              {formatSecondsToHMText(catSpentSec)}
+                              {catBudgetHours > 0 ? ` / ${catBudgetHours}h budgétées` : ' passées au total'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Activities Tags */}
+                      <div className="deliverable-activities-tags">
+                        {card.activities.map(act => (
+                          <span key={act} className="activity-pill">
+                            {act}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Sub-tasks List if any */}
+                      {catTasks.length > 0 && (
+                        <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                          {catTasks.map(task => {
+                            const budgetSec = task.budget_hours * 3600;
+                            const spentSec = task.time_spent_seconds || 0;
+                            const isCompleted = task.status === 'Fait';
+                            const progressPercent = budgetSec > 0 ? Math.round((spentSec / budgetSec) * 100) : 0;
+                            const isSelected = selectedTaskIds.includes(task.id);
+
+                            return (
+                              <div 
+                                key={task.id} 
+                                className={`task-item-card ${isCompleted ? 'completed' : ''}`}
+                                style={{
+                                  border: isSelected ? '2px solid #ea580c' : undefined,
+                                  background: isSelected ? '#fff7ed' : undefined,
+                                  boxShadow: isSelected ? '0 2px 8px rgba(234, 88, 12, 0.15)' : undefined
+                                }}
+                              >
+                                <div className="task-item-header">
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                                    <input 
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleToggleSelectTask(task.id)}
+                                      style={{ 
+                                        width: '15px', 
+                                        height: '15px', 
+                                        cursor: 'pointer', 
+                                        accentColor: '#ea580c', 
+                                        marginTop: '0.2rem',
+                                        flexShrink: 0
+                                      }}
+                                      title="Sélectionner pour suppression"
+                                    />
+                                    <div className="task-item-details" style={{ flex: 1, minWidth: 0 }}>
+                                      <h4 className="task-item-name">{task.name}</h4>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', margin: '0.2rem 0' }}>
+                                        <span className="task-item-budget">
+                                          {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
+                                        </span>
+                                        {task.assigned_to_name && (
+                                          <span style={{ fontSize: '0.68rem', background: 'rgba(23, 143, 203, 0.1)', color: '#178FCB', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                            <User size={10} /> {task.assigned_to_name}
+                                          </span>
+                                        )}
+                                        {task.is_recurring && (
+                                          <span style={{ fontSize: '0.68rem', background: 'rgba(51, 136, 85, 0.1)', color: '#338855', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                            <Repeat size={10} /> Récurrente
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'nowrap' }}>
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>Échéance :</span>
+                                        <input 
+                                          type="date"
+                                          value={task.due_date ? task.due_date.split('T')[0] : ''}
+                                          onChange={(e) => handleUpdateTaskDueDate(task.id, e.target.value)}
+                                          style={{
+                                            fontSize: '0.7rem',
+                                            padding: '0.1rem 0.25rem',
+                                            borderRadius: '4px',
+                                            border: '1px solid var(--border-light)',
+                                            backgroundColor: 'var(--panel-white)',
+                                            color: 'var(--text-primary)',
+                                            cursor: 'pointer',
+                                            width: '115px',
+                                            flexShrink: 0
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="task-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                                    <select 
+                                      className="task-status-selector"
+                                      value={task.status} 
+                                      onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
+                                    >
+                                      <option value="Non démarré">À faire</option>
+                                      <option value="En cours">En cours</option>
+                                      <option value="Fait">Fait</option>
+                                    </select>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}>
+                                      <button 
+                                        type="button"
+                                        className="btn-icon-edit" 
+                                        onClick={() => handleStartEditTask(task)} 
+                                        title="Modifier la tâche"
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: '#64748b',
+                                          cursor: 'pointer',
+                                          padding: '0.2rem',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          borderRadius: '4px',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.color = '#ea580c'; e.currentTarget.style.backgroundColor = 'rgba(234, 88, 12, 0.1)'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                                      >
+                                        <Edit size={12} />
+                                      </button>
+
+                                      <button className="btn-icon-delete" onClick={() => handleDeleteTask(task.id)} title="Supprimer la tâche">
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="task-item-progress">
+                                  <div className="progress-bar-container">
+                                    <div 
+                                      className={`progress-bar-fill ${isCompleted ? 'green' : 'blue'}`}
+                                      style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Autres tâches spécifiques du client */}
+              {(() => {
+                const otherClientTasks = (selectedClient.tasks || []).filter(t => {
                   const cat = (t.category || '').toLowerCase();
                   const name = (t.name || '').toLowerCase();
-
-                  if (card.id === 'redaction') {
-                    return cat === 'rédaction' || cat === 'redaction' || cat.includes('post') || cat.includes('article') || cat.includes('bb') || cat.includes('linkedin') || cat.includes('facebook') || cat.includes('instagram') || name.includes('post') || name.includes('article') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
-                  }
-                  if (card.id === 'crea_graphique') {
-                    return cat === 'créa graphique' || cat === 'crea graphique' || cat === 'créa' || cat === 'crea' || cat.includes('visuel') || cat.includes('video') || cat.includes('vidéo') || cat.includes('maquette') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
-                  }
-                  if (card.id === 'reunion') {
-                    return cat === 'réunion' || cat === 'reunion' || cat.includes('reunion') || cat.includes('réunion') || cat.includes('brief') || cat.includes('meeting') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
-                  }
-                  if (card.id === 'data') {
-                    return cat === 'data' || cat.includes('reporting') || cat.includes('rapport') || cat.includes('rh') || cat.includes('comptabilite') || cat.includes('comptabilité') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
-                  }
-                  if (card.id === 'tech') {
-                    return cat === 'tech' || cat.includes('web') || cat.includes('ia') || cat.includes('dev') || cat.includes('tma') || cat === card.id.toLowerCase() || name === card.title.toLowerCase();
-                  }
-                  return t.category?.toLowerCase() === card.categoryKey.toLowerCase() || t.name?.toLowerCase() === card.title.toLowerCase();
+                  const isRedaction = cat === 'rédaction' || cat === 'redaction' || cat.includes('post') || cat.includes('article') || cat.includes('bb') || cat.includes('linkedin') || cat.includes('facebook') || cat.includes('instagram') || name.includes('post') || name.includes('article') || cat === 'redaction';
+                  const isCrea = cat === 'créa graphique' || cat === 'crea graphique' || cat === 'créa' || cat === 'crea' || cat.includes('visuel') || cat.includes('video') || cat.includes('vidéo') || cat.includes('maquette') || cat === 'crea_graphique';
+                  const isReunion = cat === 'réunion' || cat === 'reunion' || cat.includes('reunion') || cat.includes('réunion') || cat.includes('brief') || cat.includes('meeting') || cat === 'reunion';
+                  const isData = cat === 'data' || cat.includes('reporting') || cat.includes('rapport') || cat.includes('rh') || cat.includes('comptabilite') || cat.includes('comptabilité');
+                  const isTech = cat === 'tech' || cat.includes('web') || cat.includes('ia') || cat.includes('dev') || cat.includes('tma');
+                  return !isRedaction && !isCrea && !isReunion && !isData && !isTech;
                 });
 
-                let catSpentSec = 0;
-                let catBudgetHours = 0;
-                catTasks.forEach(t => {
-                  catSpentSec += (t.time_spent_seconds || 0);
-                  catBudgetHours += (t.budget_hours || 0);
-                });
+                if (otherClientTasks.length === 0) return null;
 
                 return (
-                  <div 
-                    key={card.id}
-                    className="deliverable-card-item"
-                    style={{ borderLeft: `4px solid ${card.themeColor}` }}
-                  >
-                    <div className="deliverable-card-header">
-                      <div className="deliverable-card-title-group">
-                        <div 
-                          className="deliverable-card-icon-badge"
-                          style={{ backgroundColor: `${card.themeColor}15`, color: card.themeColor }}
-                        >
-                          <IconComp size={20} />
-                        </div>
-                        <div>
-                          <h3 className="deliverable-card-title">{card.title}</h3>
-                          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                            {formatSecondsToHMText(catSpentSec)}
-                            {catBudgetHours > 0 ? ` / ${catBudgetHours}h budgétées` : ' passées au total'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                  <div style={{ marginTop: '1.5rem', paddingTop: '1.2rem', borderTop: '1px solid var(--border-light)' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Layers size={16} style={{ color: 'var(--brand-orange)' }} />
+                      Autres tâches du client ({otherClientTasks.length})
+                    </h3>
+                    <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                      {otherClientTasks.map(task => {
+                        const budgetSec = task.budget_hours * 3600;
+                        const spentSec = task.time_spent_seconds || 0;
+                        const isCompleted = task.status === 'Fait';
+                        const isSelected = selectedTaskIds.includes(task.id);
 
-                    {/* Activities Tags */}
-                    <div className="deliverable-activities-tags">
-                      {card.activities.map(act => (
-                        <span key={act} className="activity-pill">
-                          {act}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Sub-tasks List if any */}
-                    {catTasks.length > 0 && (
-                      <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
-                        {catTasks.map(task => {
-                          const budgetSec = task.budget_hours * 3600;
-                          const spentSec = task.time_spent_seconds || 0;
-                          const isCompleted = task.status === 'Fait';
-                          const progressPercent = budgetSec > 0 ? Math.round((spentSec / budgetSec) * 100) : 0;
-                          const isSelected = selectedTaskIds.includes(task.id);
-
-                          return (
-                            <div 
-                              key={task.id} 
-                              className={`task-item-card ${isCompleted ? 'completed' : ''}`}
-                              style={{
-                                border: isSelected ? '2px solid #ea580c' : undefined,
-                                background: isSelected ? '#fff7ed' : undefined,
-                                boxShadow: isSelected ? '0 2px 8px rgba(234, 88, 12, 0.15)' : undefined
-                              }}
-                            >
-                              <div className="task-item-header">
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                                  <input 
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => handleToggleSelectTask(task.id)}
-                                    style={{ 
-                                      width: '15px', 
-                                      height: '15px', 
-                                      cursor: 'pointer', 
-                                      accentColor: '#ea580c', 
-                                      marginTop: '0.2rem',
-                                      flexShrink: 0
-                                    }}
-                                    title="Sélectionner pour suppression"
-                                  />
-                                  <div className="task-item-details" style={{ flex: 1, minWidth: 0 }}>
-                                    <h4 className="task-item-name">{task.name}</h4>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', margin: '0.2rem 0' }}>
-                                      <span className="task-item-budget">
-                                        {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
-                                      </span>
-                                      {task.assigned_to_name && (
-                                        <span style={{ fontSize: '0.68rem', background: 'rgba(23, 143, 203, 0.1)', color: '#178FCB', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                          <User size={10} /> {task.assigned_to_name}
-                                        </span>
-                                      )}
-                                      {task.is_recurring && (
-                                        <span style={{ fontSize: '0.68rem', background: 'rgba(51, 136, 85, 0.1)', color: '#338855', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                          <Repeat size={10} /> Récurrente
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'nowrap' }}>
-                                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>Échéance :</span>
-                                      <input 
-                                        type="date"
-                                        value={task.due_date ? task.due_date.split('T')[0] : ''}
-                                        onChange={(e) => handleUpdateTaskDueDate(task.id, e.target.value)}
-                                        style={{
-                                          fontSize: '0.7rem',
-                                          padding: '0.1rem 0.25rem',
-                                          borderRadius: '4px',
-                                          border: '1px solid var(--border-light)',
-                                          backgroundColor: 'var(--panel-white)',
-                                          color: 'var(--text-primary)',
-                                          cursor: 'pointer',
-                                          width: '115px',
-                                          flexShrink: 0
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="task-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
-                                  <select 
-                                    className="task-status-selector"
-                                    value={task.status} 
-                                    onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
-                                  >
-                                    <option value="Non démarré">À faire</option>
-                                    <option value="En cours">En cours</option>
-                                    <option value="Fait">Fait</option>
-                                  </select>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}>
-                                    <button 
-                                      type="button"
-                                      className="btn-icon-edit" 
-                                      onClick={() => handleStartEditTask(task)} 
-                                      title="Modifier la tâche"
-                                      style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: '#64748b',
-                                        cursor: 'pointer',
-                                        padding: '0.2rem',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        borderRadius: '4px',
-                                        transition: 'all 0.15s ease'
-                                      }}
-                                      onMouseEnter={(e) => { e.currentTarget.style.color = '#ea580c'; e.currentTarget.style.backgroundColor = 'rgba(234, 88, 12, 0.1)'; }}
-                                      onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-                                    >
-                                      <Edit size={12} />
-                                    </button>
-
-                                    <button className="btn-icon-delete" onClick={() => handleDeleteTask(task.id)} title="Supprimer la tâche">
-                                      <Trash2 size={12} />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="task-item-progress">
-                                <div className="progress-bar-container">
-                                  <div 
-                                    className={`progress-bar-fill ${isCompleted ? 'green' : 'blue'}`}
-                                    style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                                  ></div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Autres tâches spécifiques du client */}
-            {(() => {
-              const otherClientTasks = (selectedClient.tasks || []).filter(t => {
-                const cat = (t.category || '').toLowerCase();
-                const name = (t.name || '').toLowerCase();
-                const isRedaction = cat === 'rédaction' || cat === 'redaction' || cat.includes('post') || cat.includes('article') || cat.includes('bb') || cat.includes('linkedin') || cat.includes('facebook') || cat.includes('instagram') || name.includes('post') || name.includes('article') || cat === 'redaction';
-                const isCrea = cat === 'créa graphique' || cat === 'crea graphique' || cat === 'créa' || cat === 'crea' || cat.includes('visuel') || cat.includes('video') || cat.includes('vidéo') || cat.includes('maquette') || cat === 'crea_graphique';
-                const isReunion = cat === 'réunion' || cat === 'reunion' || cat.includes('reunion') || cat.includes('réunion') || cat.includes('brief') || cat.includes('meeting') || cat === 'reunion';
-                const isData = cat === 'data' || cat.includes('reporting') || cat.includes('rapport') || cat.includes('rh') || cat.includes('comptabilite') || cat.includes('comptabilité');
-                const isTech = cat === 'tech' || cat.includes('web') || cat.includes('ia') || cat.includes('dev') || cat.includes('tma');
-                return !isRedaction && !isCrea && !isReunion && !isData && !isTech;
-              });
-
-              if (otherClientTasks.length === 0) return null;
-
-              return (
-                <div style={{ marginTop: '1.5rem', paddingTop: '1.2rem', borderTop: '1px solid var(--border-light)' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Layers size={16} style={{ color: 'var(--brand-orange)' }} />
-                    Autres tâches du client ({otherClientTasks.length})
-                  </h3>
-                  <div className="task-items-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
-                    {otherClientTasks.map(task => {
-                      const budgetSec = task.budget_hours * 3600;
-                      const spentSec = task.time_spent_seconds || 0;
-                      const isCompleted = task.status === 'Fait';
-                      const isSelected = selectedTaskIds.includes(task.id);
-
-                      return (
-                        <div 
-                          key={task.id} 
-                          className={`task-item-card ${isCompleted ? 'completed' : ''}`}
-                          style={{
-                            border: isSelected ? '2px solid #ea580c' : undefined,
-                            background: isSelected ? '#fff7ed' : undefined,
-                            boxShadow: isSelected ? '0 2px 8px rgba(234, 88, 12, 0.15)' : undefined
-                          }}
-                        >
-                          <div className="task-item-header">
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                              <input 
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => handleToggleSelectTask(task.id)}
-                                style={{ 
-                                  width: '15px', 
-                                  height: '15px', 
-                                  cursor: 'pointer', 
-                                  accentColor: '#ea580c', 
-                                  marginTop: '0.2rem',
-                                  flexShrink: 0
-                                }}
-                                title="Sélectionner pour suppression"
-                              />
-                              <div className="task-item-details" style={{ flex: 1, minWidth: 0 }}>
-                                <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--brand-orange)', background: 'rgba(249, 115, 22, 0.1)', padding: '0.1rem 0.4rem', borderRadius: '4px', display: 'inline-block', marginBottom: '0.2rem' }}>
-                                  {task.category || 'Non catégorisé'}
-                                </span>
-                                <h4 className="task-item-name">{task.name}</h4>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', margin: '0.2rem 0' }}>
-                                  <span className="task-item-budget">
-                                    {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
-                                  </span>
-                                  {task.assigned_to_name && (
-                                    <span style={{ fontSize: '0.68rem', background: 'rgba(23, 143, 203, 0.1)', color: '#178FCB', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
-                                      {task.assigned_to_name}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="task-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}>
-                                <button 
-                                  type="button"
-                                  className="btn-icon-edit" 
-                                  onClick={() => handleStartEditTask(task)} 
-                                  title="Modifier la tâche"
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#64748b',
-                                    cursor: 'pointer',
-                                    padding: '0.2rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: '4px',
-                                    transition: 'all 0.15s ease'
+                        return (
+                          <div 
+                            key={task.id} 
+                            className={`task-item-card ${isCompleted ? 'completed' : ''}`}
+                            style={{
+                              border: isSelected ? '2px solid #ea580c' : undefined,
+                              background: isSelected ? '#fff7ed' : undefined,
+                              boxShadow: isSelected ? '0 2px 8px rgba(234, 88, 12, 0.15)' : undefined
+                            }}
+                          >
+                            <div className="task-item-header">
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                                <input 
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => handleToggleSelectTask(task.id)}
+                                  style={{ 
+                                    width: '15px', 
+                                    height: '15px', 
+                                    cursor: 'pointer', 
+                                    accentColor: '#ea580c', 
+                                    marginTop: '0.2rem',
+                                    flexShrink: 0
                                   }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.color = '#ea580c'; e.currentTarget.style.backgroundColor = 'rgba(234, 88, 12, 0.1)'; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-                                >
-                                  <Edit size={12} />
-                                </button>
+                                  title="Sélectionner pour suppression"
+                                />
+                                <div className="task-item-details" style={{ flex: 1, minWidth: 0 }}>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--brand-orange)', background: 'rgba(249, 115, 22, 0.1)', padding: '0.1rem 0.4rem', borderRadius: '4px', display: 'inline-block', marginBottom: '0.2rem' }}>
+                                    {task.category || 'Non catégorisé'}
+                                  </span>
+                                  <h4 className="task-item-name">{task.name}</h4>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', margin: '0.2rem 0' }}>
+                                    <span className="task-item-budget">
+                                      {formatSecondsToHMText(spentSec)} / {task.budget_hours}h00 budgété
+                                    </span>
+                                    {task.assigned_to_name && (
+                                      <span style={{ fontSize: '0.68rem', background: 'rgba(23, 143, 203, 0.1)', color: '#178FCB', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
+                                        {task.assigned_to_name}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="task-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}>
+                                  <button 
+                                    type="button"
+                                    className="btn-icon-edit" 
+                                    onClick={() => handleStartEditTask(task)} 
+                                    title="Modifier la tâche"
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#64748b',
+                                      cursor: 'pointer',
+                                      padding: '0.2rem',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '4px',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.color = '#ea580c'; e.currentTarget.style.backgroundColor = 'rgba(234, 88, 12, 0.1)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                                  >
+                                    <Edit size={12} />
+                                  </button>
 
-                                <button className="btn-icon-delete" onClick={() => handleDeleteTask(task.id)} title="Supprimer la tâche">
-                                  <Trash2 size={12} />
-                                </button>
+                                  <button className="btn-icon-delete" onClick={() => handleDeleteTask(task.id)} title="Supprimer la tâche">
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
-          </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* TEMPS TOTAL PAR COLLABORATEUR */}
           <div className="panel collaborators-summary-card">

@@ -1285,7 +1285,7 @@ export default function Page() {
     const localTime = new Date(utc + (3600000 * 3));
     const nowTimeStr = `${String(localTime.getHours()).padStart(2, '0')}:${String(localTime.getMinutes()).padStart(2, '0')}`;
 
-    // Determine scheduled clock-in for status logic
+    // Determine scheduled clock-in for status logic if not already set
     const dateObj = new Date(pointageDate);
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dayOfWeek = days[dateObj.getDay()];
@@ -1298,22 +1298,29 @@ export default function Page() {
     const [inH, inM] = nowTimeStr.split(':').map(Number);
     const [schedH, schedM] = scheduledClockIn.split(':').map(Number);
 
-    let status = 'Présent';
+    let calculatedStatus = 'Présent';
     if ((inH * 60 + inM) > (schedH * 60 + schedM)) {
-      status = 'En retard';
+      calculatedStatus = 'En retard';
     }
+
+    const prevLog = emp.time_log || {};
+    const prevEntries = Array.isArray(prevLog.entries) ? [...prevLog.entries] : (prevLog.clock_in ? [{ in: prevLog.clock_in, out: prevLog.clock_out || null }] : []);
+    const newEntries = [...prevEntries, { in: nowTimeStr, out: null }];
 
     // Keep original copy for potential rollback
     const originalEmployees = [...pointageEmployees];
 
-    // 1. Optimistic Update: Add clock-in data locally immediately
+    // 1. Optimistic Update: Mark employee as inside with clock_out = null and new entry
     const updatedEmployees = [...pointageEmployees];
     updatedEmployees[empIndex] = {
       ...emp,
       time_log: {
-        ...(emp.time_log || {}),
-        clock_in: nowTimeStr,
-        status: status
+        ...prevLog,
+        clock_in: prevLog.clock_in || nowTimeStr,
+        clock_out: null,
+        last_entry: nowTimeStr,
+        entries: newEntries,
+        status: prevLog.status || calculatedStatus
       }
     };
     setPointageEmployees(updatedEmployees);
@@ -1361,13 +1368,32 @@ export default function Page() {
 
     const originalEmployees = [...pointageEmployees];
 
-    // 1. Optimistic Update: Add clock-out locally immediately
+    const prevLog = emp.time_log || {};
+    let updatedEntries = Array.isArray(prevLog.entries) ? [...prevLog.entries] : [];
+    if (updatedEntries.length === 0) {
+      updatedEntries = [{ in: prevLog.clock_in || nowTimeStr, out: nowTimeStr }];
+    } else {
+      let closed = false;
+      for (let i = updatedEntries.length - 1; i >= 0; i--) {
+        if (!updatedEntries[i].out) {
+          updatedEntries[i].out = nowTimeStr;
+          closed = true;
+          break;
+        }
+      }
+      if (!closed) {
+        updatedEntries.push({ in: prevLog.clock_in || nowTimeStr, out: nowTimeStr });
+      }
+    }
+
+    // 1. Optimistic Update: Set clock_out locally immediately to mark outside
     const updatedEmployees = [...pointageEmployees];
     updatedEmployees[empIndex] = {
       ...emp,
       time_log: {
-        ...(emp.time_log || {}),
-        clock_out: nowTimeStr
+        ...prevLog,
+        clock_out: nowTimeStr,
+        entries: updatedEntries
       }
     };
     setPointageEmployees(updatedEmployees);
@@ -2019,7 +2045,7 @@ export default function Page() {
                     className={`tab-button ${activeTab === 'pointage' ? 'active' : ''}`}
                     onClick={() => setActiveTab('pointage')}
                   >
-                    Pointage
+                    Entrée/Sortie
                   </button>
                 </>
               )}
@@ -3590,21 +3616,8 @@ export default function Page() {
         {profileLoaded && activeTab === 'pointage' && (userRole === 'hr' || userRole === 'manager' || userRole === 'director' || balance?.service === 'Logistique' || balance?.service === 'Pointeur') && (
           <div className="pointage-layout" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-            {/* Top Toolbar: Service Filter & Search */}
+            {/* Top Toolbar: Search Collaborator */}
             <div className="panel" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div className="form-group" style={{ marginBottom: 0, minWidth: '220px' }}>
-                <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Service / Département</label>
-                <select
-                  value={pointageServiceFilter}
-                  onChange={(e) => setPointageServiceFilter(e.target.value)}
-                  style={{ margin: 0, padding: '0.5rem', width: '100%', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--panel-white)', color: 'var(--text-primary)', cursor: 'pointer' }}
-                >
-                  {uniqueServices.map(svc => (
-                    <option key={svc} value={svc}>{svc === 'Tous' ? 'Tous les services' : svc}</option>
-                  ))}
-                </select>
-              </div>
-
               <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '240px', position: 'relative' }}>
                 <label style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Rechercher un collaborateur</label>
                 <input
@@ -3616,20 +3629,21 @@ export default function Page() {
                 />
               </div>
             </div>
+
             {/* Mobile sub-tab switcher */}
             {(() => {
-              const expectedCount = pointageEmployees.filter(emp => {
+              const outsideCount = pointageEmployees.filter(emp => {
                 const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
                 const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
-                const notClockedIn = !emp.time_log || !emp.time_log.clock_in;
-                return matchesSearch && matchesService && notClockedIn;
+                const isOutside = !emp.time_log || !emp.time_log.clock_in || (emp.time_log.clock_in && emp.time_log.clock_out);
+                return matchesSearch && matchesService && isOutside;
               }).length;
 
-              const presentCount = pointageEmployees.filter(emp => {
+              const insideCount = pointageEmployees.filter(emp => {
                 const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
                 const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
-                const isClockedIn = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
-                return matchesSearch && matchesService && isClockedIn;
+                const isInside = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
+                return matchesSearch && matchesService && isInside;
               }).length;
 
               return (
@@ -3655,14 +3669,14 @@ export default function Page() {
                       transition: 'all 0.2s'
                     }}
                   >
-                    Non arrivés
+                    À l'extérieur
                     <span style={{
                       background: pointageSubTab === 'expected' ? 'rgba(255,255,255,0.2)' : 'var(--background-light)',
                       color: pointageSubTab === 'expected' ? '#fff' : 'var(--brand-orange)',
                       padding: '0.1rem 0.5rem',
                       borderRadius: '10px',
                       fontSize: '0.75rem'
-                    }}>{expectedCount}</span>
+                    }}>{outsideCount}</span>
                   </button>
                   <button
                     type="button"
@@ -3685,14 +3699,14 @@ export default function Page() {
                       transition: 'all 0.2s'
                     }}
                   >
-                    Présents
+                    Dans les locaux
                     <span style={{
                       background: pointageSubTab === 'present' ? 'rgba(255,255,255,0.2)' : 'var(--background-light)',
                       color: pointageSubTab === 'present' ? '#fff' : 'var(--brand-orange)',
                       padding: '0.1rem 0.5rem',
                       borderRadius: '10px',
                       fontSize: '0.75rem'
-                    }}>{presentCount}</span>
+                    }}>{insideCount}</span>
                   </button>
                 </div>
               );
@@ -3701,20 +3715,19 @@ export default function Page() {
             {/* The 2 Columns Board */}
             <div className="pointage-columns-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
 
-              {/* Column 1: A l'étape d'arrivée (Non présents) */}
+              {/* Column 1: À l'extérieur (Hors des locaux) */}
               <div className={`panel pointage-column-panel expected-panel ${pointageSubTab === 'expected' ? 'mobile-show' : 'mobile-hide'}`} style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '2px solid var(--border-light)', paddingBottom: '0.75rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)' }}>
-                      Non arrivés
+                      À l'extérieur
                     </h2>
                     <span className="badge-role employee" style={{ padding: '0.2rem 0.5rem', borderRadius: '12px', fontSize: '0.75rem' }}>
                       {pointageEmployees.filter(emp => {
-                        // Match filter
                         const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
                         const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
-                        const notClockedIn = !emp.time_log || !emp.time_log.clock_in;
-                        return matchesSearch && matchesService && notClockedIn;
+                        const isOutside = !emp.time_log || !emp.time_log.clock_in || (emp.time_log.clock_in && emp.time_log.clock_out);
+                        return matchesSearch && matchesService && isOutside;
                       }).length}
                     </span>
                   </div>
@@ -3748,8 +3761,8 @@ export default function Page() {
                     const filtered = pointageEmployees.filter(emp => {
                       const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
                       const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
-                      const notClockedIn = !emp.time_log || !emp.time_log.clock_in;
-                      return matchesSearch && matchesService && notClockedIn;
+                      const isOutside = !emp.time_log || !emp.time_log.clock_in || (emp.time_log.clock_in && emp.time_log.clock_out);
+                      return matchesSearch && matchesService && isOutside;
                     });
 
                     const sorted = [...filtered].sort((a, b) => {
@@ -3781,7 +3794,7 @@ export default function Page() {
                     if (sorted.length === 0) {
                       return (
                         <div style={{ textAlign: 'center', padding: '4rem 1rem', background: 'var(--panel-white)', borderRadius: '8px', border: '1px dashed var(--border-light)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                          Aucun collaborateur attendu dans cette liste.
+                          Aucun collaborateur à l'extérieur.
                         </div>
                       );
                     }
@@ -3805,16 +3818,23 @@ export default function Page() {
                                   <Timer size={12} /> Horaire : {daySchedule.arrival} - {daySchedule.departure}
                                 </span>
                                 {emp.time_log && emp.time_log.clock_out && (
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--error-color)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    <LogOut size={12} /> Parti à {emp.time_log.clock_out.substring(0, 5)}
-                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--brand-orange)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                      <LogOut size={12} /> Sorti(e) à {emp.time_log.clock_out.substring(0, 5)}
+                                    </span>
+                                    {Array.isArray(emp.time_log.entries) && emp.time_log.entries.length > 0 && (
+                                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'var(--background-light)', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>
+                                        {emp.time_log.entries.length} {emp.time_log.entries.length > 1 ? 'passages' : 'passage'}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
 
                               <button
                                 className="btn-accent"
                                 onClick={() => handleClockIn(emp.employee_id)}
-                                disabled={clockingEmployeeId === emp.employee_id || (emp.time_log && emp.time_log.clock_out)}
+                                disabled={clockingEmployeeId === emp.employee_id}
                                 style={{
                                   padding: '0.4rem 0.8rem',
                                   fontSize: '0.85rem',
@@ -3823,12 +3843,13 @@ export default function Page() {
                                   minWidth: '90px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
+                                  justifyContent: 'center',
                                   gap: '0.25rem'
                                 }}
                               >
                                 {clockingEmployeeId === emp.employee_id ? 'Envoi...' : (
                                   <>
-                                    <LogIn size={14} /> Arrivé
+                                    <LogIn size={14} /> Entrée
                                   </>
                                 )}
                               </button>
@@ -3870,19 +3891,19 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Column 2: Présents dans les locaux */}
+              {/* Column 2: Dans les locaux (Présents actuellement) */}
               <div className={`panel pointage-column-panel present-panel ${pointageSubTab === 'present' ? 'mobile-show' : 'mobile-hide'}`} style={{ background: 'var(--background-light)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '2px solid var(--border-light)', paddingBottom: '0.75rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)' }}>
-                      Présents
+                      Dans les locaux
                     </h2>
                     <span className="badge-role manager" style={{ padding: '0.2rem 0.5rem', borderRadius: '12px', fontSize: '0.75rem' }}>
                       {pointageEmployees.filter(emp => {
                         const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
                         const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
-                        const isClockedIn = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
-                        return matchesSearch && matchesService && isClockedIn;
+                        const isInside = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
+                        return matchesSearch && matchesService && isInside;
                       }).length}
                     </span>
                   </div>
@@ -3901,8 +3922,8 @@ export default function Page() {
                       width: '160px'
                     }}
                   >
-                    <option value="time-asc">Tri : Arrivée (croiss.)</option>
-                    <option value="time-desc">Tri : Arrivée (décroiss.)</option>
+                    <option value="time-asc">Tri : Entrée (croiss.)</option>
+                    <option value="time-desc">Tri : Entrée (décroiss.)</option>
                     <option value="name-asc">Tri : Prénom (A-Z)</option>
                     <option value="name-desc">Tri : Prénom (Z-A)</option>
                     <option value="service-asc">Tri : Service (A-Z)</option>
@@ -3916,19 +3937,26 @@ export default function Page() {
                     const filtered = pointageEmployees.filter(emp => {
                       const matchesSearch = `${emp.employee_first_name} ${emp.employee_name}`.toLowerCase().includes(pointageSearchQuery.toLowerCase());
                       const matchesService = pointageServiceFilter === 'Tous' || emp.service === pointageServiceFilter;
-                      const isClockedIn = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
-                      return matchesSearch && matchesService && isClockedIn;
+                      const isInside = emp.time_log && emp.time_log.clock_in && !emp.time_log.clock_out;
+                      return matchesSearch && matchesService && isInside;
                     });
 
                     const sorted = [...filtered].sort((a, b) => {
+                      const getLatestEntryTime = (emp) => {
+                        if (Array.isArray(emp.time_log?.entries) && emp.time_log.entries.length > 0) {
+                          return emp.time_log.entries[emp.time_log.entries.length - 1]?.in || emp.time_log.clock_in || '00:00';
+                        }
+                        return emp.time_log?.clock_in || '00:00';
+                      };
+
                       if (presentSort === 'time-asc') {
-                        const timeA = a.time_log?.clock_in || '00:00';
-                        const timeB = b.time_log?.clock_in || '00:00';
+                        const timeA = getLatestEntryTime(a);
+                        const timeB = getLatestEntryTime(b);
                         if (timeA !== timeB) return timeA.localeCompare(timeB);
                         return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
                       } else if (presentSort === 'time-desc') {
-                        const timeA = a.time_log?.clock_in || '00:00';
-                        const timeB = b.time_log?.clock_in || '00:00';
+                        const timeA = getLatestEntryTime(a);
+                        const timeB = getLatestEntryTime(b);
                         if (timeA !== timeB) return timeB.localeCompare(timeA);
                         return (a.employee_first_name || '').localeCompare(b.employee_first_name || '', 'fr', { sensitivity: 'base' });
                       } else if (presentSort === 'name-asc') {
@@ -3949,7 +3977,7 @@ export default function Page() {
                     if (sorted.length === 0) {
                       return (
                         <div style={{ textAlign: 'center', padding: '4rem 1rem', background: 'var(--panel-white)', borderRadius: '8px', border: '1px dashed var(--border-light)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                          Aucun collaborateur présent actuellement.
+                          Aucun collaborateur dans les locaux actuellement.
                         </div>
                       );
                     }
@@ -3957,101 +3985,52 @@ export default function Page() {
                     return (
                       <>
                         {sorted.slice(0, pointagePresentLimit).map(emp => (
-                          <div key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-white)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: emp.time_log?.is_on_break ? '1px solid #fde68a' : '1px solid var(--border-light)', position: 'relative' }}>
+                          <div key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-white)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border-light)', position: 'relative' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                               <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{emp.employee_first_name}</span>
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Service : {emp.service}</span>
 
-                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--success-color)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <LogIn size={12} /> Arrivée : {emp.time_log?.clock_in ? emp.time_log.clock_in.substring(0, 5) : '-'}
-                                </span>
-                                <span className={`status-badge ${emp.time_log?.status === 'En retard' ? 'status-rejected' : 'status-approved'}`} style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
-                                  {emp.time_log?.status}
-                                </span>
-                                {emp.time_log?.is_on_break && (
-                                  <span style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 700,
-                                    padding: '0.12rem 0.45rem',
-                                    borderRadius: '6px',
-                                    background: '#fef3c7',
-                                    color: '#b45309',
-                                    border: '1px solid #fde68a'
-                                  }}>
-                                    <Coffee size={11} /> En pause ({emp.time_log?.break_start ? emp.time_log.break_start.substring(0, 5) : '...'})
-                                  </span>
-                                )}
-                                {!emp.time_log?.is_on_break && emp.time_log?.break_duration && emp.time_log.break_duration !== '0h 00m' && (
-                                  <span style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem',
-                                    fontSize: '0.72rem',
-                                    color: 'var(--text-secondary)',
-                                    fontWeight: 500
-                                  }}>
-                                    <Coffee size={11} /> Pause : {emp.time_log.break_duration}
-                                  </span>
-                                )}
-                              </div>
+                              {(() => {
+                                const entries = Array.isArray(emp.time_log?.entries) ? emp.time_log.entries : [];
+                                const latestEntry = entries.length > 0 ? entries[entries.length - 1] : null;
+                                const entryTime = latestEntry?.in || emp.time_log?.clock_in;
+
+                                return (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem' }}>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--success-color)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                      <LogIn size={12} /> Entrée : {entryTime ? entryTime.substring(0, 5) : '-'}
+                                    </span>
+                                    {emp.time_log?.status && (
+                                      <span className={`status-badge ${emp.time_log?.status === 'En retard' ? 'status-rejected' : 'status-approved'}`} style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
+                                        {emp.time_log?.status}
+                                      </span>
+                                    )}
+                                    {entries.length > 1 && (
+                                      <span style={{ fontSize: '0.7rem', color: 'var(--brand-navy)', background: '#e0f2fe', border: '1px solid #bae6fd', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                                        {entries.length}e entrée
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
 
-                            {/* Action Buttons Column: Pause above Sortie */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: '95px' }}>
-                              {/* Pause / Retour button (Above Sortie) */}
-                              <button
-                                type="button"
-                                onClick={() => handleTogglePause(emp.employee_id)}
-                                disabled={clockingEmployeeId === emp.employee_id}
-                                style={{
-                                  padding: '0.35rem 0.65rem',
-                                  fontSize: '0.8rem',
-                                  fontWeight: 600,
-                                  color: '#fff',
-                                  background: emp.time_log?.is_on_break ? '#16a34a' : '#f59e0b',
-                                  border: emp.time_log?.is_on_break ? '1px solid #15803d' : '1px solid #d97706',
-                                  borderRadius: '6px',
-                                  cursor: clockingEmployeeId === emp.employee_id ? 'not-allowed' : 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '0.3rem',
-                                  transition: 'all 0.15s ease',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
-                                }}
-                                title={emp.time_log?.is_on_break ? "Enregistrer l'heure de retour au travail" : "Enregistrer l'heure de prise de pause (déjeuner / goûter)"}
-                              >
-                                {clockingEmployeeId === emp.employee_id ? 'Envoi...' : (
-                                  emp.time_log?.is_on_break ? (
-                                    <>
-                                      <Play size={13} fill="#fff" /> Retour
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Coffee size={13} /> Pause
-                                    </>
-                                  )
-                                )}
-                              </button>
-
-                              {/* Sortie button (Below Pause) */}
+                            {/* Action Button Column: Sortie */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '90px' }}>
                               <button
                                 className="btn-accent"
                                 onClick={() => handleClockOut(emp.employee_id)}
                                 disabled={clockingEmployeeId === emp.employee_id}
                                 style={{
-                                  padding: '0.35rem 0.65rem',
-                                  fontSize: '0.8rem',
+                                  padding: '0.4rem 0.8rem',
+                                  fontSize: '0.85rem',
                                   background: 'var(--brand-orange)',
                                   borderColor: 'var(--brand-orange-hover)',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  gap: '0.3rem'
+                                  gap: '0.3rem',
+                                  boxShadow: '0 1px 3px rgba(234, 88, 12, 0.2)'
                                 }}
                                 title="Pointer la sortie"
                               >

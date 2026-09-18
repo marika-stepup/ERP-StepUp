@@ -47,7 +47,7 @@ export async function POST(req) {
 
     if (!log || !log.clock_in) {
       return NextResponse.json(
-        { error: "Impossible de pointer le départ : aucun pointage d'arrivée enregistré aujourd'hui pour ce collaborateur." },
+        { error: "Impossible de pointer la sortie : aucun pointage d'entrée enregistré aujourd'hui pour ce collaborateur." },
         { status: 400 }
       );
     }
@@ -59,7 +59,25 @@ export async function POST(req) {
       finalClockOut = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
 
-    // 4. Check if early departure and handle active break
+    // 4. Update sessions (entries array)
+    let updatedEntries = Array.isArray(log.entries) ? [...log.entries] : [];
+    if (updatedEntries.length === 0) {
+      updatedEntries = [{ in: log.clock_in, out: finalClockOut }];
+    } else {
+      let closed = false;
+      for (let i = updatedEntries.length - 1; i >= 0; i--) {
+        if (!updatedEntries[i].out) {
+          updatedEntries[i].out = finalClockOut;
+          closed = true;
+          break;
+        }
+      }
+      if (!closed) {
+        updatedEntries.push({ in: log.clock_in, out: finalClockOut });
+      }
+    }
+
+    // 5. Check if early departure and handle active break
     let newStatus = log.status || 'Présent';
     if (log.scheduled_clock_out) {
       const [outH, outM] = finalClockOut.split(':').map(Number);
@@ -100,38 +118,56 @@ export async function POST(req) {
       updatedBreakDuration = `${hrs}h ${mins.toString().padStart(2, '0')}m`;
     }
 
-    // 5. Update pointage row in Supabase
-    const { data: updatedData, error: updateErr } = await supabase
+    // 6. Update pointage row in Supabase
+    const updatePayload = {
+      clock_out: finalClockOut,
+      entries: updatedEntries,
+      status: newStatus,
+      is_on_break: false,
+      break_end: updatedBreakEnd,
+      break_duration: updatedBreakDuration,
+      breaks: updatedBreaks,
+      updated_at: new Date().toISOString()
+    };
+
+    let updatedData = null;
+    let { data, error: updateErr } = await supabase
       .from('time_logs')
-      .update({
-        clock_out: finalClockOut,
-        status: newStatus,
-        is_on_break: false,
-        break_end: updatedBreakEnd,
-        break_duration: updatedBreakDuration,
-        breaks: updatedBreaks,
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('id', log.id)
       .select()
       .single();
 
-    if (updateErr) throw updateErr;
+    if (updateErr) {
+      // Fallback if entries column doesn't exist in DB schema yet
+      const { entries: _discard, ...fallbackPayload } = updatePayload;
+      const { data: fallbackData, error: fallbackErr } = await supabase
+        .from('time_logs')
+        .update(fallbackPayload)
+        .eq('id', log.id)
+        .select()
+        .single();
 
-    // 6. Trigger Google Sheets sync in background
+      if (fallbackErr) throw fallbackErr;
+      updatedData = { ...fallbackData, entries: updatedEntries };
+    } else {
+      updatedData = data;
+    }
+
+    // 7. Trigger Google Sheets sync in background
     syncTimeLog(employee_id, date).catch(syncErr => {
       console.error('[ClockOut] Background Sheet sync error:', syncErr);
     });
 
     return NextResponse.json({
-      message: 'Pointage départ enregistré avec succès.',
+      message: 'Pointage sortie enregistré avec succès.',
       log: updatedData
     });
 
   } catch (error) {
     console.error('Error clocking out:', error);
     return NextResponse.json(
-      { error: "Erreur interne du serveur lors de l'enregistrement du départ." },
+      { error: "Erreur interne du serveur lors de l'enregistrement de la sortie." },
       { status: 500 }
     );
   }

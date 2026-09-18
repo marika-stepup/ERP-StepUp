@@ -20,7 +20,7 @@ if (fs.existsSync(envPath)) {
 
 const emailUser = process.env.EMAIL_USER;
 const emailPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '';
-const emailFrom = process.env.EMAIL_FROM || `"ERP Step-Up RH" <${emailUser}>`;
+const emailFrom = process.env.EMAIL_FROM || `"ERP Step Up RH" <${emailUser}>`;
 const targetEmail = process.argv[2] || emailUser;
 
 console.log('====================================================');

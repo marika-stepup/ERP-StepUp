@@ -204,7 +204,7 @@ function ChronoCardView({
   activeTaskClientName,
   selectedClient,
   timerSeconds,
-  formatSecondsToHMS,
+  formatSecondsToHM,
   activeInterruption,
   interruptionSeconds,
   activeInterruptionClientName,
@@ -338,17 +338,40 @@ function ChronoCardView({
             )}
           </div>
 
-          {/* Large Digital Timer Display in Orbitron Font */}
-          <div
-            className="chrono-digits blue"
-            style={{
-              fontSize: isPip ? '1.45rem' : '3.4rem',
-              margin: isPip ? '0.15rem 0 0.15rem 0' : '1.1rem 0 0.9rem 0',
-              letterSpacing: isPip ? '1px' : '2px',
-              textShadow: isPip ? '0 0 8px rgba(37, 99, 235, 0.22)' : undefined
-            }}
-          >
-            {formatSecondsToHMS(timerSeconds)}
+          {/* Large Digital Timer Display in Orbitron Font (HH:MM without seconds) + Scintillating Green Active Indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isPip ? '0.35rem' : '0.65rem', margin: isPip ? '0.15rem 0' : '0.9rem 0 0.8rem 0' }}>
+            <div
+              className="chrono-digits blue"
+              style={{
+                fontSize: isPip ? '1.45rem' : '3.4rem',
+                margin: 0,
+                letterSpacing: isPip ? '1px' : '2px',
+                textShadow: isPip ? '0 0 8px rgba(37, 99, 235, 0.22)' : undefined
+              }}
+            >
+              {formatSecondsToHM(timerSeconds)}
+            </div>
+            <span
+              className="chrono-sparkle-badge"
+              title="Chronomètre actif"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: isPip ? '0.2rem' : '0.35rem',
+                padding: isPip ? '0.15rem 0.35rem' : '0.3rem 0.65rem',
+                background: 'rgba(34, 197, 94, 0.12)',
+                border: '1px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '9999px',
+                fontSize: isPip ? '0.58rem' : '0.78rem',
+                color: '#16a34a',
+                fontWeight: 800,
+                letterSpacing: '0.2px',
+                boxShadow: '0 0 10px rgba(34, 197, 94, 0.2)'
+              }}
+            >
+              <span className="chrono-sparkle-dot" />
+              {!isPip && <span>Actif</span>}
+            </span>
           </div>
 
           {/* Progress track indicator */}
@@ -359,7 +382,7 @@ function ChronoCardView({
           {activeInterruption && (
             <div className="active-interruption-banner" style={{ marginBottom: isPip ? '0.35rem' : '1rem', padding: isPip ? '0.2rem 0.4rem' : '0.4rem 0.65rem', borderRadius: isPip ? '4px' : '6px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: isPip ? '200px' : '340px' }}>
               <span style={{ fontSize: isPip ? '0.62rem' : '0.8rem', color: '#d97706', fontWeight: '600' }}>
-                Pause ({activeInterruption}) : {formatSecondsToHMS(interruptionSeconds)}
+                Pause ({activeInterruption}) : {formatSecondsToHM(interruptionSeconds)}
               </span>
               <button
                 type="button"
@@ -440,16 +463,38 @@ function ChronoCardView({
             {activeInterruptionClientName ? `Client : ${activeInterruptionClientName}` : 'Met le chrono en pause'}
           </div>
 
-          <div
-            className="chrono-digits orange"
-            style={{
-              fontSize: isPip ? '1.45rem' : '3.4rem',
-              margin: isPip ? '0.15rem 0 0.15rem 0' : '1.1rem 0 0.9rem 0',
-              letterSpacing: isPip ? '1px' : '2px',
-              textShadow: isPip ? '0 0 8px rgba(249, 115, 22, 0.22)' : undefined
-            }}
-          >
-            {formatSecondsToHMS(interruptionSeconds)}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isPip ? '0.35rem' : '0.65rem', margin: isPip ? '0.15rem 0' : '0.9rem 0 0.8rem 0' }}>
+            <div
+              className="chrono-digits orange"
+              style={{
+                fontSize: isPip ? '1.45rem' : '3.4rem',
+                margin: 0,
+                letterSpacing: isPip ? '1px' : '2px',
+                textShadow: isPip ? '0 0 8px rgba(249, 115, 22, 0.22)' : undefined
+              }}
+            >
+              {formatSecondsToHM(interruptionSeconds)}
+            </div>
+            <span
+              className="chrono-sparkle-badge"
+              title="Pause active"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: isPip ? '0.2rem' : '0.35rem',
+                padding: isPip ? '0.15rem 0.35rem' : '0.3rem 0.65rem',
+                background: 'rgba(249, 115, 22, 0.12)',
+                border: '1px solid rgba(249, 115, 22, 0.35)',
+                borderRadius: '9999px',
+                fontSize: isPip ? '0.58rem' : '0.78rem',
+                color: '#ea580c',
+                fontWeight: 800,
+                letterSpacing: '0.2px'
+              }}
+            >
+              <span className="chrono-sparkle-dot orange" />
+              {!isPip && <span>En pause</span>}
+            </span>
           </div>
 
           <div style={{ width: '100%', maxWidth: isPip ? '190px' : '340px', height: isPip ? '3px' : '5px', background: '#fed7aa', borderRadius: '9999px', overflow: 'hidden', margin: isPip ? '0.1rem auto 0.45rem auto' : '0.2rem auto 1.3rem auto' }}>
@@ -576,9 +621,9 @@ export default function EspaceProduction({ user, token, clients, loading, refres
   useEffect(() => {
     if (pipWindow && pipWindow.document) {
       if (timerRunning && activeTask) {
-        pipWindow.document.title = `${formatSecondsToHMS(timerSeconds)} • ${activeTask.name}`;
+        pipWindow.document.title = `${formatSecondsToHM(timerSeconds)} • ${activeTask.name}`;
       } else if (activeInterruption) {
-        pipWindow.document.title = `${formatSecondsToHMS(interruptionSeconds)} • Pause (${activeInterruption})`;
+        pipWindow.document.title = `${formatSecondsToHM(interruptionSeconds)} • Pause (${activeInterruption})`;
       } else {
         pipWindow.document.title = "⏱️ Chronomètre — StepUp RH";
       }
@@ -676,6 +721,28 @@ export default function EspaceProduction({ user, token, clients, loading, refres
         .chrono-digits.orange {
           color: #f97316;
           text-shadow: 0 0 8px rgba(249, 115, 22, 0.22);
+        }
+        @keyframes chrono-sparkle-pulse {
+          0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); opacity: 0.85; }
+          50% { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); opacity: 1; }
+          100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); opacity: 0.85; }
+        }
+        @keyframes chrono-sparkle-pulse-orange {
+          0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7); opacity: 0.85; }
+          50% { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); opacity: 1; }
+          100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); opacity: 0.85; }
+        }
+        .chrono-sparkle-dot {
+          width: 7px;
+          height: 7px;
+          background-color: #22c55e;
+          border-radius: 50%;
+          display: inline-block;
+          animation: chrono-sparkle-pulse 1.4s infinite ease-in-out;
+        }
+        .chrono-sparkle-dot.orange {
+          background-color: #f97316;
+          animation: chrono-sparkle-pulse-orange 1.4s infinite ease-in-out;
         }
       `;
       pip.document.head.appendChild(customStyle);
@@ -1180,11 +1247,10 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     }
   };
 
-  const formatSecondsToHMS = (totalSeconds) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const formatSecondsToHM = (totalSeconds) => {
+    const hours = Math.floor((totalSeconds || 0) / 3600);
+    const minutes = Math.floor(((totalSeconds || 0) % 3600) / 60);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   };
 
   const formatSecondsToHMText = (totalSeconds) => {
@@ -1662,7 +1728,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               activeTaskClientName={activeTaskClientName}
               selectedClient={selectedClient}
               timerSeconds={timerSeconds}
-              formatSecondsToHMS={formatSecondsToHMS}
+              formatSecondsToHM={formatSecondsToHM}
               activeInterruption={activeInterruption}
               interruptionSeconds={interruptionSeconds}
               activeInterruptionClientName={activeInterruptionClientName}
@@ -1676,211 +1742,212 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               onTogglePip={togglePip}
             />
 
-            {/* ASSIGNED TASKS CARD (TÂCHES ASSIGNÉES) */}
-            <div className="panel prod-assigned-tasks-card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.05rem', letterSpacing: '0.3px' }}>
-                  <UserCheck size={18} style={{ color: 'var(--brand-orange)' }} />
-                  TÂCHES ASSIGNÉES
-                </h2>
-                {assignedTasks.length > 0 && (
-                  <span style={{
-                    background: 'rgba(249, 115, 22, 0.12)',
-                    color: 'var(--brand-orange)',
-                    padding: '0.15rem 0.55rem',
-                    borderRadius: '9999px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700'
-                  }}>
-                    {assignedTasks.length} {assignedTasks.length > 1 ? 'tâches' : 'tâche'}
-                  </span>
-                )}
-              </div>
-              <p className="panel-subtitle" style={{ margin: '0 0 1.1rem 0', fontSize: '0.8rem' }}>
-                Toutes les tâches qui vous sont assignées (tous clients confondus).
-              </p>
-
-              {assignedTasks.length === 0 ? (
-                <div style={{
-                  padding: '1.5rem 1rem',
-                  textAlign: 'center',
-                  background: 'var(--background-light)',
-                  borderRadius: '8px',
-                  border: '1px dashed var(--border-light)',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.85rem'
-                }}>
-                  <CheckCircle size={22} style={{ color: '#94a3b8', margin: '0 auto 0.4rem auto', display: 'block', opacity: 0.7 }} />
-                  <span>Aucune tâche assignée actuellement.</span>
+            {/* ASSIGNED TASKS CARD (TÂCHES ASSIGNÉES) - MASQUÉ TEMPORAIREMENT */}
+            {false && (
+              <div className="panel prod-assigned-tasks-card" style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.05rem', letterSpacing: '0.3px' }}>
+                    <UserCheck size={18} style={{ color: 'var(--brand-orange)' }} />
+                    TÂCHES ASSIGNÉES
+                  </h2>
+                  {assignedTasks.length > 0 && (
+                    <span style={{
+                      background: 'rgba(249, 115, 22, 0.12)',
+                      color: 'var(--brand-orange)',
+                      padding: '0.15rem 0.55rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: '700'
+                    }}>
+                      {assignedTasks.length} {assignedTasks.length > 1 ? 'tâches' : 'tâche'}
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <div className="assigned-tasks-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {assignedTasks.map(task => {
-                    const budgetSec = (task.budget_hours || 0) * 3600;
-                    const spentSec = task.time_spent_seconds || 0;
-                    const isTaskCompleted = task.status === 'Fait';
-                    const isTaskRunning = activeTask && activeTask.id === task.id && timerRunning;
-                    const taskProgress = budgetSec > 0 ? Math.min(Math.round((spentSec / budgetSec) * 100), 100) : 0;
+                <p className="panel-subtitle" style={{ margin: '0 0 1.1rem 0', fontSize: '0.8rem' }}>
+                  Toutes les tâches qui vous sont assignées (tous clients confondus).
+                </p>
 
-                    const cardMatch = DELIVERABLE_CARDS.find(c =>
-                      c.categoryKey.toLowerCase() === task.category?.toLowerCase() ||
-                      c.id.toLowerCase() === task.category?.toLowerCase() ||
-                      c.title.toLowerCase() === task.category?.toLowerCase()
-                    );
-                    const catColor = cardMatch?.themeColor || '#178FCB';
-                    const catTitle = cardMatch?.title || task.category || 'Production';
+                {assignedTasks.length === 0 ? (
+                  <div style={{
+                    padding: '1.5rem 1rem',
+                    textAlign: 'center',
+                    background: 'var(--background-light)',
+                    borderRadius: '8px',
+                    border: '1px dashed var(--border-light)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.85rem'
+                  }}>
+                    <CheckCircle size={22} style={{ color: '#94a3b8', margin: '0 auto 0.4rem auto', display: 'block', opacity: 0.7 }} />
+                    <span>Aucune tâche assignée actuellement.</span>
+                  </div>
+                ) : (
+                  <div className="assigned-tasks-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {assignedTasks.map(task => {
+                      const budgetSec = (task.budget_hours || 0) * 3600;
+                      const spentSec = task.time_spent_seconds || 0;
+                      const isTaskCompleted = task.status === 'Fait';
+                      const isTaskRunning = activeTask && activeTask.id === task.id && timerRunning;
+                      const taskProgress = budgetSec > 0 ? Math.min(Math.round((spentSec / budgetSec) * 100), 100) : 0;
 
-                    return (
-                      <div
-                        key={task.id}
-                        className={`assigned-task-item ${isTaskCompleted ? 'completed' : isTaskRunning ? 'running' : ''}`}
-                        style={{
-                          padding: '0.85rem 1rem',
-                          borderRadius: '8px',
-                          border: isTaskRunning ? '1.5px solid var(--brand-orange)' : '1px solid var(--border-light)',
-                          background: isTaskRunning ? 'rgba(249, 115, 22, 0.03)' : 'var(--panel-white)',
-                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
-                              {/* Indicateur Client */}
-                              <span style={{
-                                fontSize: '0.7rem',
-                                fontWeight: '800',
-                                color: '#1e293b',
-                                background: '#f1f5f9',
-                                border: '1px solid #cbd5e1',
-                                padding: '0.12rem 0.5rem',
-                                borderRadius: '4px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                letterSpacing: '0.2px'
-                              }}>
-                                <Building2 size={12} style={{ color: 'var(--brand-orange)' }} />
-                                {task.client_name}{task.client_code ? ` (${task.client_code})` : ''}
-                              </span>
+                      const cardMatch = DELIVERABLE_CARDS.find(c =>
+                        c.categoryKey.toLowerCase() === task.category?.toLowerCase() ||
+                        c.id.toLowerCase() === task.category?.toLowerCase() ||
+                        c.title.toLowerCase() === task.category?.toLowerCase()
+                      );
+                      const catColor = cardMatch?.themeColor || '#178FCB';
+                      const catTitle = cardMatch?.title || task.category || 'Production';
 
-                              <span style={{
-                                fontSize: '0.68rem',
-                                fontWeight: '700',
-                                color: catColor,
-                                background: `${catColor}15`,
-                                padding: '0.1rem 0.45rem',
-                                borderRadius: '4px',
-                                textTransform: 'uppercase'
-                              }}>
-                                {catTitle}
-                              </span>
-
-                              <h4 style={{
-                                fontSize: '0.95rem',
-                                fontWeight: '800',
-                                color: isTaskCompleted ? '#338855' : '#0f172a',
-                                margin: 0,
-                                textDecoration: isTaskCompleted ? 'line-through' : 'none',
-                                lineHeight: '1.3'
-                              }}>
-                                {task.name}
-                              </h4>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                              <span style={{ fontWeight: '600' }}>
-                                {formatSecondsToHMText(spentSec)} passées
-                              </span>
-
-                              {task.due_date && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <Calendar size={12} style={{ color: 'var(--text-secondary)' }} />
-                                  <span>Échéance : <strong>{new Date(task.due_date).toLocaleDateString('fr-FR')}</strong></span>
-                                </div>
-                              )}
-
-                              {task.is_recurring && (
-                                <span style={{ fontSize: '0.68rem', background: 'rgba(23, 143, 203, 0.1)', color: '#178FCB', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                  <Repeat size={10} /> Récurrente
-                                </span>
-                              )}
-
-                              <span style={{ fontSize: '0.68rem', background: 'rgba(100, 116, 139, 0.1)', color: '#475569', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
-                                Assigné à moi
-                              </span>
-                            </div>
-                          </div>
-
-                          <div style={{ flexShrink: 0 }}>
-                            {isTaskCompleted ? (
-                              <div className="status-badge fait" style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}>
-                                <CheckCircle size={12} /> Fait
-                              </div>
-                            ) : isTaskRunning ? (
-                              <div
-                                className="status-badge en-cours"
-                                style={{
-                                  background: 'rgba(234, 88, 12, 0.15)',
-                                  color: 'var(--brand-orange)',
-                                  fontWeight: '700',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.35rem',
-                                  padding: '0.3rem 0.8rem',
-                                  borderRadius: '20px',
-                                  fontSize: '0.78rem'
-                                }}
-                              >
-                                <span className="dot" style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--brand-orange)', display: 'inline-block' }}></span>
-                                En cours
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => handleStartTimer(task)}
-                                title={`Lancer le chronomètre sur ${task.name}`}
-                                style={{
-                                  background: 'var(--panel-white)',
-                                  border: '1px solid var(--border-light)',
-                                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
-                                  padding: '0.3rem 0.85rem',
-                                  borderRadius: '20px',
-                                  cursor: 'pointer',
+                      return (
+                        <div
+                          key={task.id}
+                          className={`assigned-task-item ${isTaskCompleted ? 'completed' : isTaskRunning ? 'running' : ''}`}
+                          style={{
+                            padding: '0.85rem 1rem',
+                            borderRadius: '8px',
+                            border: isTaskRunning ? '1.5px solid var(--brand-orange)' : '1px solid var(--border-light)',
+                            background: isTaskRunning ? 'rgba(249, 115, 22, 0.03)' : 'var(--panel-white)',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: '800',
+                                  color: '#1e293b',
+                                  background: '#f1f5f9',
+                                  border: '1px solid #cbd5e1',
+                                  padding: '0.12rem 0.5rem',
+                                  borderRadius: '4px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '0.4rem',
-                                  color: '#10b981',
-                                  fontWeight: '700',
-                                  fontSize: '0.78rem',
-                                  transition: 'all 0.15s ease'
-                                }}
-                              >
-                                <Play size={12} fill="#10b981" />
-                                Démarrer
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                                  gap: '0.3rem',
+                                  letterSpacing: '0.2px'
+                                }}>
+                                  <Building2 size={12} style={{ color: 'var(--brand-orange)' }} />
+                                  {task.client_name}{task.client_code ? ` (${task.client_code})` : ''}
+                                </span>
 
-                        {task.budget_hours > 0 && (
-                          <div className="progress-bar-container" style={{ height: '4px', marginTop: '0.55rem', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
-                            <div
-                              className={`progress-bar-fill ${isTaskCompleted ? 'green' : isTaskRunning ? 'orange' : 'blue'}`}
-                              style={{
-                                width: `${taskProgress}%`,
-                                height: '100%',
-                                background: isTaskCompleted ? '#338855' : isTaskRunning ? '#ff7a00' : '#2563eb',
-                                borderRadius: '9999px'
-                              }}
-                            ></div>
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  fontWeight: '700',
+                                  color: catColor,
+                                  background: `${catColor}15`,
+                                  padding: '0.1rem 0.45rem',
+                                  borderRadius: '4px',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {catTitle}
+                                </span>
+
+                                <h4 style={{
+                                  fontSize: '0.95rem',
+                                  fontWeight: '800',
+                                  color: isTaskCompleted ? '#338855' : '#0f172a',
+                                  margin: 0,
+                                  textDecoration: isTaskCompleted ? 'line-through' : 'none',
+                                  lineHeight: '1.3'
+                                }}>
+                                  {task.name}
+                                </h4>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                <span style={{ fontWeight: '600' }}>
+                                  {formatSecondsToHMText(spentSec)} passées
+                                </span>
+
+                                {task.due_date && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    <Calendar size={12} style={{ color: 'var(--text-secondary)' }} />
+                                    <span>Échéance : <strong>{new Date(task.due_date).toLocaleDateString('fr-FR')}</strong></span>
+                                  </div>
+                                )}
+
+                                {task.is_recurring && (
+                                  <span style={{ fontSize: '0.68rem', background: 'rgba(23, 143, 203, 0.1)', color: '#178FCB', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                    <Repeat size={10} /> Récurrente
+                                  </span>
+                                )}
+
+                                <span style={{ fontSize: '0.68rem', background: 'rgba(100, 116, 139, 0.1)', color: '#475569', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
+                                  Assigné à moi
+                                </span>
+                              </div>
+                            </div>
+
+                            <div style={{ flexShrink: 0 }}>
+                              {isTaskCompleted ? (
+                                <div className="status-badge fait" style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}>
+                                  <CheckCircle size={12} /> Fait
+                                </div>
+                              ) : isTaskRunning ? (
+                                <div
+                                  className="status-badge en-cours"
+                                  style={{
+                                    background: 'rgba(234, 88, 12, 0.15)',
+                                    color: 'var(--brand-orange)',
+                                    fontWeight: '700',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                    padding: '0.3rem 0.8rem',
+                                    borderRadius: '20px',
+                                    fontSize: '0.78rem'
+                                  }}
+                                >
+                                  <span className="dot" style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--brand-orange)', display: 'inline-block' }}></span>
+                                  En cours
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleStartTimer(task)}
+                                  title={`Lancer le chronomètre sur ${task.name}`}
+                                  style={{
+                                    background: 'var(--panel-white)',
+                                    border: '1px solid var(--border-light)',
+                                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
+                                    padding: '0.3rem 0.85rem',
+                                    borderRadius: '20px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem',
+                                    color: '#10b981',
+                                    fontWeight: '700',
+                                    fontSize: '0.78rem',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                >
+                                  <Play size={12} fill="#10b981" />
+                                  Démarrer
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+
+                          {task.budget_hours > 0 && (
+                            <div className="progress-bar-container" style={{ height: '4px', marginTop: '0.55rem', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+                              <div
+                                className={`progress-bar-fill ${isTaskCompleted ? 'green' : isTaskRunning ? 'orange' : 'blue'}`}
+                                style={{
+                                  width: `${taskProgress}%`,
+                                  height: '100%',
+                                  background: isTaskCompleted ? '#338855' : isTaskRunning ? '#ff7a00' : '#2563eb',
+                                  borderRadius: '9999px'
+                                }}
+                              ></div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* INTERRUPTIONS CARD */}
             <div className="panel prod-interruptions-card">
@@ -2212,7 +2279,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
             activeTaskClientName={activeTaskClientName}
             selectedClient={selectedClient}
             timerSeconds={timerSeconds}
-            formatSecondsToHMS={formatSecondsToHMS}
+            formatSecondsToHM={formatSecondsToHM}
             activeInterruption={activeInterruption}
             interruptionSeconds={interruptionSeconds}
             activeInterruptionClientName={activeInterruptionClientName}

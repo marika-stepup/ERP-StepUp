@@ -78,23 +78,65 @@ export async function POST(req) {
       status = 'En retard';
     }
 
-    // 5. Upsert pointage row in Supabase
-    const { data: upsertData, error: upsertErr } = await supabase
+    // 5. Check if record already exists for today to support multiple in/out sessions
+    const { data: existingLog } = await supabase
       .from('time_logs')
-      .upsert({
-        employee_id,
-        employee_name: `${member.employee_first_name} ${member.employee_name}`,
-        date,
-        clock_in: finalClockIn,
-        scheduled_clock_in: scheduledClockIn,
-        scheduled_clock_out: scheduledClockOut,
-        status,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'employee_id,date' })
+      .select('*')
+      .eq('employee_id', employee_id)
+      .eq('date', date)
+      .maybeSingle();
+
+    let updatedEntries = [];
+    let initialClockIn = finalClockIn;
+    let finalStatus = status;
+
+    if (existingLog) {
+      initialClockIn = existingLog.clock_in || finalClockIn;
+      finalStatus = existingLog.status || status;
+      if (Array.isArray(existingLog.entries) && existingLog.entries.length > 0) {
+        updatedEntries = [...existingLog.entries];
+      } else if (existingLog.clock_in) {
+        updatedEntries = [{ in: existingLog.clock_in, out: existingLog.clock_out || null }];
+      }
+      updatedEntries.push({ in: finalClockIn, out: null });
+    } else {
+      updatedEntries = [{ in: finalClockIn, out: null }];
+    }
+
+    const payloadWithEntries = {
+      employee_id,
+      employee_name: `${member.employee_first_name} ${member.employee_name}`,
+      date,
+      clock_in: initialClockIn,
+      clock_out: null,
+      entries: updatedEntries,
+      scheduled_clock_in: scheduledClockIn,
+      scheduled_clock_out: scheduledClockOut,
+      status: finalStatus,
+      updated_at: new Date().toISOString()
+    };
+
+    let upsertData = null;
+    let { data, error: upsertErr } = await supabase
+      .from('time_logs')
+      .upsert(payloadWithEntries, { onConflict: 'employee_id,date' })
       .select()
       .single();
 
-    if (upsertErr) throw upsertErr;
+    if (upsertErr) {
+      // Fallback if entries column does not exist yet in DB schema
+      const { entries: _discard, ...payloadWithoutEntries } = payloadWithEntries;
+      const { data: fallbackData, error: fallbackErr } = await supabase
+        .from('time_logs')
+        .upsert(payloadWithoutEntries, { onConflict: 'employee_id,date' })
+        .select()
+        .single();
+
+      if (fallbackErr) throw fallbackErr;
+      upsertData = { ...fallbackData, entries: updatedEntries };
+    } else {
+      upsertData = data;
+    }
 
     // 6. Trigger Google Sheets sync in background
     syncTimeLog(employee_id, date).catch(syncErr => {
@@ -102,14 +144,14 @@ export async function POST(req) {
     });
 
     return NextResponse.json({
-      message: 'Pointage arrivée enregistré avec succès.',
+      message: 'Pointage entrée enregistré avec succès.',
       log: upsertData
     });
 
   } catch (error) {
     console.error('Error clocking in:', error);
     return NextResponse.json(
-      { error: "Erreur interne du serveur lors de l'enregistrement de l'arrivée." },
+      { error: "Erreur interne du serveur lors de l'enregistrement de l'entrée." },
       { status: 500 }
     );
   }
