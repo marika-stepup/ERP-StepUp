@@ -22,9 +22,11 @@ import {
   Share2,
   PictureInPicture2,
   ExternalLink,
-  Minimize2
+  Minimize2,
+  Layers
 } from 'lucide-react';
 import { supabaseClient } from '../../lib/supabaseClient';
+import ClientCombobox from './ClientCombobox';
 
 export const FacebookIcon = ({ size = 18, color = "#1877F2" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
@@ -55,6 +57,13 @@ export const GooglePostIcon = ({ size = 18 }) => (
   </svg>
 );
 
+export const PAUSE_PRESETS = [
+  { id: 'cigarette', label: 'Cigarette', icon: '🚬', fullLabel: 'Pause Cigarette', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
+  { id: 'gouter', label: 'Goûter', icon: '🍪', fullLabel: 'Pause Goûter', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+  { id: 'dejeuner', label: 'Déjeuner', icon: '🍽️', fullLabel: 'Pause Déjeuner', color: '#ea580c', bg: '#fff7ed', border: '#fed7aa' },
+  { id: 'general', label: 'Pause', icon: '☕', fullLabel: 'Pause Café / Détente', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' }
+];
+
 export const DELIVERABLE_CARDS = [
   {
     id: 'redaction',
@@ -67,7 +76,7 @@ export const DELIVERABLE_CARDS = [
       'Newsletter',
       'Stratégie',
       'Posts',
-      'Correspondance mail',
+      'Correspondance mail/Slack/WhatsApp',
       'Relance client',
       'Compte rendu',
       'Modération',
@@ -105,7 +114,8 @@ export const DELIVERABLE_CARDS = [
       'Entretien individuel',
       'KIDS',
       'Formation',
-      'Meeting marketing de croissance'
+      'Meeting marketing de croissance',
+      'Appel impromptu'
     ]
   },
   {
@@ -197,6 +207,9 @@ export const isStandardDeliverableTask = (task, card) => {
 /* ==========================================================================
    SHARED CHRONOMETER CARD VIEW (MAIN APP & DOCUMENT PiP PORTAL)
    ========================================================================== */
+/* ==========================================================================
+   SHARED CHRONOMETER CARD VIEW (MAIN APP & DOCUMENT PiP PORTAL)
+   ========================================================================== */
 function ChronoCardView({
   isPip = false,
   timerRunning,
@@ -205,54 +218,64 @@ function ChronoCardView({
   selectedClient,
   timerSeconds,
   formatSecondsToHM,
-  activeInterruption,
-  interruptionSeconds,
-  activeInterruptionClientName,
   handleStopTimer,
   handleCompleteTask,
-  handleToggleInterruption,
-  handleInterruptionClick,
   isStandardMission,
   isPipSupported,
   isPipActive,
-  onTogglePip
+  onTogglePip,
+  activePause,
+  pauseSeconds,
+  handleStartPause,
+  handleStopPause,
+  suspendedTask
 }) {
+  const currentPausePreset = PAUSE_PRESETS.find(p => p.id === activePause) || {
+    id: 'general',
+    label: 'Pause',
+    icon: '☕',
+    fullLabel: 'Pause',
+    color: '#ea580c'
+  };
+
   return (
     <div
-      className={`panel prod-active-card ${timerRunning ? 'running' : ''} ${isPip ? 'pip-window-card' : ''}`}
+      className={`panel prod-active-card ${timerRunning ? 'running' : ''} ${activePause ? 'pause-running' : ''} ${isPip ? 'pip-window-card' : ''}`}
       style={{
-        padding: isPip ? '0.45rem 0.6rem' : '1.75rem 1.5rem',
-        textAlign: 'center',
+        padding: isPip ? '0.45rem 0.6rem' : '1.25rem 1.5rem',
+        textAlign: isPip ? 'center' : 'left',
         background: '#ffffff',
         borderRadius: isPip ? '8px' : '14px',
-        border: '1px solid var(--border-light)',
+        border: activePause ? '1.5px solid #fed7aa' : '1px solid var(--border-light)',
         boxShadow: isPip ? '0 4px 12px rgba(0,0,0,0.08)' : 'var(--shadow-sm)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: isPip ? 'space-around' : 'space-between',
+        gap: isPip ? '0.2rem' : '1rem',
         height: isPip ? '100%' : 'auto',
         boxSizing: 'border-box',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        width: '100%'
       }}
     >
       {/* CARD HEADER WITH TITLE & PiP TOGGLE */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isPip ? '0.2rem' : '0.75rem', width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: isPip ? '0.3rem' : '0.45rem', color: timerRunning ? '#0f172a' : activeInterruption ? '#ea580c' : '#64748b', fontWeight: '800', fontSize: isPip ? '0.62rem' : '0.88rem', letterSpacing: '0.3px' }}>
-          {timerRunning ? (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isPip ? '0.3rem' : '0.5rem', color: timerRunning ? '#0f172a' : activePause ? '#ea580c' : '#64748b', fontWeight: '800', fontSize: isPip ? '0.62rem' : '0.88rem', letterSpacing: '0.3px' }}>
+          {activePause ? (
+            <>
+              <Clock size={isPip ? 11 : 16} style={{ color: '#ea580c' }} />
+              <span>PAUSE ACTIVE</span>
+            </>
+          ) : timerRunning ? (
             <>
               <span className="pip-live-dot" style={{ width: isPip ? '5px' : '8px', height: isPip ? '5px' : '8px' }} />
-              <Clock size={isPip ? 11 : 16} style={{ color: '#ea580c' }} />
-              <span>TÂCHE EN COURS</span>
-            </>
-          ) : activeInterruption ? (
-            <>
-              <Clock size={isPip ? 11 : 16} style={{ color: '#ea580c' }} />
-              <span>INTERRUPTION</span>
+              <Clock size={isPip ? 11 : 16} style={{ color: '#2563eb' }} />
+              <span>SESSION DE PRODUCTION EN COURS</span>
             </>
           ) : (
             <>
               <Clock size={isPip ? 11 : 16} style={{ color: '#94a3b8' }} />
-              <span>CHRONOMÈTRE</span>
+              <span>CHRONOMÈTRE DE PRODUCTION</span>
             </>
           )}
         </div>
@@ -292,7 +315,111 @@ function ChronoCardView({
       </div>
 
       {/* CARD BODY */}
-      {timerRunning && activeTask ? (
+      {activePause ? (
+        /* 1. ACTIVE PAUSE DISPLAY */
+        <div className="active-timer-display" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+          <h3 style={{ fontSize: isPip ? '0.82rem' : '1.35rem', fontWeight: '800', color: '#0f172a', margin: isPip ? '0.05rem 0' : '0.25rem 0', textAlign: 'center' }}>
+            {currentPausePreset.icon} {currentPausePreset.fullLabel}
+          </h3>
+
+          <div style={{ fontSize: isPip ? '0.62rem' : '0.8rem', color: '#64748b', fontWeight: '500', marginBottom: isPip ? '0.15rem' : '0.4rem' }}>
+            {suspendedTask ? `Mission suspendue : ${suspendedTask.name}` : 'Pause active • Indépendante de tout client'}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isPip ? '0.35rem' : '0.65rem', margin: isPip ? '0.15rem 0' : '0.8rem 0 0.7rem 0' }}>
+            <div
+              className="chrono-digits orange"
+              style={{
+                fontSize: isPip ? '1.45rem' : '3.4rem',
+                margin: 0,
+                letterSpacing: isPip ? '1px' : '2px',
+                textShadow: isPip ? '0 0 8px rgba(249, 115, 22, 0.22)' : undefined
+              }}
+            >
+              {formatSecondsToHM(pauseSeconds)}
+            </div>
+            <span
+              className="chrono-sparkle-badge"
+              title="Pause active"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: isPip ? '0.2rem' : '0.35rem',
+                padding: isPip ? '0.15rem 0.35rem' : '0.3rem 0.65rem',
+                background: 'rgba(249, 115, 22, 0.12)',
+                border: '1px solid rgba(249, 115, 22, 0.35)',
+                borderRadius: '9999px',
+                fontSize: isPip ? '0.58rem' : '0.78rem',
+                color: '#ea580c',
+                fontWeight: 800,
+                letterSpacing: '0.2px'
+              }}
+            >
+              <span className="chrono-sparkle-dot orange" />
+              {!isPip && <span>En pause</span>}
+            </span>
+          </div>
+
+          <div style={{ width: '100%', maxWidth: isPip ? '190px' : '340px', height: isPip ? '3px' : '5px', background: '#fed7aa', borderRadius: '9999px', overflow: 'hidden', margin: isPip ? '0.1rem auto 0.45rem auto' : '0.2rem auto 1.2rem auto' }}>
+            <div style={{ width: '60%', height: '100%', background: '#ea580c', borderRadius: '9999px' }}></div>
+          </div>
+
+          {/* Action buttons during pause */}
+          <div style={{ display: 'flex', gap: isPip ? '0.4rem' : '0.75rem', width: '100%', maxWidth: isPip ? '200px' : (suspendedTask ? '340px' : '220px'), justifyContent: 'center' }}>
+            {suspendedTask && (
+              <button
+                type="button"
+                onClick={() => handleStopPause(true)}
+                style={{
+                  flex: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: isPip ? '0.3rem' : '0.5rem',
+                  padding: isPip ? '0.35rem 0.65rem' : '0.75rem 1rem',
+                  background: '#10b981',
+                  color: '#ffffff',
+                  fontWeight: '700',
+                  fontSize: isPip ? '0.72rem' : '0.88rem',
+                  borderRadius: isPip ? '5px' : '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)',
+                  transition: 'all 0.15s ease'
+                }}
+                title={`Reprendre ${suspendedTask.name}`}
+              >
+                <Play size={isPip ? 10 : 14} fill="white" /> Reprendre
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => handleStopPause(false)}
+              style={{
+                flex: 1,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: isPip ? '0.3rem' : '0.5rem',
+                padding: isPip ? '0.35rem 0.65rem' : '0.75rem 1rem',
+                background: '#ef4444',
+                color: '#ffffff',
+                fontWeight: '700',
+                fontSize: isPip ? '0.72rem' : '0.88rem',
+                borderRadius: isPip ? '5px' : '8px',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Square size={isPip ? 9 : 13} fill="white" /> Fin de pause
+            </button>
+          </div>
+        </div>
+      ) : timerRunning && activeTask ? (
+        /* 2. ACTIVE TASK RUNNING DISPLAY */
         <div className="active-timer-display" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
           {/* Task Name */}
           <h3
@@ -338,7 +465,7 @@ function ChronoCardView({
             )}
           </div>
 
-          {/* Large Digital Timer Display in Orbitron Font (HH:MM without seconds) + Scintillating Green Active Indicator */}
+          {/* Large Digital Timer Display */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isPip ? '0.35rem' : '0.65rem', margin: isPip ? '0.15rem 0' : '0.9rem 0 0.8rem 0' }}>
             <div
               className="chrono-digits blue"
@@ -375,26 +502,11 @@ function ChronoCardView({
           </div>
 
           {/* Progress track indicator */}
-          <div style={{ width: '100%', maxWidth: isPip ? '190px' : '340px', height: isPip ? '3px' : '5px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden', margin: isPip ? '0.1rem auto 0.45rem auto' : '0.2rem auto 1.3rem auto' }}>
-            <div style={{ width: '35%', height: '100%', background: '#2563eb', borderRadius: '9999px' }}></div>
+          <div style={{ width: '100%', maxWidth: isPip ? '190px' : '340px', height: isPip ? '3px' : '5px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden', margin: isPip ? '0.1rem auto 0.45rem auto' : '0.2rem auto 1.2rem auto' }}>
+            <div style={{ width: '45%', height: '100%', background: '#2563eb', borderRadius: '9999px' }}></div>
           </div>
 
-          {activeInterruption && (
-            <div className="active-interruption-banner" style={{ marginBottom: isPip ? '0.35rem' : '1rem', padding: isPip ? '0.2rem 0.4rem' : '0.4rem 0.65rem', borderRadius: isPip ? '4px' : '6px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: isPip ? '200px' : '340px' }}>
-              <span style={{ fontSize: isPip ? '0.62rem' : '0.8rem', color: '#d97706', fontWeight: '600' }}>
-                Pause ({activeInterruption}) : {formatSecondsToHM(interruptionSeconds)}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleToggleInterruption(activeInterruption)}
-                style={{ fontSize: isPip ? '0.58rem' : '0.75rem', padding: isPip ? '0.1rem 0.35rem' : '0.2rem 0.5rem', background: '#d97706', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontWeight: '600' }}
-              >
-                Reprendre
-              </button>
-            </div>
-          )}
-
-          {/* Action Buttons: Red STOP (and Green TERMINÉ only for specific assigned tasks) */}
+          {/* Action Buttons: Red STOP (and Green TERMINÉ) */}
           <div style={{ display: 'flex', gap: isPip ? '0.4rem' : '0.75rem', width: '100%', maxWidth: isPip ? '200px' : (isStandardMission ? '240px' : '340px'), justifyContent: 'center' }}>
             <button
               type="button"
@@ -450,108 +562,86 @@ function ChronoCardView({
               </button>
             )}
           </div>
-        </div>
-      ) : activeInterruption ? (
-        <div className="active-timer-display" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-          <h3 style={{ fontSize: isPip ? '0.82rem' : '1.35rem', fontWeight: '800', color: '#0f172a', margin: isPip ? '0.05rem 0' : '0.4rem 0 0.15rem 0', textAlign: 'center', textTransform: 'capitalize' }}>
-            {activeInterruption === 'slack' ? 'Slack / Mails' :
-              activeInterruption === 'meeting' ? 'Point Interne' :
-                activeInterruption === 'pause' ? 'Pause' : 'Appel Impromptu'}
-          </h3>
 
-          <div style={{ fontSize: isPip ? '0.62rem' : '0.8rem', color: '#64748b', fontWeight: '500', marginBottom: isPip ? '0.15rem' : '0.4rem' }}>
-            {activeInterruptionClientName ? `Client : ${activeInterruptionClientName}` : 'Met le chrono en pause'}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isPip ? '0.35rem' : '0.65rem', margin: isPip ? '0.15rem 0' : '0.9rem 0 0.8rem 0' }}>
-            <div
-              className="chrono-digits orange"
-              style={{
-                fontSize: isPip ? '1.45rem' : '3.4rem',
-                margin: 0,
-                letterSpacing: isPip ? '1px' : '2px',
-                textShadow: isPip ? '0 0 8px rgba(249, 115, 22, 0.22)' : undefined
-              }}
-            >
-              {formatSecondsToHM(interruptionSeconds)}
-            </div>
-            <span
-              className="chrono-sparkle-badge"
-              title="Pause active"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: isPip ? '0.2rem' : '0.35rem',
-                padding: isPip ? '0.15rem 0.35rem' : '0.3rem 0.65rem',
-                background: 'rgba(249, 115, 22, 0.12)',
-                border: '1px solid rgba(249, 115, 22, 0.35)',
-                borderRadius: '9999px',
-                fontSize: isPip ? '0.58rem' : '0.78rem',
-                color: '#ea580c',
-                fontWeight: 800,
-                letterSpacing: '0.2px'
-              }}
-            >
-              <span className="chrono-sparkle-dot orange" />
-              {!isPip && <span>En pause</span>}
+          {/* Quick Pause Toolbar while task is running */}
+          <div style={{ marginTop: isPip ? '0.4rem' : '1.25rem', width: '100%', borderTop: '1px solid var(--border-light)', paddingTop: isPip ? '0.3rem' : '0.85rem' }}>
+            <span style={{ fontSize: isPip ? '0.58rem' : '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block', marginBottom: isPip ? '0.2rem' : '0.45rem' }}>
+              Prendre une pause :
             </span>
-          </div>
-
-          <div style={{ width: '100%', maxWidth: isPip ? '190px' : '340px', height: isPip ? '3px' : '5px', background: '#fed7aa', borderRadius: '9999px', overflow: 'hidden', margin: isPip ? '0.1rem auto 0.45rem auto' : '0.2rem auto 1.3rem auto' }}>
-            <div style={{ width: '50%', height: '100%', background: '#f97316', borderRadius: '9999px' }}></div>
-          </div>
-
-          <div style={{ display: 'flex', gap: isPip ? '0.4rem' : '0.75rem', width: '100%', maxWidth: isPip ? '190px' : '340px', justifyContent: 'center' }}>
-            <button
-              type="button"
-              onClick={() => handleToggleInterruption(activeInterruption)}
-              style={{
-                flex: 1,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: isPip ? '0.3rem' : '0.5rem',
-                padding: isPip ? '0.35rem 0.65rem' : '0.7rem 1.25rem',
-                background: '#ef4444',
-                color: '#ffffff',
-                fontWeight: '700',
-                fontSize: isPip ? '0.72rem' : '0.92rem',
-                borderRadius: isPip ? '5px' : '8px',
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)'
-              }}
-            >
-              <Square size={isPip ? 9 : 13} fill="white" /> STOP
-            </button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: isPip ? '0.25rem' : '0.4rem', width: '100%', maxWidth: '340px', margin: '0 auto' }}>
+              {PAUSE_PRESETS.map(preset => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => handleStartPause(preset.id)}
+                  title={`Lancer une pause ${preset.label}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: isPip ? '0.15rem' : '0.3rem',
+                    padding: isPip ? '0.2rem 0.3rem' : '0.4rem 0.5rem',
+                    fontSize: isPip ? '0.58rem' : '0.78rem',
+                    fontWeight: '700',
+                    borderRadius: isPip ? '4px' : '6px',
+                    border: `1px solid ${preset.border}`,
+                    background: preset.bg,
+                    color: preset.color,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.04)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  <span>{preset.icon}</span>
+                  <span>{preset.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       ) : (
-        <div className="no-active-timer" style={{ textAlign: 'center', padding: isPip ? '0.25rem 0' : '1rem 0', width: '100%' }}>
-          <p style={{ color: '#0f172a', fontWeight: '700', margin: '0 0 0.2rem 0', fontSize: isPip ? '0.78rem' : '1rem' }}>
+        /* 3. NO ACTIVE TASK / IDLE STATE */
+        <div className="no-active-timer" style={{ textAlign: 'center', padding: isPip ? '0.25rem 0' : '0.8rem 0', width: '100%' }}>
+          <p style={{ color: '#0f172a', fontWeight: '800', margin: '0 0 0.25rem 0', fontSize: isPip ? '0.78rem' : '1.1rem' }}>
             Aucune tâche en cours
           </p>
-          <span style={{ fontSize: isPip ? '0.62rem' : '0.8rem', color: '#64748b', display: 'block', marginBottom: isPip ? '0.35rem' : '0' }}>
-            {isPip ? 'Lancez une pause rapide :' : 'Lancez le chrono directement depuis la liste des livrables à droite.'}
+          <span style={{ fontSize: isPip ? '0.62rem' : '0.82rem', color: '#64748b', display: 'block', marginBottom: isPip ? '0.4rem' : '1rem' }}>
+            {isPip ? 'Prenez une pause rapide :' : 'Lancez un livrable à droite ou prenez une pause immédiate :'}
           </span>
-          {isPip && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem', marginTop: '0.35rem' }}>
+
+          {/* Quick Pause Buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: isPip ? '1fr 1fr' : 'repeat(4, 1fr)', gap: isPip ? '0.3rem' : '0.5rem', width: '100%', maxWidth: '380px', margin: '0 auto' }}>
+            {PAUSE_PRESETS.map(preset => (
               <button
+                key={preset.id}
                 type="button"
-                onClick={() => handleInterruptionClick('pause')}
-                style={{ padding: '0.25rem', fontSize: '0.62rem', fontWeight: '700', borderRadius: '4px', border: '1px solid #fed7aa', background: '#fff7ed', color: '#c2410c', cursor: 'pointer' }}
+                onClick={() => handleStartPause(preset.id)}
+                title={`Démarrer une pause ${preset.label}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.35rem',
+                  padding: isPip ? '0.35rem' : '0.6rem 0.5rem',
+                  fontSize: isPip ? '0.65rem' : '0.85rem',
+                  fontWeight: '700',
+                  borderRadius: isPip ? '5px' : '8px',
+                  border: `1.5px solid ${preset.border}`,
+                  background: preset.bg,
+                  color: preset.color,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.08)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.03)'; }}
               >
-                ☕ Pause
+                <span>{preset.icon}</span>
+                <span>{preset.label}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => handleInterruptionClick('slack')}
-                style={{ padding: '0.25rem', fontSize: '0.62rem', fontWeight: '700', borderRadius: '4px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', cursor: 'pointer' }}
-              >
-                💬 Slack
-              </button>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -571,16 +661,11 @@ export default function EspaceProduction({ user, token, clients, loading, refres
   const [pipWindow, setPipWindow] = useState(null);
   const [isPipSupported, setIsPipSupported] = useState(false);
 
-  // Interruptions
-  const [activeInterruption, setActiveInterruption] = useState(null); // 'slack', 'meeting', 'pause', 'call'
-  const [interruptionLogId, setInterruptionLogId] = useState(null);
-  const [interruptionSeconds, setInterruptionSeconds] = useState(0);
-
-  // Allocation client pour interruptions
-  const [interruptionModalOpen, setInterruptionModalOpen] = useState(false);
-  const [interruptionTypeToStart, setInterruptionTypeToStart] = useState(null);
-  const [selectedInterruptionClientId, setSelectedInterruptionClientId] = useState('');
-  const [activeInterruptionClientId, setActiveInterruptionClientId] = useState(null);
+  // Pauses (cigarette, gouter, dejeuner, general)
+  const [activePause, setActivePause] = useState(null); // 'cigarette' | 'gouter' | 'dejeuner' | 'general'
+  const [pauseLogId, setPauseLogId] = useState(null);
+  const [pauseSeconds, setPauseSeconds] = useState(0);
+  const [suspendedTask, setSuspendedTask] = useState(null);
 
   // Modals d'alerte et confirmation personnalisés
   const [clientOverviewTab, setClientOverviewTab] = useState('poles'); // 'poles' | 'contract'
@@ -597,7 +682,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
-  const interruptionStartTimeRef = useRef(null);
+  const pauseStartTimeRef = useRef(null);
 
   // Vérifier la compatibilité Document Picture-in-Picture au montage
   useEffect(() => {
@@ -622,13 +707,14 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     if (pipWindow && pipWindow.document) {
       if (timerRunning && activeTask) {
         pipWindow.document.title = `${formatSecondsToHM(timerSeconds)} • ${activeTask.name}`;
-      } else if (activeInterruption) {
-        pipWindow.document.title = `${formatSecondsToHM(interruptionSeconds)} • Pause (${activeInterruption})`;
+      } else if (activePause) {
+        const preset = PAUSE_PRESETS.find(p => p.id === activePause) || { label: 'Pause', icon: '☕' };
+        pipWindow.document.title = `${formatSecondsToHM(pauseSeconds)} • ${preset.icon} ${preset.label}`;
       } else {
         pipWindow.document.title = "⏱️ Chronomètre — StepUp RH";
       }
     }
-  }, [pipWindow, timerSeconds, interruptionSeconds, timerRunning, activeTask, activeInterruption]);
+  }, [pipWindow, timerSeconds, pauseSeconds, timerRunning, activeTask, activePause]);
 
   // Fonction pour ouvrir la fenêtre Document PiP Always-on-top
   const openPip = async () => {
@@ -813,54 +899,43 @@ export default function EspaceProduction({ user, token, clients, loading, refres
       if (error) throw error;
 
       let myActiveProdLog = null;
-      let myActiveInterLog = null;
+      let myActivePauseLog = null;
 
       (data || []).forEach(log => {
         if (log.log_type === 'production') {
           myActiveProdLog = log;
-        } else if (log.log_type.startsWith('interruption:')) {
-          myActiveInterLog = log;
+        } else if (log.log_type.startsWith('pause') || log.log_type.startsWith('interruption:pause')) {
+          myActivePauseLog = log;
         }
       });
 
-      // Re-hydrate active timer state using the pre-fetched clients prop
-      if (clients && clients.length > 0) {
-        if (myActiveProdLog && !timerRunning) {
-          let matchedTask = null;
-          clients.forEach(c => {
-            const t = (c.tasks || []).find(task => task.id === myActiveProdLog.task_id);
-            if (t) matchedTask = t;
-          });
+      // 1. Re-hydrate running production task if any
+      if (clients && clients.length > 0 && myActiveProdLog && !timerRunning) {
+        let matchedTask = null;
+        clients.forEach(c => {
+          const t = (c.tasks || []).find(task => task.id === myActiveProdLog.task_id);
+          if (t) matchedTask = t;
+        });
 
-          if (matchedTask) {
-            setActiveTask(matchedTask);
-            setActiveLogId(myActiveProdLog.id);
+        if (matchedTask) {
+          setActiveTask(matchedTask);
+          setActiveLogId(myActiveProdLog.id);
 
-            const elapsed = Math.floor((Date.now() - new Date(myActiveProdLog.start_time).getTime()) / 1000);
-            setTimerSeconds(elapsed > 0 ? elapsed : 0);
-            startTimeRef.current = new Date(myActiveProdLog.start_time).getTime();
-            setTimerRunning(true);
-
-            if (myActiveInterLog) {
-              const type = myActiveInterLog.log_type.split(':')[1];
-              setActiveInterruption(type);
-              setInterruptionLogId(myActiveInterLog.id);
-
-              let matchedInterTaskClient = null;
-              clients.forEach(c => {
-                const t = (c.tasks || []).find(task => task.id === myActiveInterLog.task_id);
-                if (t) matchedInterTaskClient = c;
-              });
-              if (matchedInterTaskClient) {
-                setActiveInterruptionClientId(matchedInterTaskClient.id);
-              }
-
-              const elapsedInter = Math.floor((Date.now() - new Date(myActiveInterLog.start_time).getTime()) / 1000);
-              setInterruptionSeconds(elapsedInter > 0 ? elapsedInter : 0);
-              interruptionStartTimeRef.current = new Date(myActiveInterLog.start_time).getTime();
-            }
-          }
+          const elapsed = Math.floor((Date.now() - new Date(myActiveProdLog.start_time).getTime()) / 1000);
+          setTimerSeconds(elapsed > 0 ? elapsed : 0);
+          startTimeRef.current = new Date(myActiveProdLog.start_time).getTime();
+          setTimerRunning(true);
         }
+      }
+
+      // 2. Re-hydrate active pause if any
+      if (myActivePauseLog) {
+        const rawType = myActivePauseLog.log_type.includes(':') ? myActivePauseLog.log_type.split(':')[1] : 'general';
+        setActivePause(rawType);
+        setPauseLogId(myActivePauseLog.id);
+        const elapsedPause = Math.floor((Date.now() - new Date(myActivePauseLog.start_time).getTime()) / 1000);
+        setPauseSeconds(elapsedPause > 0 ? elapsedPause : 0);
+        pauseStartTimeRef.current = new Date(myActivePauseLog.start_time).getTime();
       }
     } catch (err) {
       console.error('Error fetching active time logs:', err);
@@ -872,16 +947,16 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     fetchMyActiveLogs();
   }, [user, clients]);
 
-  // Timer interval updates
+  // Timer interval updates (Production & Pause)
   useEffect(() => {
-    if (timerRunning || activeInterruption) {
+    if (timerRunning || activePause) {
       timerRef.current = setInterval(() => {
-        if (activeInterruption) {
-          const diff = Math.floor((Date.now() - interruptionStartTimeRef.current) / 1000);
-          setInterruptionSeconds(diff);
-        } else {
+        if (activePause && pauseStartTimeRef.current) {
+          const diff = Math.floor((Date.now() - pauseStartTimeRef.current) / 1000);
+          setPauseSeconds(diff > 0 ? diff : 0);
+        } else if (timerRunning && startTimeRef.current) {
           const diff = Math.floor((Date.now() - startTimeRef.current) / 1000);
-          setTimerSeconds(diff);
+          setTimerSeconds(diff > 0 ? diff : 0);
         }
       }, 1000);
     } else {
@@ -891,7 +966,7 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [timerRunning, activeInterruption]);
+  }, [timerRunning, activePause]);
 
   const handleStartTimer = async (task) => {
     // 🚀 Ouverture automatique de la fenêtre flottante PiP Always-on-top au lancement de la tâche
@@ -902,6 +977,11 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     const prevTimerSeconds = timerSeconds;
     const prevTimerRunning = timerRunning;
 
+    // Si une pause est active, la clore d'abord
+    if (activePause && pauseLogId) {
+      await handleStopPause(false);
+    }
+
     // Stop current running timer if there is one
     if (timerRunning && activeTask) {
       await handleStopTimer();
@@ -910,8 +990,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     // Optimistic UI update
     setActiveTask(task);
     setTimerSeconds(0);
-    setInterruptionSeconds(0);
-    setActiveInterruption(null);
     setTimerRunning(true);
     startTimeRef.current = Date.now();
 
@@ -1012,33 +1090,13 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     const stopTime = new Date().toISOString();
     const prodSeconds = timerSeconds;
     const currentLogId = activeLogId;
-    const currentInterLogId = interruptionLogId;
-    const interSeconds = interruptionSeconds;
 
     setTimerRunning(false);
     setActiveTask(null);
     setActiveLogId(null);
-    setActiveInterruption(null);
-    setInterruptionLogId(null);
-    setActiveInterruptionClientId(null);
     setTimerSeconds(0);
-    setInterruptionSeconds(0);
 
     try {
-      if (currentInterLogId) {
-        await fetch(`/api/production/time-logs/${currentInterLogId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            end_time: stopTime,
-            duration_seconds: interSeconds
-          })
-        });
-      }
-
       if (currentLogId) {
         await fetch(`/api/production/time-logs/${currentLogId}`, {
           method: 'PATCH',
@@ -1121,51 +1179,16 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     );
   };
 
-  const handleToggleInterruption = async (type) => {
+  const handleStartPause = async (type = 'general') => {
     const now = new Date().toISOString();
 
-    if (activeInterruption === type) {
-      const interSeconds = interruptionSeconds;
-      const currentInterLogId = interruptionLogId;
+    // 🚀 Ouverture automatique de la fenêtre flottante PiP
+    openPip();
 
-      setActiveInterruption(null);
-      setInterruptionLogId(null);
-      setInterruptionSeconds(0);
-      setActiveInterruptionClientId(null);
-
-      if (activeTask) {
-        startTimeRef.current = startTimeRef.current + (Date.now() - interruptionStartTimeRef.current);
-      }
-
+    // 1. Si une pause est déjà en cours, la terminer proprement
+    if (activePause && pauseLogId) {
       try {
-        if (currentInterLogId) {
-          await fetch(`/api/production/time-logs/${currentInterLogId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              end_time: now,
-              duration_seconds: interSeconds
-            })
-          });
-          await refreshData();
-        }
-      } catch (err) {
-        console.error('Error ending interruption:', err);
-      }
-    } else {
-      handleStartInterruption(type);
-    }
-  };
-
-  const handleStartInterruption = async (type, targetClientId = null) => {
-    const now = new Date().toISOString();
-
-    if (activeInterruption && interruptionLogId) {
-      try {
-        await fetch(`/api/production/time-logs/${interruptionLogId}`, {
+        await fetch(`/api/production/time-logs/${pauseLogId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1173,36 +1196,45 @@ export default function EspaceProduction({ user, token, clients, loading, refres
           },
           body: JSON.stringify({
             end_time: now,
-            duration_seconds: interruptionSeconds
+            duration_seconds: pauseSeconds
           })
         });
       } catch (err) {
-        console.error('Error stopping previous interruption:', err);
+        console.error('Error closing previous pause:', err);
       }
     }
 
-    let resolvedClientId = targetClientId;
-    if (!resolvedClientId && activeTask) {
-      resolvedClientId = activeTask.client_id;
-    }
-
+    // 2. Si une tâche est en cours, la suspendre (sauvegarder le temps et conserver la référence)
     if (activeTask && timerRunning) {
-      await handleStopTimer();
-    }
+      setSuspendedTask(activeTask);
+      const prodSeconds = timerSeconds;
+      const currentLogId = activeLogId;
 
-    let targetTaskId = null;
-    if (resolvedClientId) {
-      const clientObj = clients.find(c => c.id === resolvedClientId);
-      if (clientObj && clientObj.tasks && clientObj.tasks.length > 0) {
-        targetTaskId = clientObj.tasks[0].id;
+      setTimerRunning(false);
+      setActiveTask(null);
+      setActiveLogId(null);
+      setTimerSeconds(0);
+
+      try {
+        if (currentLogId) {
+          await fetch(`/api/production/time-logs/${currentLogId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              end_time: now,
+              duration_seconds: prodSeconds
+            })
+          });
+        }
+      } catch (err) {
+        console.error('Error suspending task for pause:', err);
       }
     }
 
-    if (!targetTaskId) {
-      showAlert("Action impossible", "Le client choisi n'a aucune tâche configurée.");
-      return;
-    }
-
+    // 3. Démarrage de la nouvelle pause (100% indépendante de tout client)
     try {
       const res = await fetch('/api/production/time-logs', {
         method: 'POST',
@@ -1211,11 +1243,11 @@ export default function EspaceProduction({ user, token, clients, loading, refres
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          task_id: targetTaskId,
+          task_id: null,
           employee_id: user.id,
           employee_name: employeeName || 'Collaborateur',
           duration_seconds: 0,
-          log_type: `interruption:${type}`,
+          log_type: `pause:${type}`,
           start_time: now,
           end_time: null
         })
@@ -1223,27 +1255,51 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
       if (res.ok) {
         const data = await res.json();
-        setActiveInterruption(type);
-        setInterruptionLogId(data.log.id);
-        setInterruptionSeconds(0);
-        setActiveInterruptionClientId(resolvedClientId);
-        interruptionStartTimeRef.current = Date.now();
+        setActivePause(type);
+        setPauseLogId(data.log.id);
+        setPauseSeconds(0);
+        pauseStartTimeRef.current = Date.now();
+        await refreshData();
       }
     } catch (err) {
-      console.error('Error starting new interruption:', err);
+      console.error('Error starting pause:', err);
     }
   };
 
-  const handleInterruptionClick = (type) => {
-    if (activeInterruption === type) {
-      handleToggleInterruption(type);
-    } else if (type === 'pause') {
-      const clientId = activeTask ? activeTask.client_id : (selectedClient?.id || clients[0]?.id || '');
-      handleStartInterruption('pause', clientId);
+  const handleStopPause = async (shouldResumeSuspended = false) => {
+    const now = new Date().toISOString();
+    const currentPauseLogId = pauseLogId;
+    const currentPauseSec = pauseSeconds;
+
+    setActivePause(null);
+    setPauseLogId(null);
+    setPauseSeconds(0);
+
+    try {
+      if (currentPauseLogId) {
+        await fetch(`/api/production/time-logs/${currentPauseLogId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            end_time: now,
+            duration_seconds: currentPauseSec
+          })
+        });
+        await refreshData();
+      }
+    } catch (err) {
+      console.error('Error stopping pause:', err);
+    }
+
+    if (shouldResumeSuspended && suspendedTask) {
+      const taskToResume = suspendedTask;
+      setSuspendedTask(null);
+      handleStartTimer(taskToResume);
     } else {
-      setInterruptionTypeToStart(type);
-      setSelectedInterruptionClientId(activeTask?.client_id || selectedClient?.id || clients[0]?.id || '');
-      setInterruptionModalOpen(true);
+      setSuspendedTask(null);
     }
   };
 
@@ -1264,9 +1320,6 @@ export default function EspaceProduction({ user, token, clients, loading, refres
 
   const activeTaskClientObj = activeTask ? clients.find(c => c.id === activeTask.client_id) : null;
   const activeTaskClientName = activeTaskClientObj ? activeTaskClientObj.name : '';
-
-  const activeInterruptionClientObj = activeInterruptionClientId ? clients.find(c => c.id === activeInterruptionClientId) : null;
-  const activeInterruptionClientName = activeInterruptionClientObj ? activeInterruptionClientObj.name : '';
 
   // Filtrer TOUTES les tâches spécifiquement assignées à l'utilisateur courant (tous clients confondus)
   const allClientsTasks = (clients || []).flatMap(client =>
@@ -1293,45 +1346,172 @@ export default function EspaceProduction({ user, token, clients, loading, refres
     return !isStandardDeliverable;
   });
 
+  const renderDeliverableCard = (card) => {
+    const IconComp = card.icon;
+
+    // Trouver les tâches standard / génériques (non assignées) associées à ce livrable
+    const genericTasks = (selectedClient?.tasks || []).filter(t => isStandardDeliverableTask(t, card));
+
+    let totalSpentSec = 0;
+    let totalBudgetHours = 0;
+    genericTasks.forEach(t => {
+      totalSpentSec += (t.time_spent_seconds || 0);
+      totalBudgetHours += (t.budget_hours || 0);
+    });
+
+    const areAllTasksCompleted = genericTasks.length > 0 && genericTasks.every(t => t.status === 'Fait');
+    const isCategoryActive = Boolean(
+      activeTask &&
+      timerRunning &&
+      isStandardDeliverableTask(activeTask, card)
+    );
+
+    const totalBudgetSec = totalBudgetHours * 3600;
+    const progressPercent = totalBudgetSec > 0 ? Math.min(Math.round((totalSpentSec / totalBudgetSec) * 100), 100) : 0;
+
+    return (
+      <div
+        key={card.id}
+        className={`deliverable-card-item ${areAllTasksCompleted ? 'completed' : isCategoryActive ? 'active' : ''}`}
+        style={{
+          borderLeft: `4px solid ${card.themeColor}`,
+          background: '#ffffff',
+          borderRadius: '12px',
+          padding: '1.15rem 1.25rem',
+          border: '1px solid var(--border-light)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
+          boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        <div className="deliverable-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+          <div className="deliverable-card-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div
+              className="deliverable-card-icon-badge"
+              style={{
+                backgroundColor: `${card.themeColor}15`,
+                color: card.themeColor,
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <IconComp size={20} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h3 className="deliverable-card-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800', color: '#0f172a' }}>
+                  {card.title}
+                </h3>
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                ⏱️ {formatSecondsToHMText(totalSpentSec)} passées
+              </span>
+            </div>
+          </div>
+
+          <div className="deliverable-card-actions" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
+            {selectedClient && (
+              <span className="deliverable-client-tag" style={{ margin: 0, fontSize: '0.72rem', padding: '0.2rem 0.55rem', borderRadius: '4px', background: 'rgba(23, 143, 203, 0.08)', color: '#178FCB', fontWeight: '700', border: '1px solid rgba(23, 143, 203, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Briefcase size={10} />
+                {selectedClient.code ? `${selectedClient.code} • ` : ''}{selectedClient.name}
+              </span>
+            )}
+            {isCategoryActive ? (
+              <div
+                className="status-badge en-cours"
+                style={{
+                  background: 'rgba(234, 88, 12, 0.15)',
+                  color: 'var(--brand-orange)',
+                  fontWeight: '700',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem'
+                }}
+              >
+                <span className="dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--brand-orange)', display: 'inline-block' }}></span>
+                En cours
+              </div>
+            ) : (
+              <button
+                onClick={() => handleStartDeliverable(card)}
+                title={`Lancer le chronomètre sur ${card.title} (${selectedClient?.name || ''})`}
+                style={{
+                  background: 'var(--panel-white)',
+                  border: '1px solid var(--border-light)',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
+                  padding: '0.35rem 0.95rem',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  color: '#10b981',
+                  fontWeight: '700',
+                  fontSize: '0.82rem',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Play size={13} fill="#10b981" />
+                Démarrer
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Activities Tags */}
+        <div className="deliverable-activities-tags" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.2rem' }}>
+          {card.activities.map(act => (
+            <span key={act} className="activity-pill">
+              {act}
+            </span>
+          ))}
+        </div>
+
+        {/* Progress bar for category if budget exists */}
+        {totalBudgetHours > 0 && (
+          <div style={{ marginTop: '0.2rem' }}>
+            <div className="progress-bar-container" style={{ height: '5px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+              <div
+                className={`progress-bar-fill ${areAllTasksCompleted ? 'green' : isCategoryActive ? 'orange' : 'blue'}`}
+                style={{
+                  width: `${progressPercent}%`,
+                  height: '100%',
+                  background: areAllTasksCompleted ? '#338855' : isCategoryActive ? '#ff7a00' : '#2563eb',
+                  borderRadius: '9999px'
+                }}
+              ></div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="espace-production">
       {/* HEADER CONTROLS & CLIENT OVERVIEW */}
       <div className="panel prod-header" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.25rem 1.5rem', borderRadius: '12px', border: '1px solid var(--border-light)', marginBottom: '1.5rem', background: 'var(--panel-white)' }}>
         {/* ROW 1: Client Selector & Main Badges */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(234, 88, 12, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-orange)' }}>
-              <Briefcase size={22} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#64748b', marginBottom: '2px' }}>
-                Espace Client
-              </div>
-              <select
-                className="client-selector"
-                value={selectedClient?.id || ''}
-                onChange={(e) => {
-                  const client = clients.find(c => c.id === e.target.value);
-                  setSelectedClient(client || null);
-                }}
-                disabled={timerRunning}
-                style={{
-                  fontSize: '1rem',
-                  fontWeight: '700',
-                  color: '#0f172a',
-                  padding: '0.4rem 0.8rem',
-                  borderRadius: '8px',
-                  border: '1.5px solid var(--border-color)',
-                  background: 'var(--background-light)',
-                  cursor: timerRunning ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
-                ))}
-                {clients.length === 0 && <option value="">Aucun client</option>}
-              </select>
-            </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1.25rem', width: '100%' }}>
+          <div style={{ flex: '1 1 320px', maxWidth: '440px' }}>
+            <ClientCombobox
+              label="Espace Client"
+              clients={clients}
+              selectedClient={selectedClient}
+              onSelectClient={(client) => setSelectedClient(client || null)}
+              disabled={timerRunning}
+              placeholder="Rechercher un client..."
+            />
           </div>
 
           {selectedClient && (() => {
@@ -1339,14 +1519,29 @@ export default function EspaceProduction({ user, token, clients, loading, refres
             const currentMonthCapitalized = currentMonthFormatted.charAt(0).toUpperCase() + currentMonthFormatted.slice(1);
 
             return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', background: '#f8fafc', padding: '0.45rem 0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155' }}>
-                  🗓️ {currentMonthCapitalized}
-                </span>
-                <span style={{ width: '1px', height: '14px', background: '#cbd5e1' }} />
-                <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--brand-orange)' }}>
-                  ⏱️ {selectedClient.total_spent_hours}h consommées
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', flex: '1 1 auto', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', background: '#f8fafc', padding: '0.55rem 0.95rem', borderRadius: '9px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                  <Calendar size={15} style={{ color: 'var(--brand-orange)' }} />
+                  <span style={{ fontSize: '0.84rem', fontWeight: '700', color: '#334155' }}>
+                    {currentMonthCapitalized}
+                  </span>
+                </div>
+
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(234, 88, 12, 0.08)', padding: '0.55rem 0.95rem', borderRadius: '9px', border: '1px solid rgba(234, 88, 12, 0.25)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                  <Clock size={15} style={{ color: 'var(--brand-orange)' }} />
+                  <span style={{ fontSize: '0.84rem', fontWeight: '800', color: 'var(--brand-orange)' }}>
+                    {selectedClient.total_spent_hours}h consommées
+                  </span>
+                </div>
+
+                {selectedClient.total_budget_hours > 0 && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(37, 99, 235, 0.08)', padding: '0.55rem 0.95rem', borderRadius: '9px', border: '1px solid rgba(37, 99, 235, 0.25)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                    <BarChart3 size={15} style={{ color: '#2563eb' }} />
+                    <span style={{ fontSize: '0.84rem', fontWeight: '800', color: '#2563eb' }}>
+                      Budget : {selectedClient.total_budget_hours}h ({selectedClient.progression_percent || 0}%)
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -1715,12 +1910,10 @@ export default function EspaceProduction({ user, token, clients, loading, refres
           <p style={{ color: 'var(--text-secondary)' }}>Veuillez sélectionner un client dans le menu ci-dessus.</p>
         </div>
       ) : (
-        <div className="prod-grid">
+        <div className="prod-vertical-layout" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
 
-          {/* LEFT COLUMN: ACTIVE TRACKING & INTERRUPTIONS */}
-          <div className="prod-left-column">
-
-            {/* ACTIVE CHRONO CARD */}
+          {/* 1. CHRONOMÈTRE POSITIONNÉ AU-DESSUS (COMMAND CENTER) */}
+          <div className="prod-chrono-hero-wrapper" style={{ width: '100%' }}>
             <ChronoCardView
               isPip={false}
               timerRunning={timerRunning}
@@ -1729,484 +1922,93 @@ export default function EspaceProduction({ user, token, clients, loading, refres
               selectedClient={selectedClient}
               timerSeconds={timerSeconds}
               formatSecondsToHM={formatSecondsToHM}
-              activeInterruption={activeInterruption}
-              interruptionSeconds={interruptionSeconds}
-              activeInterruptionClientName={activeInterruptionClientName}
               handleStopTimer={handleStopTimer}
               handleCompleteTask={handleCompleteTask}
-              handleToggleInterruption={handleToggleInterruption}
-              handleInterruptionClick={handleInterruptionClick}
               isStandardMission={DELIVERABLE_CARDS.some(c => isStandardDeliverableTask(activeTask, c))}
               isPipSupported={isPipSupported}
               isPipActive={!!pipWindow}
               onTogglePip={togglePip}
+              activePause={activePause}
+              pauseSeconds={pauseSeconds}
+              handleStartPause={handleStartPause}
+              handleStopPause={handleStopPause}
+              suspendedTask={suspendedTask}
             />
+          </div>
 
-            {/* ASSIGNED TASKS CARD (TÂCHES ASSIGNÉES) - MASQUÉ TEMPORAIREMENT */}
-            {false && (
-              <div className="panel prod-assigned-tasks-card" style={{ padding: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.05rem', letterSpacing: '0.3px' }}>
-                    <UserCheck size={18} style={{ color: 'var(--brand-orange)' }} />
-                    TÂCHES ASSIGNÉES
-                  </h2>
-                  {assignedTasks.length > 0 && (
-                    <span style={{
-                      background: 'rgba(249, 115, 22, 0.12)',
-                      color: 'var(--brand-orange)',
-                      padding: '0.15rem 0.55rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '700'
-                    }}>
-                      {assignedTasks.length} {assignedTasks.length > 1 ? 'tâches' : 'tâche'}
-                    </span>
-                  )}
-                </div>
-                <p className="panel-subtitle" style={{ margin: '0 0 1.1rem 0', fontSize: '0.8rem' }}>
-                  Toutes les tâches qui vous sont assignées (tous clients confondus).
+          {/* 2. MISSIONS ACTIVES : PLEINE LARGEUR & SCINDÉE EN 2 COLONNES */}
+          <div className="panel deliverables-card" style={{ width: '100%', padding: '1.5rem 1.75rem', borderRadius: '14px', border: '1px solid var(--border-light)', background: '#ffffff', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-light)' }}>
+              <div>
+                <h2 className="panel-title" style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                  <Layers size={22} style={{ color: 'var(--brand-orange)' }} />
+                  MISSIONS ACTIVES
+                </h2>
+                <p className="panel-subtitle" style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem' }}>
+                  Sélectionnez votre pôle d'intervention et démarrez votre session de travail.
                 </p>
-
-                {assignedTasks.length === 0 ? (
-                  <div style={{
-                    padding: '1.5rem 1rem',
-                    textAlign: 'center',
-                    background: 'var(--background-light)',
-                    borderRadius: '8px',
-                    border: '1px dashed var(--border-light)',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.85rem'
-                  }}>
-                    <CheckCircle size={22} style={{ color: '#94a3b8', margin: '0 auto 0.4rem auto', display: 'block', opacity: 0.7 }} />
-                    <span>Aucune tâche assignée actuellement.</span>
-                  </div>
-                ) : (
-                  <div className="assigned-tasks-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {assignedTasks.map(task => {
-                      const budgetSec = (task.budget_hours || 0) * 3600;
-                      const spentSec = task.time_spent_seconds || 0;
-                      const isTaskCompleted = task.status === 'Fait';
-                      const isTaskRunning = activeTask && activeTask.id === task.id && timerRunning;
-                      const taskProgress = budgetSec > 0 ? Math.min(Math.round((spentSec / budgetSec) * 100), 100) : 0;
-
-                      const cardMatch = DELIVERABLE_CARDS.find(c =>
-                        c.categoryKey.toLowerCase() === task.category?.toLowerCase() ||
-                        c.id.toLowerCase() === task.category?.toLowerCase() ||
-                        c.title.toLowerCase() === task.category?.toLowerCase()
-                      );
-                      const catColor = cardMatch?.themeColor || '#178FCB';
-                      const catTitle = cardMatch?.title || task.category || 'Production';
-
-                      return (
-                        <div
-                          key={task.id}
-                          className={`assigned-task-item ${isTaskCompleted ? 'completed' : isTaskRunning ? 'running' : ''}`}
-                          style={{
-                            padding: '0.85rem 1rem',
-                            borderRadius: '8px',
-                            border: isTaskRunning ? '1.5px solid var(--brand-orange)' : '1px solid var(--border-light)',
-                            background: isTaskRunning ? 'rgba(249, 115, 22, 0.03)' : 'var(--panel-white)',
-                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
-                                <span style={{
-                                  fontSize: '0.7rem',
-                                  fontWeight: '800',
-                                  color: '#1e293b',
-                                  background: '#f1f5f9',
-                                  border: '1px solid #cbd5e1',
-                                  padding: '0.12rem 0.5rem',
-                                  borderRadius: '4px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.3rem',
-                                  letterSpacing: '0.2px'
-                                }}>
-                                  <Building2 size={12} style={{ color: 'var(--brand-orange)' }} />
-                                  {task.client_name}{task.client_code ? ` (${task.client_code})` : ''}
-                                </span>
-
-                                <span style={{
-                                  fontSize: '0.68rem',
-                                  fontWeight: '700',
-                                  color: catColor,
-                                  background: `${catColor}15`,
-                                  padding: '0.1rem 0.45rem',
-                                  borderRadius: '4px',
-                                  textTransform: 'uppercase'
-                                }}>
-                                  {catTitle}
-                                </span>
-
-                                <h4 style={{
-                                  fontSize: '0.95rem',
-                                  fontWeight: '800',
-                                  color: isTaskCompleted ? '#338855' : '#0f172a',
-                                  margin: 0,
-                                  textDecoration: isTaskCompleted ? 'line-through' : 'none',
-                                  lineHeight: '1.3'
-                                }}>
-                                  {task.name}
-                                </h4>
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                                <span style={{ fontWeight: '600' }}>
-                                  {formatSecondsToHMText(spentSec)} passées
-                                </span>
-
-                                {task.due_date && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    <Calendar size={12} style={{ color: 'var(--text-secondary)' }} />
-                                    <span>Échéance : <strong>{new Date(task.due_date).toLocaleDateString('fr-FR')}</strong></span>
-                                  </div>
-                                )}
-
-                                {task.is_recurring && (
-                                  <span style={{ fontSize: '0.68rem', background: 'rgba(23, 143, 203, 0.1)', color: '#178FCB', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                    <Repeat size={10} /> Récurrente
-                                  </span>
-                                )}
-
-                                <span style={{ fontSize: '0.68rem', background: 'rgba(100, 116, 139, 0.1)', color: '#475569', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
-                                  Assigné à moi
-                                </span>
-                              </div>
-                            </div>
-
-                            <div style={{ flexShrink: 0 }}>
-                              {isTaskCompleted ? (
-                                <div className="status-badge fait" style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}>
-                                  <CheckCircle size={12} /> Fait
-                                </div>
-                              ) : isTaskRunning ? (
-                                <div
-                                  className="status-badge en-cours"
-                                  style={{
-                                    background: 'rgba(234, 88, 12, 0.15)',
-                                    color: 'var(--brand-orange)',
-                                    fontWeight: '700',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.35rem',
-                                    padding: '0.3rem 0.8rem',
-                                    borderRadius: '20px',
-                                    fontSize: '0.78rem'
-                                  }}
-                                >
-                                  <span className="dot" style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--brand-orange)', display: 'inline-block' }}></span>
-                                  En cours
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => handleStartTimer(task)}
-                                  title={`Lancer le chronomètre sur ${task.name}`}
-                                  style={{
-                                    background: 'var(--panel-white)',
-                                    border: '1px solid var(--border-light)',
-                                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
-                                    padding: '0.3rem 0.85rem',
-                                    borderRadius: '20px',
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem',
-                                    color: '#10b981',
-                                    fontWeight: '700',
-                                    fontSize: '0.78rem',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                >
-                                  <Play size={12} fill="#10b981" />
-                                  Démarrer
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {task.budget_hours > 0 && (
-                            <div className="progress-bar-container" style={{ height: '4px', marginTop: '0.55rem', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
-                              <div
-                                className={`progress-bar-fill ${isTaskCompleted ? 'green' : isTaskRunning ? 'orange' : 'blue'}`}
-                                style={{
-                                  width: `${taskProgress}%`,
-                                  height: '100%',
-                                  background: isTaskCompleted ? '#338855' : isTaskRunning ? '#ff7a00' : '#2563eb',
-                                  borderRadius: '9999px'
-                                }}
-                              ></div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
-            )}
 
-            {/* INTERRUPTIONS CARD */}
-            <div className="panel prod-interruptions-card">
-              <h2 className="panel-title">INTERRUPTIONS <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>(Met le chrono client en pause)</span></h2>
-              <p className="panel-subtitle">Ne perdez plus de temps à justifier les coupures. Un clic suffit.</p>
-
-              <div className="interruptions-grid">
-                <button
-                  className={`btn-interrupt slack ${activeInterruption === 'slack' ? 'active' : ''}`}
-                  onClick={() => handleInterruptionClick('slack')}
+              {selectedClient && (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.55rem',
+                    background: 'rgba(23, 143, 203, 0.08)',
+                    border: '1.5px solid rgba(23, 143, 203, 0.25)',
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '8px'
+                  }}
                 >
-                  <span className="dot"></span> Slack / Mails
-                </button>
-                <button
-                  className={`btn-interrupt meeting ${activeInterruption === 'meeting' ? 'active' : ''}`}
-                  onClick={() => handleInterruptionClick('meeting')}
-                >
-                  <span className="dot"></span> Point Interne
-                </button>
-                <button
-                  className={`btn-interrupt pause-type ${activeInterruption === 'pause' ? 'active' : ''}`}
-                  onClick={() => handleInterruptionClick('pause')}
-                >
-                  <span className="dot"></span> Pause
-                </button>
-                <button
-                  className={`btn-interrupt call ${activeInterruption === 'call' ? 'active' : ''}`}
-                  onClick={() => handleInterruptionClick('call')}
-                >
-                  <span className="dot"></span> Appel Impromptu
-                </button>
-              </div>
-            </div>
-
-          </div>
-
-          {/* RIGHT COLUMN: DELIVERABLES */}
-          <div className="prod-right-column">
-
-            {/* LIVRABLES CARD */}
-            <div className="panel deliverables-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <div>
-                  <h2 className="panel-title" style={{ margin: 0 }}>MISSIONS ACTIVES</h2>
-                  <p className="panel-subtitle" style={{ margin: '0.2rem 0 0 0' }}>Sélectionnez votre pôle d'intervention et démarrez votre session de travail.</p>
+                  <Briefcase size={16} style={{ color: '#178FCB' }} />
+                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Client actif :</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#178FCB' }}>
+                    {selectedClient.code ? `${selectedClient.code} - ` : ''}{selectedClient.name}
+                  </span>
                 </div>
-                {selectedClient && (
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      background: 'rgba(234, 88, 12, 0.08)',
-                      border: '1.5px solid rgba(234, 88, 12, 0.28)',
-                      padding: '0.4rem 0.85rem',
-                      borderRadius: '8px'
-                    }}
-                  >
-                    <Briefcase size={15} style={{ color: '#178FCB' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Client actif :</span>
-                    <span style={{ fontSize: '0.92rem', fontWeight: '800', color: '#178FCB' }}>
-                      {selectedClient.code ? `${selectedClient.code} - ` : ''}{selectedClient.name}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="deliverables-5-container" style={{ marginTop: '1.25rem' }}>
-                {DELIVERABLE_CARDS.map(card => {
-                  const IconComp = card.icon;
-
-                  // Trouver les tâches standard / génériques (non assignées) associées à ce livrable
-                  const genericTasks = (selectedClient?.tasks || []).filter(t => isStandardDeliverableTask(t, card));
-
-                  let totalSpentSec = 0;
-                  let totalBudgetHours = 0;
-                  genericTasks.forEach(t => {
-                    totalSpentSec += (t.time_spent_seconds || 0);
-                    totalBudgetHours += (t.budget_hours || 0);
-                  });
-
-                  const areAllTasksCompleted = genericTasks.length > 0 && genericTasks.every(t => t.status === 'Fait');
-                  const isCategoryActive = Boolean(
-                    activeTask &&
-                    timerRunning &&
-                    isStandardDeliverableTask(activeTask, card)
-                  );
-
-                  const totalBudgetSec = totalBudgetHours * 3600;
-                  const progressPercent = totalBudgetSec > 0 ? Math.min(Math.round((totalSpentSec / totalBudgetSec) * 100), 100) : 0;
-
-                  return (
-                    <div
-                      key={card.id}
-                      className={`deliverable-card-item ${areAllTasksCompleted ? 'completed' : isCategoryActive ? 'active' : ''}`}
-                      style={{
-                        borderLeft: `4px solid ${card.themeColor}`
-                      }}
-                    >
-                      <div className="deliverable-card-header">
-                        <div className="deliverable-card-title-group">
-                          <div
-                            className="deliverable-card-icon-badge"
-                            style={{
-                              backgroundColor: `${card.themeColor}15`,
-                              color: card.themeColor
-                            }}
-                          >
-                            <IconComp size={20} />
-                          </div>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                              <h3 className="deliverable-card-title">
-                                {card.title}
-                              </h3>
-                              {selectedClient && (
-                                <span className="deliverable-client-tag">
-                                  <Briefcase size={10} />
-                                  {selectedClient.code ? `${selectedClient.code} • ` : ''}{selectedClient.name}
-                                </span>
-                              )}
-                            </div>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                              {formatSecondsToHMText(totalSpentSec)} passées
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="deliverable-card-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {isCategoryActive ? (
-                            <div
-                              className="status-badge en-cours"
-                              style={{
-                                background: 'rgba(234, 88, 12, 0.15)',
-                                color: 'var(--brand-orange)',
-                                fontWeight: '700',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                padding: '0.35rem 0.85rem',
-                                borderRadius: '20px',
-                                fontSize: '0.82rem'
-                              }}
-                            >
-                              <span className="dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--brand-orange)', display: 'inline-block' }}></span>
-                              En cours
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => handleStartDeliverable(card)}
-                              title={`Lancer le chronomètre sur ${card.title} (${selectedClient?.name || ''})`}
-                              style={{
-                                background: 'var(--panel-white)',
-                                border: '1px solid var(--border-light)',
-                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
-                                padding: '0.35rem 0.95rem',
-                                borderRadius: '20px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.45rem',
-                                color: '#10b981',
-                                fontWeight: '700',
-                                fontSize: '0.82rem',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <Play size={13} fill="#10b981" />
-                              Démarrer
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Activities Tags */}
-                      <div className="deliverable-activities-tags">
-                        {card.activities.map(act => (
-                          <span key={act} className="activity-pill">
-                            {act}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* Progress bar for category if budget exists */}
-                      {totalBudgetHours > 0 && (
-                        <div style={{ marginTop: '0.4rem' }}>
-                          <div className="progress-bar-container" style={{ height: '5px' }}>
-                            <div
-                              className={`progress-bar-fill ${areAllTasksCompleted ? 'green' : isCategoryActive ? 'orange' : 'blue'}`}
-                              style={{ width: `${progressPercent}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              )}
             </div>
 
-          </div>
-        </div>
-      )}
+            {/* GRILLE À 2 COLONNES (Rédaction + Créa graphique D'UN CÔTÉ, Réunion + Data + Tech DE L'AUTRE) */}
+            <div
+              className="deliverables-two-columns-layout"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+                gap: '1.5rem',
+                alignItems: 'start'
+              }}
+            >
+              {/* COLONNE GAUCHE : RÉDACTION & CRÉA GRAPHIQUE */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.4rem', borderBottom: '2px solid rgba(217, 18, 7, 0.25)' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    ✍️ Pôle Contenu & Création
+                  </span>
+                </div>
 
-      {/* MODAL: ALLOCATE INTERRUPTION CLIENT */}
-      {interruptionModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '480px', width: '90%' }}>
-            <h2 className="modal-title" style={{ textAlign: 'center', marginBottom: '1rem' }}>
-              Attribuer l'interruption
-            </h2>
-            <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-              À quel client souhaitez-vous attribuer ce temps de <strong>{
-                interruptionTypeToStart === 'slack' ? 'Slack / Mails' :
-                  interruptionTypeToStart === 'meeting' ? 'Point Interne' : 'Appel Impromptu'
-              }</strong> ?
-            </p>
-
-            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-              <label style={{ fontWeight: '600' }}>Client concerné</label>
-              <select
-                value={selectedInterruptionClientId}
-                onChange={(e) => setSelectedInterruptionClientId(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}
-              >
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} - {c.name}
-                  </option>
+                {DELIVERABLE_CARDS.filter(c => ['redaction', 'crea_graphique'].includes(c.id)).map(card => (
+                  renderDeliverableCard(card)
                 ))}
-              </select>
+              </div>
+
+              {/* COLONNE DROITE : RÉUNION, DATA & TECH */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.4rem', borderBottom: '2px solid rgba(51, 136, 85, 0.25)' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    👥 Pôle Gestion, Data & Tech
+                  </span>
+                </div>
+
+                {DELIVERABLE_CARDS.filter(c => ['reunion', 'data', 'tech'].includes(c.id)).map(card => (
+                  renderDeliverableCard(card)
+                ))}
+              </div>
             </div>
 
-            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-              <button
-                type="button"
-                className="btn btn-outline"
-                style={{ minWidth: '100px' }}
-                onClick={() => {
-                  setInterruptionModalOpen(false);
-                  setInterruptionTypeToStart(null);
-                }}
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ minWidth: '120px' }}
-                onClick={() => {
-                  setInterruptionModalOpen(false);
-                  handleStartInterruption(interruptionTypeToStart, selectedInterruptionClientId);
-                  setInterruptionTypeToStart(null);
-                }}
-              >
-                Démarrer
-              </button>
-            </div>
           </div>
+
         </div>
       )}
 
@@ -2280,17 +2082,17 @@ export default function EspaceProduction({ user, token, clients, loading, refres
             selectedClient={selectedClient}
             timerSeconds={timerSeconds}
             formatSecondsToHM={formatSecondsToHM}
-            activeInterruption={activeInterruption}
-            interruptionSeconds={interruptionSeconds}
-            activeInterruptionClientName={activeInterruptionClientName}
             handleStopTimer={handleStopTimer}
             handleCompleteTask={handleCompleteTask}
-            handleToggleInterruption={handleToggleInterruption}
-            handleInterruptionClick={handleInterruptionClick}
             isStandardMission={DELIVERABLE_CARDS.some(c => isStandardDeliverableTask(activeTask, c))}
             isPipSupported={isPipSupported}
             isPipActive={true}
             onTogglePip={togglePip}
+            activePause={activePause}
+            pauseSeconds={pauseSeconds}
+            handleStartPause={handleStartPause}
+            handleStopPause={handleStopPause}
+            suspendedTask={suspendedTask}
           />,
           pipWindow.document.getElementById('pip-root')
         )

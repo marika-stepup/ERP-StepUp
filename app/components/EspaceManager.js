@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { 
-  Plus, 
-  Trash2, 
-  User, 
-  Briefcase, 
-  PlusCircle, 
-  AlertCircle, 
+import {
+  Plus,
+  Trash2,
+  User,
+  Briefcase,
+  PlusCircle,
+  AlertCircle,
   UserCheck,
   Edit,
   Calendar,
@@ -27,6 +27,7 @@ import {
   Wrench,
   Share2
 } from 'lucide-react';
+import ClientCombobox from './ClientCombobox';
 
 export const FacebookIcon = ({ size = 18, color = "#1877F2" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
@@ -44,16 +45,16 @@ export const InstagramIcon = ({ size = 18, color = "#E1306C" }) => (
 
 export const LinkedinIcon = ({ size = 18, color = "#0A66C2" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+    <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
   </svg>
 );
 
 export const GooglePostIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24">
-    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
   </svg>
 );
 
@@ -69,7 +70,7 @@ export const DELIVERABLE_CATEGORIES = [
       'Newsletter',
       'Stratégie',
       'Posts',
-      'Correspondance mail',
+      'Correspondance mail/Slack/WhatsApp',
       'Relance client',
       'Compte rendu',
       'Modération',
@@ -103,6 +104,7 @@ export const DELIVERABLE_CATEGORIES = [
       'Réunion des team leader',
       'Présentation commerciale',
       'Brief',
+      'Appel impromptu',
       'Atelier de stratégie',
       'Entretien individuel',
       'KIDS',
@@ -148,7 +150,7 @@ export const DELIVERABLE_CATEGORIES = [
 export default function EspaceManager({ user, token, allMembers, clients, loading, refreshData }) {
   const [selectedClient, setSelectedClient] = useState(null);
   const [timeLogs, setTimeLogs] = useState([]);
-  
+
   // Modals / Form states
   const [showAddClient, setShowAddClient] = useState(false);
   const [newClientInput, setNewClientInput] = useState('');
@@ -581,7 +583,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
   // Gestion de la sélection multiple et suppression groupée
   const handleToggleSelectTask = (taskId) => {
-    setSelectedTaskIds(prev => 
+    setSelectedTaskIds(prev =>
       prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
     );
   };
@@ -692,10 +694,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
     (c.tasks || []).forEach(t => {
       const cat = (t.category || '').toLowerCase();
       const name = (t.name || '').toLowerCase();
-      
+
       const keywords = ['post', 'article', 'linkedin', 'facebook', 'instagram', 'tiktok', 'twitter', 'bb', 'visuel', 'carrousel', 'story', 'reels', 'août', 'aout', 'septembre', 'octobre', 'novembre', 'décembre', 'decembre', 'janvier', 'février', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet'];
       const matchesKeyword = keywords.some(k => cat.includes(k) || name.includes(k));
-      
+
       const isStandardDeliverable = ['rédaction', 'redaction', 'créa graphique', 'crea graphique', 'créa', 'crea', 'réunion', 'reunion', 'data', 'tech'].includes(cat) &&
         ['rédaction', 'redaction', 'créa graphique', 'crea graphique', 'réunion', 'reunion', 'data', 'tech'].includes(name.trim().toLowerCase());
 
@@ -726,44 +728,35 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
     <div className="espace-manager">
       {/* HEADER CONTROLS */}
       <div className="panel prod-header" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.25rem 1.5rem', borderRadius: '12px', border: '1px solid var(--border-light)', marginBottom: '1.5rem', background: 'var(--panel-white)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(234, 88, 12, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-orange)' }}>
-              <Briefcase size={22} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#64748b', marginBottom: '2px' }}>
-                Pilotage Client
-              </div>
-              <select 
-                className="client-selector"
-                value={selectedClient?.id || ''}
-                onChange={(e) => {
-                  const client = clients.find(c => c.id === e.target.value);
-                  setSelectedClient(client || null);
-                }}
-                style={{
-                  fontSize: '1rem',
-                  fontWeight: '700',
-                  color: '#0f172a',
-                  padding: '0.4rem 0.8rem',
-                  borderRadius: '8px',
-                  border: '1.5px solid var(--border-color)',
-                  background: 'var(--background-light)',
-                  cursor: 'pointer'
-                }}
-              >
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
-                ))}
-                {clients.length === 0 && <option value="">Aucun client</option>}
-              </select>
-            </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1.25rem', width: '100%' }}>
+          <div style={{ flex: '1 1 320px', maxWidth: '440px' }}>
+            <ClientCombobox
+              label="Pilotage Client"
+              clients={clients}
+              selectedClient={selectedClient}
+              onSelectClient={(client) => setSelectedClient(client || null)}
+              placeholder="Rechercher un client..."
+            />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button className="btn btn-primary" onClick={() => setShowAddClient(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px', padding: '0.55rem 1rem', fontWeight: '700' }}>
-              <PlusCircle size={16} /> Nouveau Client
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', flex: '1 1 auto', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowAddClient(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                borderRadius: '9px',
+                padding: '0.6rem 1.15rem',
+                fontWeight: '700',
+                fontSize: '0.92rem',
+                boxShadow: '0 2px 5px rgba(234, 88, 12, 0.25)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <PlusCircle size={17} /> Nouveau Client
             </button>
           </div>
         </div>
@@ -788,9 +781,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                   Progression globale : <strong>{selectedClient.total_spent_hours}h / {selectedClient.total_budget_hours}h ({selectedClient.progression_percent}%)</strong>
                 </div>
               </div>
-              
-              <button 
-                className="btn btn-outline btn-sm" 
+
+              <button
+                className="btn btn-outline btn-sm"
                 onClick={() => handleStartEditClient(selectedClient)}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
               >
@@ -801,16 +794,16 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             {/* Détails du contrat (Facebook, Instagram, LinkedIn, Google Post, TMA, Blog, Newsletter) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.65rem' }}>
               {/* Facebook */}
-              <div 
-                className="contract-detail-card" 
-                style={{ 
-                  padding: '0.65rem 0.8rem', 
-                  borderRadius: '8px', 
-                  border: '1px solid rgba(24, 119, 242, 0.25)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.6rem', 
-                  background: 'rgba(24, 119, 242, 0.04)' 
+              <div
+                className="contract-detail-card"
+                style={{
+                  padding: '0.65rem 0.8rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(24, 119, 242, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  background: 'rgba(24, 119, 242, 0.04)'
                 }}
               >
                 <div style={{ color: '#1877F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -825,16 +818,16 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               </div>
 
               {/* Instagram */}
-              <div 
-                className="contract-detail-card" 
-                style={{ 
-                  padding: '0.65rem 0.8rem', 
-                  borderRadius: '8px', 
-                  border: '1px solid rgba(225, 48, 108, 0.25)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.6rem', 
-                  background: 'rgba(225, 48, 108, 0.04)' 
+              <div
+                className="contract-detail-card"
+                style={{
+                  padding: '0.65rem 0.8rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(225, 48, 108, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  background: 'rgba(225, 48, 108, 0.04)'
                 }}
               >
                 <div style={{ color: '#E1306C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -849,16 +842,16 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               </div>
 
               {/* LinkedIn */}
-              <div 
-                className="contract-detail-card" 
-                style={{ 
-                  padding: '0.65rem 0.8rem', 
-                  borderRadius: '8px', 
-                  border: '1px solid rgba(10, 102, 194, 0.25)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.6rem', 
-                  background: 'rgba(10, 102, 194, 0.04)' 
+              <div
+                className="contract-detail-card"
+                style={{
+                  padding: '0.65rem 0.8rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(10, 102, 194, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  background: 'rgba(10, 102, 194, 0.04)'
                 }}
               >
                 <div style={{ color: '#0A66C2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -873,16 +866,16 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               </div>
 
               {/* Google Post */}
-              <div 
-                className="contract-detail-card" 
-                style={{ 
-                  padding: '0.65rem 0.8rem', 
-                  borderRadius: '8px', 
-                  border: '1px solid rgba(66, 133, 244, 0.25)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.6rem', 
-                  background: 'rgba(66, 133, 244, 0.04)' 
+              <div
+                className="contract-detail-card"
+                style={{
+                  padding: '0.65rem 0.8rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(66, 133, 244, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  background: 'rgba(66, 133, 244, 0.04)'
                 }}
               >
                 <div style={{ color: '#4285F4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -897,16 +890,16 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               </div>
 
               {/* TMA */}
-              <div 
-                className="contract-detail-card" 
-                style={{ 
-                  padding: '0.65rem 0.8rem', 
-                  borderRadius: '8px', 
-                  border: '1px solid rgba(99, 102, 241, 0.25)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.6rem', 
-                  background: 'rgba(99, 102, 241, 0.04)' 
+              <div
+                className="contract-detail-card"
+                style={{
+                  padding: '0.65rem 0.8rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  background: 'rgba(99, 102, 241, 0.04)'
                 }}
               >
                 <div style={{ color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -921,16 +914,16 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               </div>
 
               {/* Blog */}
-              <div 
-                className="contract-detail-card" 
-                style={{ 
-                  padding: '0.65rem 0.8rem', 
-                  borderRadius: '8px', 
-                  border: '1px solid rgba(234, 88, 12, 0.25)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.6rem', 
-                  background: 'rgba(234, 88, 12, 0.04)' 
+              <div
+                className="contract-detail-card"
+                style={{
+                  padding: '0.65rem 0.8rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(234, 88, 12, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  background: 'rgba(234, 88, 12, 0.04)'
                 }}
               >
                 <div style={{ color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -945,16 +938,16 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               </div>
 
               {/* Newsletter */}
-              <div 
-                className="contract-detail-card" 
-                style={{ 
-                  padding: '0.65rem 0.8rem', 
-                  borderRadius: '8px', 
-                  border: '1px solid rgba(2, 132, 199, 0.25)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.6rem', 
-                  background: 'rgba(2, 132, 199, 0.04)' 
+              <div
+                className="contract-detail-card"
+                style={{
+                  padding: '0.65rem 0.8rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(2, 132, 199, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  background: 'rgba(2, 132, 199, 0.04)'
                 }}
               >
                 <div style={{ color: '#0284C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -992,11 +985,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
-          
+
           {/* ANCIENNES TÂCHES / POSTS & ARTICLES À NETTOYER (POUR TOUS LES CLIENTS) */}
           {allLegacyTasks.length > 0 && (
-            <div className="panel legacy-cleanup-card" style={{ 
-              border: '1.5px solid #f97316', 
+            <div className="panel legacy-cleanup-card" style={{
+              border: '1.5px solid #f97316',
               background: 'linear-gradient(180deg, #fff7ed 0%, var(--panel-white) 100%)',
               padding: '1.25rem 1.5rem',
               borderRadius: '10px'
@@ -1008,13 +1001,13 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                       <Layers size={20} />
                       ANCIENNES TÂCHES : POSTS & ARTICLES (VERSION PRÉCÉDENTE)
                     </h2>
-                    <span style={{ 
-                      background: '#ea580c', 
-                      color: '#ffffff', 
-                      fontSize: '0.8rem', 
-                      fontWeight: '800', 
-                      padding: '0.2rem 0.65rem', 
-                      borderRadius: '9999px' 
+                    <span style={{
+                      background: '#ea580c',
+                      color: '#ffffff',
+                      fontSize: '0.8rem',
+                      fontWeight: '800',
+                      padding: '0.2rem 0.65rem',
+                      borderRadius: '9999px'
                     }}>
                       {allLegacyTasks.length} tâches à nettoyer
                     </span>
@@ -1028,8 +1021,8 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--panel-white)', border: '1px solid var(--border-light)', padding: '0.35rem 0.65rem', borderRadius: '6px' }}>
                     <Filter size={14} style={{ color: 'var(--text-secondary)' }} />
-                    <select 
-                      value={legacyFilterClientId} 
+                    <select
+                      value={legacyFilterClientId}
                       onChange={(e) => setLegacyFilterClientId(e.target.value)}
                       style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                     >
@@ -1048,9 +1041,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--panel-white)', border: '1px solid var(--border-light)', padding: '0.35rem 0.65rem', borderRadius: '6px' }}>
                     <Search size={14} style={{ color: 'var(--text-secondary)' }} />
-                    <input 
-                      type="text" 
-                      value={legacySearchQuery} 
+                    <input
+                      type="text"
+                      value={legacySearchQuery}
                       onChange={(e) => setLegacySearchQuery(e.target.value)}
                       placeholder="Filtrer par nom..."
                       style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', outline: 'none', width: '130px' }}
@@ -1074,7 +1067,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', userSelect: 'none' }}>
-                    <input 
+                    <input
                       type="checkbox"
                       checked={filteredLegacyTasks.length > 0 && filteredLegacyTasks.every(t => selectedTaskIds.includes(t.id))}
                       onChange={handleSelectAllFilteredLegacyTasks}
@@ -1083,14 +1076,14 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <span>Tout sélectionner ({filteredLegacyTasks.length})</span>
                   </label>
                   {selectedTaskIds.length > 0 && (
-                    <span style={{ 
-                      fontSize: '0.8rem', 
-                      fontWeight: '800', 
-                      color: '#ea580c', 
-                      background: '#ffffff', 
-                      padding: '0.15rem 0.6rem', 
-                      borderRadius: '12px', 
-                      border: '1px solid #fed7aa' 
+                    <span style={{
+                      fontSize: '0.8rem',
+                      fontWeight: '800',
+                      color: '#ea580c',
+                      background: '#ffffff',
+                      padding: '0.15rem 0.6rem',
+                      borderRadius: '12px',
+                      border: '1px solid #fed7aa'
                     }}>
                       {selectedTaskIds.length} sélectionnée(s)
                     </span>
@@ -1147,10 +1140,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                   Aucune tâche ne correspond aux filtres sélectionnés.
                 </div>
               ) : (
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
-                  gap: '0.85rem', 
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                  gap: '0.85rem',
                   marginTop: '1rem',
                   maxHeight: '480px',
                   overflowY: 'auto',
@@ -1162,8 +1155,8 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     const isSelected = selectedTaskIds.includes(task.id);
 
                     return (
-                      <div 
-                        key={task.id} 
+                      <div
+                        key={task.id}
                         className={`task-item-card ${isCompleted ? 'completed' : ''}`}
                         style={{
                           background: isSelected ? '#fff7ed' : 'var(--panel-white)',
@@ -1179,15 +1172,15 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', flex: 1, minWidth: 0 }}>
-                            <input 
+                            <input
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => handleToggleSelectTask(task.id)}
-                              style={{ 
-                                width: '16px', 
-                                height: '16px', 
-                                cursor: 'pointer', 
-                                accentColor: '#ea580c', 
+                              style={{
+                                width: '16px',
+                                height: '16px',
+                                cursor: 'pointer',
+                                accentColor: '#ea580c',
                                 marginTop: '0.2rem',
                                 flexShrink: 0
                               }}
@@ -1196,24 +1189,24 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                             <div style={{ flex: 1, minWidth: 0 }}>
                               {/* Client & Category Badge */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
-                                <span style={{ 
-                                  fontSize: '0.68rem', 
-                                  fontWeight: '700', 
-                                  color: '#178FCB', 
-                                  background: 'rgba(23, 143, 203, 0.1)', 
-                                  padding: '0.1rem 0.4rem', 
-                                  borderRadius: '4px' 
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  fontWeight: '700',
+                                  color: '#178FCB',
+                                  background: 'rgba(23, 143, 203, 0.1)',
+                                  padding: '0.1rem 0.4rem',
+                                  borderRadius: '4px'
                                 }}>
                                   {task.clientCode ? `${task.clientCode} • ` : ''}{task.clientName}
                                 </span>
                                 {task.category && (
-                                  <span style={{ 
-                                    fontSize: '0.68rem', 
-                                    fontWeight: '700', 
-                                    color: '#ea580c', 
-                                    background: '#ffedd5', 
-                                    padding: '0.1rem 0.4rem', 
-                                    borderRadius: '4px' 
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: '700',
+                                    color: '#ea580c',
+                                    background: '#ffedd5',
+                                    padding: '0.1rem 0.4rem',
+                                    borderRadius: '4px'
                                   }}>
                                     {task.category}
                                   </span>
@@ -1221,10 +1214,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                               </div>
 
                               {/* Task Name */}
-                              <h4 style={{ 
-                                fontSize: '0.92rem', 
-                                fontWeight: '800', 
-                                color: isCompleted ? '#338855' : '#0f172a', 
+                              <h4 style={{
+                                fontSize: '0.92rem',
+                                fontWeight: '800',
+                                color: isCompleted ? '#338855' : '#0f172a',
                                 margin: '0 0 0.2rem 0',
                                 textDecoration: isCompleted ? 'line-through' : 'none'
                               }}>
@@ -1253,9 +1246,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
                           {/* Action Delete & Edit buttons */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
-                            <select 
+                            <select
                               className="task-status-selector"
-                              value={task.status} 
+                              value={task.status}
                               onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
                               style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem' }}
                             >
@@ -1265,10 +1258,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                             </select>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}>
-                              <button 
+                              <button
                                 type="button"
-                                className="btn-icon-edit" 
-                                onClick={() => handleStartEditTask(task)} 
+                                className="btn-icon-edit"
+                                onClick={() => handleStartEditTask(task)}
                                 title={`Modifier « ${task.name} »`}
                                 style={{
                                   background: '#ffedd5',
@@ -1288,9 +1281,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                                 <Edit size={12} />
                               </button>
 
-                              <button 
-                                className="btn-icon-delete" 
-                                onClick={() => handleDeleteTask(task.id)} 
+                              <button
+                                className="btn-icon-delete"
+                                onClick={() => handleDeleteTask(task.id)}
                                 title={`Supprimer « ${task.name} »`}
                                 style={{
                                   background: '#fee2e2',
@@ -1319,7 +1312,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               )}
             </div>
           )}
-          
+
           {/* LIVRABLES / TÂCHES - MASQUÉ TEMPORAIREMENT */}
           {false && (
             <div className="panel deliverables-card">
@@ -1327,13 +1320,13 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                 <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                   LIVRABLES / TÂCHES
                   {selectedClient && (
-                    <span style={{ 
-                      fontSize: '0.85rem', 
-                      fontWeight: '600', 
-                      color: 'var(--brand-orange)', 
-                      backgroundColor: 'rgba(234, 88, 12, 0.12)', 
-                      padding: '0.2rem 0.6rem', 
-                      borderRadius: '12px' 
+                    <span style={{
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      color: 'var(--brand-orange)',
+                      backgroundColor: 'rgba(234, 88, 12, 0.12)',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '12px'
                     }}>
                       {selectedClient.name}
                     </span>
@@ -1431,14 +1424,14 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                   });
 
                   return (
-                    <div 
+                    <div
                       key={card.id}
                       className="deliverable-card-item"
                       style={{ borderLeft: `4px solid ${card.themeColor}` }}
                     >
                       <div className="deliverable-card-header">
                         <div className="deliverable-card-title-group">
-                          <div 
+                          <div
                             className="deliverable-card-icon-badge"
                             style={{ backgroundColor: `${card.themeColor}15`, color: card.themeColor }}
                           >
@@ -1474,8 +1467,8 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                             const isSelected = selectedTaskIds.includes(task.id);
 
                             return (
-                              <div 
-                                key={task.id} 
+                              <div
+                                key={task.id}
                                 className={`task-item-card ${isCompleted ? 'completed' : ''}`}
                                 style={{
                                   border: isSelected ? '2px solid #ea580c' : undefined,
@@ -1485,15 +1478,15 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                               >
                                 <div className="task-item-header">
                                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                                    <input 
+                                    <input
                                       type="checkbox"
                                       checked={isSelected}
                                       onChange={() => handleToggleSelectTask(task.id)}
-                                      style={{ 
-                                        width: '15px', 
-                                        height: '15px', 
-                                        cursor: 'pointer', 
-                                        accentColor: '#ea580c', 
+                                      style={{
+                                        width: '15px',
+                                        height: '15px',
+                                        cursor: 'pointer',
+                                        accentColor: '#ea580c',
                                         marginTop: '0.2rem',
                                         flexShrink: 0
                                       }}
@@ -1518,7 +1511,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                                       </div>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'nowrap' }}>
                                         <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>Échéance :</span>
-                                        <input 
+                                        <input
                                           type="date"
                                           value={task.due_date ? task.due_date.split('T')[0] : ''}
                                           onChange={(e) => handleUpdateTaskDueDate(task.id, e.target.value)}
@@ -1539,9 +1532,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                                   </div>
 
                                   <div className="task-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
-                                    <select 
+                                    <select
                                       className="task-status-selector"
-                                      value={task.status} 
+                                      value={task.status}
                                       onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
                                     >
                                       <option value="Non démarré">À faire</option>
@@ -1550,10 +1543,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                                     </select>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}>
-                                      <button 
+                                      <button
                                         type="button"
-                                        className="btn-icon-edit" 
-                                        onClick={() => handleStartEditTask(task)} 
+                                        className="btn-icon-edit"
+                                        onClick={() => handleStartEditTask(task)}
                                         title="Modifier la tâche"
                                         style={{
                                           background: 'none',
@@ -1582,7 +1575,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
                                 <div className="task-item-progress">
                                   <div className="progress-bar-container">
-                                    <div 
+                                    <div
                                       className={`progress-bar-fill ${isCompleted ? 'green' : 'blue'}`}
                                       style={{ width: `${Math.min(progressPercent, 100)}%` }}
                                     ></div>
@@ -1627,8 +1620,8 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                         const isSelected = selectedTaskIds.includes(task.id);
 
                         return (
-                          <div 
-                            key={task.id} 
+                          <div
+                            key={task.id}
                             className={`task-item-card ${isCompleted ? 'completed' : ''}`}
                             style={{
                               border: isSelected ? '2px solid #ea580c' : undefined,
@@ -1638,15 +1631,15 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                           >
                             <div className="task-item-header">
                               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                                <input 
+                                <input
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={() => handleToggleSelectTask(task.id)}
-                                  style={{ 
-                                    width: '15px', 
-                                    height: '15px', 
-                                    cursor: 'pointer', 
-                                    accentColor: '#ea580c', 
+                                  style={{
+                                    width: '15px',
+                                    height: '15px',
+                                    cursor: 'pointer',
+                                    accentColor: '#ea580c',
                                     marginTop: '0.2rem',
                                     flexShrink: 0
                                   }}
@@ -1671,10 +1664,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                               </div>
                               <div className="task-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}>
-                                  <button 
+                                  <button
                                     type="button"
-                                    className="btn-icon-edit" 
-                                    onClick={() => handleStartEditTask(task)} 
+                                    className="btn-icon-edit"
+                                    onClick={() => handleStartEditTask(task)}
                                     title="Modifier la tâche"
                                     style={{
                                       background: 'none',
@@ -1716,7 +1709,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               <UserCheck size={18} style={{ color: 'var(--brand-orange)' }} />
               TEMPS TOTAL PAR COLLABORATEUR
             </h2>
-            
+
             {collaboratorSummaries.length === 0 ? (
               <p className="no-data-text">Aucun temps enregistré sur ce contrat.</p>
             ) : (
@@ -1737,7 +1730,7 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
           {/* HISTORIQUE DES ENREGISTREMENTS */}
           <div className="panel history-log-card">
             <h2 className="panel-title">HISTORIQUE DES ENREGISTREMENTS</h2>
-            
+
             <div className="time-logs-history">
               {timeLogs.length === 0 ? (
                 <p className="no-data-text">Aucun log enregistré.</p>
@@ -1791,33 +1784,33 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             <form onSubmit={handleAddClient}>
               <div className="form-group">
                 <label>Nom du client (avec code facultatif)</label>
-                <input 
-                  type="text" 
-                  value={newClientInput} 
-                  onChange={(e) => setNewClientInput(e.target.value)} 
-                  placeholder="ex: SD-000 - STEP UP" 
-                  required 
+                <input
+                  type="text"
+                  value={newClientInput}
+                  onChange={(e) => setNewClientInput(e.target.value)}
+                  placeholder="ex: SD-000 - STEP UP"
+                  required
                 />
               </div>
 
               <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Période du contrat</label>
-                  <input 
-                    type="text" 
-                    value={newClientPeriod} 
-                    onChange={(e) => setNewClientPeriod(e.target.value)} 
-                    placeholder="ex: Août 2026" 
-                    required 
+                  <input
+                    type="text"
+                    value={newClientPeriod}
+                    onChange={(e) => setNewClientPeriod(e.target.value)}
+                    placeholder="ex: Août 2026"
+                    required
                   />
                 </div>
                 <div className="form-group">
                   <label>Budget total (heures)</label>
-                  <input 
-                    type="number" 
-                    value={newClientBudget} 
-                    onChange={(e) => setNewClientBudget(e.target.value)} 
-                    required 
+                  <input
+                    type="number"
+                    value={newClientBudget}
+                    onChange={(e) => setNewClientBudget(e.target.value)}
+                    required
                   />
                 </div>
               </div>
@@ -1825,18 +1818,18 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
                 <div className="form-group">
                   <label>Date de début du contrat</label>
-                  <input 
-                    type="date" 
-                    value={newClientStartDate} 
-                    onChange={(e) => setNewClientStartDate(e.target.value)} 
+                  <input
+                    type="date"
+                    value={newClientStartDate}
+                    onChange={(e) => setNewClientStartDate(e.target.value)}
                   />
                 </div>
                 <div className="form-group">
                   <label>Date de fin du contrat</label>
-                  <input 
-                    type="date" 
-                    value={newClientEndDate} 
-                    onChange={(e) => setNewClientEndDate(e.target.value)} 
+                  <input
+                    type="date"
+                    value={newClientEndDate}
+                    onChange={(e) => setNewClientEndDate(e.target.value)}
                   />
                 </div>
               </div>
@@ -1852,11 +1845,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#1877F2' }}>
                       <FacebookIcon size={14} color="#1877F2" /> Facebook
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={newClientPostsFb} 
-                      onChange={(e) => setNewClientPostsFb(e.target.value)} 
+                      value={newClientPostsFb}
+                      onChange={(e) => setNewClientPostsFb(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -1864,11 +1857,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#E1306C' }}>
                       <InstagramIcon size={14} color="#E1306C" /> Instagram
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={newClientPostsInsta} 
-                      onChange={(e) => setNewClientPostsInsta(e.target.value)} 
+                      value={newClientPostsInsta}
+                      onChange={(e) => setNewClientPostsInsta(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -1876,11 +1869,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#0A66C2' }}>
                       <LinkedinIcon size={14} color="#0A66C2" /> LinkedIn
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={newClientPostsLinkedin} 
-                      onChange={(e) => setNewClientPostsLinkedin(e.target.value)} 
+                      value={newClientPostsLinkedin}
+                      onChange={(e) => setNewClientPostsLinkedin(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -1888,11 +1881,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#4285F4' }}>
                       <GooglePostIcon size={14} /> Google Post
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={newClientPostsGoogle} 
-                      onChange={(e) => setNewClientPostsGoogle(e.target.value)} 
+                      value={newClientPostsGoogle}
+                      onChange={(e) => setNewClientPostsGoogle(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -1910,11 +1903,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#ea580c' }}>
                       <FileText size={14} /> Articles Blog / mois
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={newClientBlogCount} 
-                      onChange={(e) => setNewClientBlogCount(e.target.value)} 
+                      value={newClientBlogCount}
+                      onChange={(e) => setNewClientBlogCount(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -1922,11 +1915,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#0284C7' }}>
                       <Mail size={14} /> Newsletters / mois
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={newClientNewsletterCount} 
-                      onChange={(e) => setNewClientNewsletterCount(e.target.value)} 
+                      value={newClientNewsletterCount}
+                      onChange={(e) => setNewClientNewsletterCount(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -1934,10 +1927,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6366F1' }}>
                       <Wrench size={14} /> TMA (ex: 5h / mois)
                     </label>
-                    <input 
-                      type="text" 
-                      value={newClientTma} 
-                      onChange={(e) => setNewClientTma(e.target.value)} 
+                    <input
+                      type="text"
+                      value={newClientTma}
+                      onChange={(e) => setNewClientTma(e.target.value)}
                       placeholder="ex: 5h ou 10h/mois"
                     />
                   </div>
@@ -1946,9 +1939,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
               <div className="form-group" style={{ marginTop: '1rem' }}>
                 <label>Tâches inquantifiables et notes</label>
-                <textarea 
-                  value={newClientUnquantifiable} 
-                  onChange={(e) => setNewClientUnquantifiable(e.target.value)} 
+                <textarea
+                  value={newClientUnquantifiable}
+                  onChange={(e) => setNewClientUnquantifiable(e.target.value)}
                   placeholder="Saisissez ici les tâches inquantifiables ou notes particulières..."
                   style={{ width: '100%', minHeight: '70px', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', resize: 'vertical', fontFamily: 'inherit' }}
                 />
@@ -1971,33 +1964,33 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             <form onSubmit={handleEditClient}>
               <div className="form-group">
                 <label>Nom du client (avec code facultatif)</label>
-                <input 
-                  type="text" 
-                  value={editClientInput} 
-                  onChange={(e) => setEditClientInput(e.target.value)} 
-                  placeholder="ex: SD-000 - STEP UP" 
-                  required 
+                <input
+                  type="text"
+                  value={editClientInput}
+                  onChange={(e) => setEditClientInput(e.target.value)}
+                  placeholder="ex: SD-000 - STEP UP"
+                  required
                 />
               </div>
 
               <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Période du contrat</label>
-                  <input 
-                    type="text" 
-                    value={editClientPeriod} 
-                    onChange={(e) => setEditClientPeriod(e.target.value)} 
-                    placeholder="ex: Août 2026" 
-                    required 
+                  <input
+                    type="text"
+                    value={editClientPeriod}
+                    onChange={(e) => setEditClientPeriod(e.target.value)}
+                    placeholder="ex: Août 2026"
+                    required
                   />
                 </div>
                 <div className="form-group">
                   <label>Budget total (heures)</label>
-                  <input 
-                    type="number" 
-                    value={editClientBudget} 
-                    onChange={(e) => setEditClientBudget(e.target.value)} 
-                    required 
+                  <input
+                    type="number"
+                    value={editClientBudget}
+                    onChange={(e) => setEditClientBudget(e.target.value)}
+                    required
                   />
                 </div>
               </div>
@@ -2005,18 +1998,18 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
                 <div className="form-group">
                   <label>Date de début du contrat</label>
-                  <input 
-                    type="date" 
-                    value={editClientStartDate} 
-                    onChange={(e) => setEditClientStartDate(e.target.value)} 
+                  <input
+                    type="date"
+                    value={editClientStartDate}
+                    onChange={(e) => setEditClientStartDate(e.target.value)}
                   />
                 </div>
                 <div className="form-group">
                   <label>Date de fin du contrat</label>
-                  <input 
-                    type="date" 
-                    value={editClientEndDate} 
-                    onChange={(e) => setEditClientEndDate(e.target.value)} 
+                  <input
+                    type="date"
+                    value={editClientEndDate}
+                    onChange={(e) => setEditClientEndDate(e.target.value)}
                   />
                 </div>
               </div>
@@ -2032,11 +2025,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#1877F2' }}>
                       <FacebookIcon size={14} color="#1877F2" /> Facebook
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={editClientPostsFb} 
-                      onChange={(e) => setEditClientPostsFb(e.target.value)} 
+                      value={editClientPostsFb}
+                      onChange={(e) => setEditClientPostsFb(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -2044,11 +2037,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#E1306C' }}>
                       <InstagramIcon size={14} color="#E1306C" /> Instagram
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={editClientPostsInsta} 
-                      onChange={(e) => setEditClientPostsInsta(e.target.value)} 
+                      value={editClientPostsInsta}
+                      onChange={(e) => setEditClientPostsInsta(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -2056,11 +2049,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#0A66C2' }}>
                       <LinkedinIcon size={14} color="#0A66C2" /> LinkedIn
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={editClientPostsLinkedin} 
-                      onChange={(e) => setEditClientPostsLinkedin(e.target.value)} 
+                      value={editClientPostsLinkedin}
+                      onChange={(e) => setEditClientPostsLinkedin(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -2068,11 +2061,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#4285F4' }}>
                       <GooglePostIcon size={14} /> Google Post
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={editClientPostsGoogle} 
-                      onChange={(e) => setEditClientPostsGoogle(e.target.value)} 
+                      value={editClientPostsGoogle}
+                      onChange={(e) => setEditClientPostsGoogle(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -2090,11 +2083,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#ea580c' }}>
                       <FileText size={14} /> Articles Blog / mois
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={editClientBlogCount} 
-                      onChange={(e) => setEditClientBlogCount(e.target.value)} 
+                      value={editClientBlogCount}
+                      onChange={(e) => setEditClientBlogCount(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -2102,11 +2095,11 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#0284C7' }}>
                       <Mail size={14} /> Newsletters / mois
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={editClientNewsletterCount} 
-                      onChange={(e) => setEditClientNewsletterCount(e.target.value)} 
+                      value={editClientNewsletterCount}
+                      onChange={(e) => setEditClientNewsletterCount(e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -2114,10 +2107,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6366F1' }}>
                       <Wrench size={14} /> TMA (ex: 5h / mois)
                     </label>
-                    <input 
-                      type="text" 
-                      value={editClientTma} 
-                      onChange={(e) => setEditClientTma(e.target.value)} 
+                    <input
+                      type="text"
+                      value={editClientTma}
+                      onChange={(e) => setEditClientTma(e.target.value)}
                       placeholder="ex: 5h ou 10h/mois"
                     />
                   </div>
@@ -2126,9 +2119,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
               <div className="form-group" style={{ marginTop: '1rem' }}>
                 <label>Tâches inquantifiables et notes</label>
-                <textarea 
-                  value={editClientUnquantifiable} 
-                  onChange={(e) => setEditClientUnquantifiable(e.target.value)} 
+                <textarea
+                  value={editClientUnquantifiable}
+                  onChange={(e) => setEditClientUnquantifiable(e.target.value)}
                   placeholder="Saisissez ici les tâches inquantifiables ou notes particulières..."
                   style={{ width: '100%', minHeight: '70px', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', resize: 'vertical', fontFamily: 'inherit' }}
                 />
@@ -2150,12 +2143,12 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <h2 className="modal-title" style={{ margin: 0 }}>Nouvelle Tâche de Production</h2>
               {selectedClient && (
-                <span style={{ 
-                  fontSize: '0.85rem', 
-                  fontWeight: '700', 
-                  color: 'var(--brand-orange)', 
-                  backgroundColor: 'rgba(234, 88, 12, 0.12)', 
-                  padding: '0.25rem 0.75rem', 
+                <span style={{
+                  fontSize: '0.85rem',
+                  fontWeight: '700',
+                  color: 'var(--brand-orange)',
+                  backgroundColor: 'rgba(234, 88, 12, 0.12)',
+                  padding: '0.25rem 0.75rem',
                   borderRadius: '12px',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -2169,10 +2162,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             <form onSubmit={handleAddTask}>
               <div className="form-group">
                 <label>Catégorie de livrable</label>
-                <select 
-                  value={newTaskCategory} 
-                  onChange={(e) => setNewTaskCategory(e.target.value)} 
-                  required 
+                <select
+                  value={newTaskCategory}
+                  onChange={(e) => setNewTaskCategory(e.target.value)}
+                  required
                   style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}
                 >
                   {DELIVERABLE_CATEGORIES.map(cat => (
@@ -2182,30 +2175,30 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               </div>
               <div className="form-group">
                 <label>Nom du livrable / de la tâche</label>
-                <input 
-                  type="text" 
-                  value={newTaskName} 
-                  onChange={(e) => setNewTaskName(e.target.value)} 
-                  placeholder="ex: Rédaction newsletter de lancement" 
-                  required 
+                <input
+                  type="text"
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  placeholder="ex: Rédaction newsletter de lancement"
+                  required
                 />
               </div>
               <div className="form-group">
                 <label>Budget d'heures pour cette tâche</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   step="0.5"
-                  value={newTaskBudget} 
-                  onChange={(e) => setNewTaskBudget(e.target.value)} 
-                  required 
+                  value={newTaskBudget}
+                  onChange={(e) => setNewTaskBudget(e.target.value)}
+                  required
                 />
               </div>
               <div className="form-group">
                 <label>Date d'échéance (optionnelle)</label>
-                <input 
-                  type="date" 
-                  value={newTaskDueDate} 
-                  onChange={(e) => setNewTaskDueDate(e.target.value)} 
+                <input
+                  type="date"
+                  value={newTaskDueDate}
+                  onChange={(e) => setNewTaskDueDate(e.target.value)}
                 />
               </div>
 
@@ -2234,8 +2227,8 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     });
 
                   return (
-                    <select 
-                      value={newTaskAssignedTo} 
+                    <select
+                      value={newTaskAssignedTo}
                       onChange={(e) => {
                         const memberId = e.target.value;
                         setNewTaskAssignedTo(memberId);
@@ -2264,10 +2257,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
               <div className="form-group" style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--background-light)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', margin: 0 }}>
-                  <input 
-                    type="checkbox" 
-                    checked={newTaskIsRecurring} 
-                    onChange={(e) => setNewTaskIsRecurring(e.target.checked)} 
+                  <input
+                    type="checkbox"
+                    checked={newTaskIsRecurring}
+                    onChange={(e) => setNewTaskIsRecurring(e.target.checked)}
                     style={{ width: '18px', height: '18px', accentColor: 'var(--brand-orange)', cursor: 'pointer' }}
                   />
                   <div>
@@ -2284,9 +2277,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                 <button type="submit" className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span>Créer la tâche</span>
                   {selectedClient && (
-                    <span style={{ 
-                      background: 'rgba(255, 255, 255, 0.25)', 
-                      padding: '0.1rem 0.45rem', 
+                    <span style={{
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      padding: '0.1rem 0.45rem',
                       borderRadius: '4px',
                       fontSize: '0.8rem',
                       fontWeight: '700'
@@ -2296,12 +2289,12 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                   )}
                 </button>
                 {selectedClient && (
-                  <span style={{ 
-                    fontSize: '0.82rem', 
-                    fontWeight: '700', 
-                    color: 'var(--brand-orange)', 
-                    backgroundColor: 'rgba(234, 88, 12, 0.1)', 
-                    padding: '0.35rem 0.7rem', 
+                  <span style={{
+                    fontSize: '0.82rem',
+                    fontWeight: '700',
+                    color: 'var(--brand-orange)',
+                    backgroundColor: 'rgba(234, 88, 12, 0.1)',
+                    padding: '0.35rem 0.7rem',
                     borderRadius: '8px',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -2323,12 +2316,12 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <h2 className="modal-title" style={{ margin: 0 }}>Modifier la Tâche</h2>
               {(editingTask.clientName || selectedClient) && (
-                <span style={{ 
-                  fontSize: '0.85rem', 
-                  fontWeight: '700', 
-                  color: 'var(--brand-orange)', 
-                  backgroundColor: 'rgba(234, 88, 12, 0.12)', 
-                  padding: '0.25rem 0.75rem', 
+                <span style={{
+                  fontSize: '0.85rem',
+                  fontWeight: '700',
+                  color: 'var(--brand-orange)',
+                  backgroundColor: 'rgba(234, 88, 12, 0.12)',
+                  padding: '0.25rem 0.75rem',
                   borderRadius: '12px',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -2342,10 +2335,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
             <form onSubmit={handleSaveEditTask}>
               <div className="form-group">
                 <label>Catégorie de livrable</label>
-                <select 
-                  value={editTaskCategory} 
-                  onChange={(e) => setEditTaskCategory(e.target.value)} 
-                  required 
+                <select
+                  value={editTaskCategory}
+                  onChange={(e) => setEditTaskCategory(e.target.value)}
+                  required
                   style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}
                 >
                   {DELIVERABLE_CATEGORIES.map(cat => (
@@ -2355,30 +2348,30 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               </div>
               <div className="form-group">
                 <label>Nom du livrable / de la tâche</label>
-                <input 
-                  type="text" 
-                  value={editTaskName} 
-                  onChange={(e) => setEditTaskName(e.target.value)} 
-                  placeholder="ex: Rédaction newsletter de lancement" 
-                  required 
+                <input
+                  type="text"
+                  value={editTaskName}
+                  onChange={(e) => setEditTaskName(e.target.value)}
+                  placeholder="ex: Rédaction newsletter de lancement"
+                  required
                 />
               </div>
               <div className="form-group">
                 <label>Budget d'heures pour cette tâche</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   step="0.5"
-                  value={editTaskBudget} 
-                  onChange={(e) => setEditTaskBudget(e.target.value)} 
-                  required 
+                  value={editTaskBudget}
+                  onChange={(e) => setEditTaskBudget(e.target.value)}
+                  required
                 />
               </div>
               <div className="form-group">
                 <label>Date d'échéance (optionnelle)</label>
-                <input 
-                  type="date" 
-                  value={editTaskDueDate} 
-                  onChange={(e) => setEditTaskDueDate(e.target.value)} 
+                <input
+                  type="date"
+                  value={editTaskDueDate}
+                  onChange={(e) => setEditTaskDueDate(e.target.value)}
                 />
               </div>
 
@@ -2407,8 +2400,8 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
                     });
 
                   return (
-                    <select 
-                      value={editTaskAssignedTo} 
+                    <select
+                      value={editTaskAssignedTo}
                       onChange={(e) => {
                         const memberId = e.target.value;
                         setEditTaskAssignedTo(memberId);
@@ -2437,10 +2430,10 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
 
               <div className="form-group" style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--background-light)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', margin: 0 }}>
-                  <input 
-                    type="checkbox" 
-                    checked={editTaskIsRecurring} 
-                    onChange={(e) => setEditTaskIsRecurring(e.target.checked)} 
+                  <input
+                    type="checkbox"
+                    checked={editTaskIsRecurring}
+                    onChange={(e) => setEditTaskIsRecurring(e.target.checked)}
                     style={{ width: '18px', height: '18px', accentColor: 'var(--brand-orange)', cursor: 'pointer' }}
                   />
                   <div>
@@ -2475,9 +2468,9 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               {alertModal.message}
             </p>
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button 
-                type="button" 
-                className="btn btn-primary" 
+              <button
+                type="button"
+                className="btn btn-primary"
                 style={{ minWidth: '100px' }}
                 onClick={() => setAlertModal({ show: false, title: '', message: '' })}
               >
@@ -2499,17 +2492,17 @@ export default function EspaceManager({ user, token, allMembers, clients, loadin
               {confirmModal.message}
             </p>
             <div className="modal-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-              <button 
-                type="button" 
-                className="btn btn-outline" 
+              <button
+                type="button"
+                className="btn btn-outline"
                 style={{ minWidth: '100px' }}
                 onClick={() => setConfirmModal({ show: false, title: '', message: '', onConfirm: null })}
               >
                 Annuler
               </button>
-              <button 
-                type="button" 
-                className="btn btn-primary" 
+              <button
+                type="button"
+                className="btn btn-primary"
                 style={{ minWidth: '100px' }}
                 onClick={() => {
                   if (confirmModal.onConfirm) confirmModal.onConfirm();

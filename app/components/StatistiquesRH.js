@@ -24,7 +24,11 @@ import {
   UserCheck,
   UserX,
   Building2,
-  ArrowRight
+  ArrowRight,
+  Coffee,
+  DoorOpen,
+  Activity,
+  ArrowUpDown
 } from 'lucide-react';
 
 // Madagascar timezone offset helper (UTC+3)
@@ -77,6 +81,8 @@ export default function StatistiquesRH({
   const [employeeSortDir, setEmployeeSortDir] = useState('desc');
   const [employeeLimit, setEmployeeLimit] = useState(10);
   const [hoveredDayIndex, setHoveredDayIndex] = useState(null);
+  const [hoveredPauseDayIndex, setHoveredPauseDayIndex] = useState(null);
+  const [hoveredFluxDayIndex, setHoveredFluxDayIndex] = useState(null);
 
   // Quick Preset Handler
   const applyPreset = (presetKey) => {
@@ -231,6 +237,27 @@ export default function StatistiquesRH({
   const chartWidth = Math.max(600, chartData.length * 48 + 80);
   const chartHeight = 220;
   const barWidth = Math.min(26, Math.max(14, Math.floor(chartWidth / (chartData.length * 1.8 + 5))));
+
+  // Pauses & Flux Computations
+  const pauseChartData = statsData?.pauses?.chartData || [];
+  const pauseSummary = statsData?.pauses?.summary || {
+    totalMinutes: 0,
+    totalHours: '0',
+    avgMinutesPerDay: 0,
+    totalCount: 0,
+    breakdown: { dejeuner: 0, gouter: 0, cigarette: 0, autre: 0 }
+  };
+  const maxPauseMin = Math.max(30, ...pauseChartData.map(d => d.totalMinutes || 0));
+
+  const fluxChartData = statsData?.flux?.chartData || [];
+  const fluxSummary = statsData?.flux?.summary || {
+    totalEntries: 0,
+    totalExits: 0,
+    totalPassages: 0,
+    avgPassagesPerDay: '0',
+    totalMultiPassages: 0
+  };
+  const maxFluxCount = Math.max(5, ...fluxChartData.map(d => Math.max(d.entries || 0, d.exits || 0, d.totalPassages || 0)));
 
   const summary = statsData?.summary || {
     totalEmployees: allMembers.length,
@@ -886,7 +913,330 @@ export default function StatistiquesRH({
       </div>
 
       {/* ==================================================== */}
-      {/* 5. SECTION: SERVICE PERFORMANCE BREAKDOWN            */}
+      {/* 5. SECTION: PAUSES & FLUX ENTRÉES / SORTIES CHARTS   */}
+      {/* ==================================================== */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'stretch' }}>
+
+        {/* 5A. GRAPHIQUE DES PAUSES */}
+        <div className="panel" style={{ display: 'flex', flexDirection: 'column', minHeight: '340px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div>
+              <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.25rem 0' }}>
+                <Coffee size={20} style={{ color: 'var(--brand-orange)' }} /> Suivi des Pauses de l'Équipe
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Durée quotidienne cumulée (min) et répartition par type
+              </p>
+            </div>
+
+            {/* Quick Badges */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', padding: '0.2rem 0.55rem', borderRadius: '12px', background: 'rgba(234, 88, 12, 0.1)', color: 'var(--brand-orange)', border: '1px solid rgba(234, 88, 12, 0.2)' }}>
+                Total : {pauseSummary.totalHours} h ({pauseSummary.totalMinutes} m)
+              </span>
+              <span style={{ fontSize: '0.75rem', fontWeight: '600', padding: '0.2rem 0.55rem', borderRadius: '12px', background: 'var(--background-light)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
+                Moy. {pauseSummary.avgMinutesPerDay} min/j
+              </span>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.75rem', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#ea580c' }}></span>
+              <span>🍽️ Déjeuner ({pauseSummary.breakdown.dejeuner}m)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#f59e0b' }}></span>
+              <span>🍪 Goûter ({pauseSummary.breakdown.gouter}m)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#64748b' }}></span>
+              <span>🚬 Cigarette ({pauseSummary.breakdown.cigarette}m)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#3b82f6' }}></span>
+              <span>☕ Pause ({pauseSummary.breakdown.autre}m)</span>
+            </div>
+          </div>
+
+          {/* Pauses SVG Bar Chart */}
+          <div style={{ width: '100%', overflowX: 'auto', paddingBottom: '0.5rem', flex: 1, display: 'flex', alignItems: 'center' }}>
+            {pauseChartData.length === 0 ? (
+              <div style={{ textAlign: 'center', width: '100%', padding: '2rem', color: 'var(--text-secondary)' }}>
+                Aucune pause enregistrée sur cette période.
+              </div>
+            ) : (
+              <div style={{ minWidth: `${chartWidth}px`, width: '100%', position: 'relative' }}>
+                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+                  {/* Grid Lines */}
+                  <line x1="45" y1="20" x2={chartWidth - 20} y2="20" stroke="var(--border-light)" strokeDasharray="3" opacity="0.6" />
+                  <line x1="45" y1="65" x2={chartWidth - 20} y2="65" stroke="var(--border-light)" strokeDasharray="3" opacity="0.6" />
+                  <line x1="45" y1="110" x2={chartWidth - 20} y2="110" stroke="var(--border-light)" strokeDasharray="3" opacity="0.6" />
+                  <line x1="45" y1="155" x2={chartWidth - 20} y2="155" stroke="var(--border-light)" strokeDasharray="3" opacity="0.6" />
+                  <line x1="45" y1="175" x2={chartWidth - 20} y2="175" stroke="var(--border-light)" />
+
+                  {/* Y Axis */}
+                  <text x="38" y="24" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end" fontWeight="600">{maxPauseMin}m</text>
+                  <text x="38" y="69" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end">{Math.round(maxPauseMin * 0.75)}m</text>
+                  <text x="38" y="114" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end">{Math.round(maxPauseMin * 0.5)}m</text>
+                  <text x="38" y="159" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end">{Math.round(maxPauseMin * 0.25)}m</text>
+                  <text x="38" y="178" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end">0m</text>
+
+                  {pauseChartData.map((d, index) => {
+                    const stepX = (chartWidth - 80) / pauseChartData.length;
+                    const x = 55 + index * stepX + (stepX - barWidth) / 2;
+                    const maxHeight = 150;
+
+                    const dejH = (d.dejeuner / maxPauseMin) * maxHeight;
+                    const goutH = (d.gouter / maxPauseMin) * maxHeight;
+                    const cigH = (d.cigarette / maxPauseMin) * maxHeight;
+                    const autrH = (d.autre / maxPauseMin) * maxHeight;
+
+                    const yDej = 175 - dejH;
+                    const yGout = yDej - goutH;
+                    const yCig = yGout - cigH;
+                    const yAutr = yCig - autrH;
+
+                    const isHovered = hoveredPauseDayIndex === index;
+
+                    return (
+                      <g
+                        key={d.date}
+                        onMouseEnter={() => setHoveredPauseDayIndex(index)}
+                        onMouseLeave={() => setHoveredPauseDayIndex(null)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {d.isWeekend && (
+                          <rect x={x - 4} y="15" width={barWidth + 8} height="160" fill="rgba(0,0,0,0.02)" rx="4" />
+                        )}
+                        {isHovered && (
+                          <rect x={x - 4} y="15" width={barWidth + 8} height="160" fill="rgba(234, 88, 12, 0.08)" rx="4" />
+                        )}
+
+                        {/* Déjeuner Segment */}
+                        {dejH > 0 && (
+                          <rect x={x} y={yDej} width={barWidth} height={dejH} fill="#ea580c" rx="2" />
+                        )}
+                        {/* Goûter Segment */}
+                        {goutH > 0 && (
+                          <rect x={x} y={yGout} width={barWidth} height={goutH} fill="#f59e0b" rx="2" />
+                        )}
+                        {/* Cigarette Segment */}
+                        {cigH > 0 && (
+                          <rect x={x} y={yCig} width={barWidth} height={cigH} fill="#64748b" rx="2" />
+                        )}
+                        {/* Autre Segment */}
+                        {autrH > 0 && (
+                          <rect x={x} y={yAutr} width={barWidth} height={autrH} fill="#3b82f6" rx="2" />
+                        )}
+
+                        {/* Label */}
+                        <text
+                          x={x + barWidth / 2}
+                          y="194"
+                          fontSize="9.5"
+                          fill={d.isWeekend ? 'var(--text-secondary)' : 'var(--brand-navy)'}
+                          textAnchor="middle"
+                          fontWeight={isHovered ? '800' : '600'}
+                        >
+                          {d.label}
+                        </text>
+
+                        {/* Tooltip */}
+                        {isHovered && (
+                          <g>
+                            <rect
+                              x={Math.max(10, Math.min(chartWidth - 170, x - 75))}
+                              y="5"
+                              width="165"
+                              height="75"
+                              fill="var(--brand-navy)"
+                              rx="6"
+                              filter="drop-shadow(0 4px 6px rgba(0,0,0,0.3))"
+                            />
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 82} y="19" fill="#fff" fontSize="10" fontWeight="700" textAnchor="middle">
+                              {d.label} • {d.totalMinutes} min ({d.count} pause{d.count > 1 ? 's' : ''})
+                            </text>
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="33" fill="#fb923c" fontSize="9">
+                              🍽️ Déjeuner : {d.dejeuner} min
+                            </text>
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="45" fill="#fde047" fontSize="9">
+                              🍪 Goûter : {d.gouter} min
+                            </text>
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="57" fill="#cbd5e1" fontSize="9">
+                              🚬 Cigarette : {d.cigarette} min
+                            </text>
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="69" fill="#93c5fd" fontSize="9">
+                              ☕ Autre / Détente : {d.autre} min
+                            </text>
+                          </g>
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 5B. GRAPHIQUE DES FLUX ENTRÉES / SORTIES */}
+        <div className="panel" style={{ display: 'flex', flexDirection: 'column', minHeight: '340px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div>
+              <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.25rem 0' }}>
+                <DoorOpen size={20} style={{ color: 'var(--brand-orange)' }} /> Flux Entrées & Sorties
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Passages journaliers et collaborateurs avec entrées multiples
+              </p>
+            </div>
+
+            {/* Quick Badges */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', padding: '0.2rem 0.55rem', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                {fluxSummary.totalPassages} passages
+              </span>
+              <span style={{ fontSize: '0.75rem', fontWeight: '600', padding: '0.2rem 0.55rem', borderRadius: '12px', background: 'var(--background-light)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
+                Moy. {fluxSummary.avgPassagesPerDay}/j
+              </span>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.75rem', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#10b981' }}></span>
+              <span>Entrées ({fluxSummary.totalEntries})</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#3b82f6' }}></span>
+              <span>Sorties ({fluxSummary.totalExits})</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#8b5cf6' }}></span>
+              <span>Multi-passages ({fluxSummary.totalMultiPassages})</span>
+            </div>
+          </div>
+
+          {/* Flux SVG Bar Chart */}
+          <div style={{ width: '100%', overflowX: 'auto', paddingBottom: '0.5rem', flex: 1, display: 'flex', alignItems: 'center' }}>
+            {fluxChartData.length === 0 ? (
+              <div style={{ textAlign: 'center', width: '100%', padding: '2rem', color: 'var(--text-secondary)' }}>
+                Aucune donnée de flux pour cette période.
+              </div>
+            ) : (
+              <div style={{ minWidth: `${chartWidth}px`, width: '100%', position: 'relative' }}>
+                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+                  {/* Grid Lines */}
+                  <line x1="45" y1="20" x2={chartWidth - 20} y2="20" stroke="var(--border-light)" strokeDasharray="3" opacity="0.6" />
+                  <line x1="45" y1="65" x2={chartWidth - 20} y2="65" stroke="var(--border-light)" strokeDasharray="3" opacity="0.6" />
+                  <line x1="45" y1="110" x2={chartWidth - 20} y2="110" stroke="var(--border-light)" strokeDasharray="3" opacity="0.6" />
+                  <line x1="45" y1="155" x2={chartWidth - 20} y2="155" stroke="var(--border-light)" strokeDasharray="3" opacity="0.6" />
+                  <line x1="45" y1="175" x2={chartWidth - 20} y2="175" stroke="var(--border-light)" />
+
+                  {/* Y Axis */}
+                  <text x="38" y="24" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end" fontWeight="600">{maxFluxCount}</text>
+                  <text x="38" y="69" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end">{Math.round(maxFluxCount * 0.75)}</text>
+                  <text x="38" y="114" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end">{Math.round(maxFluxCount * 0.5)}</text>
+                  <text x="38" y="159" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end">{Math.round(maxFluxCount * 0.25)}</text>
+                  <text x="38" y="178" fontSize="9.5" fill="var(--text-secondary)" textAnchor="end">0</text>
+
+                  {fluxChartData.map((d, index) => {
+                    const stepX = (chartWidth - 80) / fluxChartData.length;
+                    const x = 55 + index * stepX + (stepX - barWidth) / 2;
+                    const subBarW = Math.max(5, (barWidth - 2) / 2);
+                    const maxHeight = 150;
+
+                    const entH = (d.entries / maxFluxCount) * maxHeight;
+                    const extH = (d.exits / maxFluxCount) * maxHeight;
+
+                    const yEnt = 175 - entH;
+                    const yExt = 175 - extH;
+
+                    const isHovered = hoveredFluxDayIndex === index;
+
+                    return (
+                      <g
+                        key={d.date}
+                        onMouseEnter={() => setHoveredFluxDayIndex(index)}
+                        onMouseLeave={() => setHoveredFluxDayIndex(null)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {d.isWeekend && (
+                          <rect x={x - 4} y="15" width={barWidth + 8} height="160" fill="rgba(0,0,0,0.02)" rx="4" />
+                        )}
+                        {isHovered && (
+                          <rect x={x - 4} y="15" width={barWidth + 8} height="160" fill="rgba(59, 130, 246, 0.08)" rx="4" />
+                        )}
+
+                        {/* Entrées Bar (Green) */}
+                        {entH > 0 && (
+                          <rect x={x} y={yEnt} width={subBarW} height={entH} fill="#10b981" rx="2" />
+                        )}
+
+                        {/* Sorties Bar (Blue) */}
+                        {extH > 0 && (
+                          <rect x={x + subBarW + 2} y={yExt} width={subBarW} height={extH} fill="#3b82f6" rx="2" />
+                        )}
+
+                        {/* Multi-passages Dot Marker */}
+                        {d.multiPassages > 0 && (
+                          <circle cx={x + barWidth / 2} cy={Math.min(yEnt, yExt) - 6} r="3.5" fill="#8b5cf6" />
+                        )}
+
+                        {/* Label */}
+                        <text
+                          x={x + barWidth / 2}
+                          y="194"
+                          fontSize="9.5"
+                          fill={d.isWeekend ? 'var(--text-secondary)' : 'var(--brand-navy)'}
+                          textAnchor="middle"
+                          fontWeight={isHovered ? '800' : '600'}
+                        >
+                          {d.label}
+                        </text>
+
+                        {/* Tooltip */}
+                        {isHovered && (
+                          <g>
+                            <rect
+                              x={Math.max(10, Math.min(chartWidth - 170, x - 75))}
+                              y="10"
+                              width="165"
+                              height="65"
+                              fill="var(--brand-navy)"
+                              rx="6"
+                              filter="drop-shadow(0 4px 6px rgba(0,0,0,0.3))"
+                            />
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 82} y="24" fill="#fff" fontSize="10" fontWeight="700" textAnchor="middle">
+                              {d.label} ({d.totalPassages} passages)
+                            </text>
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="38" fill="#4ade80" fontSize="9">
+                              🟢 Entrées : {d.entries}
+                            </text>
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="50" fill="#93c5fd" fontSize="9">
+                              🔵 Sorties : {d.exits}
+                            </text>
+                            <text x={Math.max(10, Math.min(chartWidth - 170, x - 75)) + 10} y="62" fill="#c084fc" fontSize="9">
+                              🟣 Collaborateurs multi-entrées : {d.multiPassages}
+                            </text>
+                          </g>
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* ==================================================== */}
+      {/* 6. SECTION: SERVICE PERFORMANCE BREAKDOWN            */}
       {/* ==================================================== */}
       {statsData?.byService && statsData.byService.length > 0 && (
         <div className="panel">

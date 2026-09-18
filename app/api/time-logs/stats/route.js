@@ -81,6 +81,25 @@ export async function GET(req) {
       return memberIdMap.has(log.employee_id);
     });
 
+    // Fetch production pause time logs in range
+    let prodPauseLogs = [];
+    try {
+      const { data: pLogs } = await supabase
+        .from('production_time_logs')
+        .select('id, employee_id, duration_seconds, log_type, logged_at, start_time')
+        .gte('logged_at', `${startDateParam}T00:00:00.000Z`)
+        .lte('logged_at', `${endDateParam}T23:59:59.999Z`);
+      
+      prodPauseLogs = (pLogs || []).filter(log => {
+        const isPauseType = log.log_type?.startsWith('pause') || log.log_type?.startsWith('interruption:pause');
+        if (!isPauseType) return false;
+        if (serviceFilter === 'Tous') return true;
+        return memberIdMap.has(log.employee_id);
+      });
+    } catch (e) {
+      console.warn('Could not fetch production pause logs:', e);
+    }
+
     // 4. Fetch approved leave requests overlapping the date range
     let leaveQuery = supabase
       .from('leave_requests')
@@ -139,11 +158,20 @@ export async function GET(req) {
         punctual: 0,
         clock_out: 0,
         on_leave: 0,
-        absent: 0
+        absent: 0,
+        // Pauses
+        pauseMinutes: 0,
+        pauseCount: 0,
+        pauseTypes: { dejeuner: 0, gouter: 0, cigarette: 0, autre: 0 },
+        // Flux entrées/sorties
+        entriesCount: 0,
+        exitsCount: 0,
+        totalPassages: 0,
+        multiPassageEmployees: 0
       };
     });
 
-    // Populate time logs into days
+    // Populate time logs and pauses/flux into days
     filteredLogs.forEach(log => {
       if (dayLogsMap[log.date]) {
         if (log.clock_in) {
@@ -156,6 +184,70 @@ export async function GET(req) {
         }
         if (log.clock_out) {
           dayLogsMap[log.date].clock_out++;
+        }
+
+        // Flux entrées / sorties
+        let entriesArr = [];
+        if (Array.isArray(log.entries)) {
+          entriesArr = log.entries;
+        } else if (typeof log.entries === 'string') {
+          try { entriesArr = JSON.parse(log.entries); } catch (e) { entriesArr = []; }
+        }
+
+        if (entriesArr && entriesArr.length > 0) {
+          const inCount = entriesArr.filter(e => e && e.in).length;
+          const outCount = entriesArr.filter(e => e && e.out).length;
+          dayLogsMap[log.date].entriesCount += inCount;
+          dayLogsMap[log.date].exitsCount += outCount;
+          if (inCount > 1) {
+            dayLogsMap[log.date].multiPassageEmployees++;
+          }
+        } else {
+          if (log.clock_in) dayLogsMap[log.date].entriesCount++;
+          if (log.clock_out) dayLogsMap[log.date].exitsCount++;
+        }
+
+        // Breaks / Pauses from attendance time_logs
+        let breaksArr = [];
+        if (Array.isArray(log.breaks)) {
+          breaksArr = log.breaks;
+        } else if (typeof log.breaks === 'string') {
+          try { breaksArr = JSON.parse(log.breaks); } catch (e) { breaksArr = []; }
+        }
+
+        if (breaksArr && breaksArr.length > 0) {
+          breaksArr.forEach(brk => {
+            if (!brk) return;
+            let durMin = 0;
+            if (brk.duration) {
+              durMin = Number(brk.duration) || 0;
+            } else if (brk.start && brk.end) {
+              const [sh, sm] = brk.start.split(':').map(Number);
+              const [eh, em] = brk.end.split(':').map(Number);
+              durMin = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+            }
+            if (durMin > 0) {
+              const bType = brk.type ? (brk.type.includes('dej') ? 'dejeuner' : brk.type.includes('gout') ? 'gouter' : brk.type.includes('cig') ? 'cigarette' : 'autre') : 'autre';
+              dayLogsMap[log.date].pauseMinutes += durMin;
+              dayLogsMap[log.date].pauseCount++;
+              dayLogsMap[log.date].pauseTypes[bType] = (dayLogsMap[log.date].pauseTypes[bType] || 0) + durMin;
+            }
+          });
+        }
+      }
+    });
+
+    // Populate pauses from production_time_logs
+    prodPauseLogs.forEach(log => {
+      const dStr = log.logged_at ? log.logged_at.slice(0, 10) : (log.start_time ? log.start_time.slice(0, 10) : '');
+      if (dayLogsMap[dStr]) {
+        const durMin = Math.round((log.duration_seconds || 0) / 60);
+        if (durMin > 0) {
+          const lType = log.log_type || '';
+          const category = lType.includes('dejeuner') ? 'dejeuner' : lType.includes('gouter') ? 'gouter' : lType.includes('cigarette') ? 'cigarette' : 'autre';
+          dayLogsMap[dStr].pauseMinutes += durMin;
+          dayLogsMap[dStr].pauseCount++;
+          dayLogsMap[dStr].pauseTypes[category] = (dayLogsMap[dStr].pauseTypes[category] || 0) + durMin;
         }
       }
     });
@@ -171,6 +263,7 @@ export async function GET(req) {
       dayLogsMap[item.date].on_leave = leaveCountOnDay;
       const nonPresent = Math.max(0, totalMembersCount - dayLogsMap[item.date].present);
       dayLogsMap[item.date].absent = nonPresent;
+      dayLogsMap[item.date].totalPassages = dayLogsMap[item.date].entriesCount + dayLogsMap[item.date].exitsCount;
     });
 
     // 7. Overall Summary Stats for the period
@@ -180,6 +273,28 @@ export async function GET(req) {
     let totalClockOuts = 0;
     let totalLeaveDays = 0;
     const leaveBreakdown = {};
+
+    let totalPauseMinutes = 0;
+    let totalPauseCount = 0;
+    const pauseBreakdown = { dejeuner: 0, gouter: 0, cigarette: 0, autre: 0 };
+
+    let totalFluxEntries = 0;
+    let totalFluxExits = 0;
+    let totalMultiPassages = 0;
+
+    dateList.forEach(item => {
+      const dayStats = dayLogsMap[item.date];
+      totalPauseMinutes += dayStats.pauseMinutes;
+      totalPauseCount += dayStats.pauseCount;
+      pauseBreakdown.dejeuner += dayStats.pauseTypes.dejeuner;
+      pauseBreakdown.gouter += dayStats.pauseTypes.gouter;
+      pauseBreakdown.cigarette += dayStats.pauseTypes.cigarette;
+      pauseBreakdown.autre += dayStats.pauseTypes.autre;
+
+      totalFluxEntries += dayStats.entriesCount;
+      totalFluxExits += dayStats.exitsCount;
+      totalMultiPassages += dayStats.multiPassageEmployees;
+    });
 
     filteredLogs.forEach(log => {
       if (log.clock_in) {
@@ -331,7 +446,41 @@ export async function GET(req) {
       };
     });
 
-    // 11. Today's snapshot stats (for quick indicators)
+    // 11. Format Pauses Chart Data
+    const pauseChartData = dateList.map(item => {
+      const stats = dayLogsMap[item.date];
+      return {
+        date: item.date,
+        label: item.label,
+        dayName: item.dayName,
+        dayNum: item.dayNum,
+        isWeekend: item.isWeekend,
+        dejeuner: stats.pauseTypes.dejeuner,
+        gouter: stats.pauseTypes.gouter,
+        cigarette: stats.pauseTypes.cigarette,
+        autre: stats.pauseTypes.autre,
+        totalMinutes: stats.pauseMinutes,
+        count: stats.pauseCount
+      };
+    });
+
+    // 12. Format Flux Entrées/Sorties Chart Data
+    const fluxChartData = dateList.map(item => {
+      const stats = dayLogsMap[item.date];
+      return {
+        date: item.date,
+        label: item.label,
+        dayName: item.dayName,
+        dayNum: item.dayNum,
+        isWeekend: item.isWeekend,
+        entries: stats.entriesCount,
+        exits: stats.exitsCount,
+        totalPassages: stats.totalPassages,
+        multiPassages: stats.multiPassageEmployees
+      };
+    });
+
+    // 13. Today's snapshot stats
     const todayStats = dayLogsMap[todayStr] || {
       present: 0,
       late: 0,
@@ -356,6 +505,26 @@ export async function GET(req) {
         punctualityRate: overallPunctualityRate,
         totalLeaveDays: parseFloat(totalLeaveDays.toFixed(1)),
         avgPresentPerDay: avgPresentPerWorkingDay
+      },
+      pauses: {
+        summary: {
+          totalMinutes: totalPauseMinutes,
+          totalHours: (totalPauseMinutes / 60).toFixed(1),
+          avgMinutesPerDay: workingDaysCount > 0 ? Math.round(totalPauseMinutes / workingDaysCount) : 0,
+          totalCount: totalPauseCount,
+          breakdown: pauseBreakdown
+        },
+        chartData: pauseChartData
+      },
+      flux: {
+        summary: {
+          totalEntries: totalFluxEntries,
+          totalExits: totalFluxExits,
+          totalPassages: totalFluxEntries + totalFluxExits,
+          avgPassagesPerDay: workingDaysCount > 0 ? ((totalFluxEntries + totalFluxExits) / workingDaysCount).toFixed(1) : '0',
+          totalMultiPassages
+        },
+        chartData: fluxChartData
       },
       today: {
         date: todayStr,

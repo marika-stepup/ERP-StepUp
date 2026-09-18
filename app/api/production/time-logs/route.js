@@ -92,14 +92,16 @@ export async function POST(req) {
     const body = await req.json();
     const { task_id, employee_id, employee_name, duration_seconds, log_type, logged_at, start_time, end_time } = body;
 
-    if (!task_id || !employee_id || !employee_name) {
-      return NextResponse.json({ error: 'Champs requis manquants (task_id, employee_id, employee_name).' }, { status: 400 });
+    const isPauseOrInterruption = log_type?.startsWith('pause') || log_type?.startsWith('interruption');
+
+    if ((!task_id && !isPauseOrInterruption) || !employee_id || !employee_name) {
+      return NextResponse.json({ error: 'Champs requis manquants (employee_id, employee_name, task_id).' }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
 
     const insertData = {
-      task_id,
+      task_id: task_id || null,
       employee_id,
       employee_name,
       duration_seconds: Number(duration_seconds) || 0,
@@ -128,7 +130,7 @@ export async function POST(req) {
     syncProductionTimeLog(newLog.id);
 
     // If task was 'Non démarré' and log_type is 'production', update status to 'En cours'
-    if (log_type === 'production') {
+    if (log_type === 'production' && task_id) {
       const { data: taskData } = await supabase
         .from('production_tasks')
         .select('status')
